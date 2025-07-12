@@ -129,11 +129,6 @@ TEST (unchecked, simple)
 TEST (unchecked, multiple)
 {
 	nano::test::system system{};
-	if (nano::rocksdb_config::using_rocksdb_in_tests ())
-	{
-		// Don't test this in rocksdb mode
-		GTEST_SKIP ();
-	}
 	nano::unchecked_map unchecked{ max_unchecked_blocks, system.stats, false };
 	nano::block_builder builder;
 	auto block = builder
