@@ -319,11 +319,7 @@ int main (int argc, char * const * argv)
 						data_path = nano::working_path ();
 					}
 					nano::node_flags flags;
-					auto flags_ec = nano::update_flags (flags, vm);
-					if (flags_ec)
-					{
-						throw std::runtime_error (flags_ec.message ());
-					}
+					nano::update_flags (flags, vm);
 					result = daemon.run_wallet (application, argc, argv, data_path, flags);
 				}
 				catch (std::exception const & e)
