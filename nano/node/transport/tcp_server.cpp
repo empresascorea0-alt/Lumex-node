@@ -57,14 +57,16 @@ auto nano::transport::tcp_server::start_impl () -> asio::awaitable<void>
 	try
 	{
 		auto handshake_result = co_await perform_handshake ();
-		if (handshake_result != process_result::progress)
+
+		// Only realtime mode is supported now
+		if (handshake_result == handshake_status::realtime)
 		{
-			node.stats.inc (nano::stat::type::tcp_server, nano::stat::detail::handshake_abort);
-			node.logger.debug (nano::log::type::tcp_server, "Handshake aborted: {}", get_remote_endpoint ());
+			co_await run_realtime ();
 		}
 		else
 		{
-			co_await run_realtime ();
+			node.stats.inc (nano::stat::type::tcp_server, nano::stat::detail::handshake_abort);
+			node.logger.debug (nano::log::type::tcp_server, "Handshake aborted: {}", get_remote_endpoint ());
 		}
 	}
 	catch (boost::system::system_error const & ex)
@@ -87,7 +89,7 @@ bool nano::transport::tcp_server::alive () const
 	return socket->alive ();
 }
 
-auto nano::transport::tcp_server::perform_handshake () -> asio::awaitable<process_result>
+auto nano::transport::tcp_server::perform_handshake () -> asio::awaitable<handshake_status>
 {
 	debug_assert (strand.running_in_this_thread ());
 	debug_assert (get_type () == nano::transport::socket_type::undefined);
@@ -120,7 +122,7 @@ auto nano::transport::tcp_server::perform_handshake () -> asio::awaitable<proces
 			to_string (message_status),
 			get_remote_endpoint ());
 
-			co_return process_result::abort;
+			co_return handshake_status::abort;
 		}
 
 		handshake_message_visitor handshake_visitor{};
@@ -137,11 +139,11 @@ auto nano::transport::tcp_server::perform_handshake () -> asio::awaitable<proces
 			case handshake_status::abort:
 			case handshake_status::bootstrap: // Legacy bootstrap is no longer supported
 			{
-				co_return process_result::abort;
+				co_return handshake_status::abort;
 			}
 			case handshake_status::realtime:
 			{
-				co_return process_result::progress; // Continue receiving new messages
+				co_return handshake_status::realtime; // Switch to realtime mode
 			}
 			case handshake_status::handshake:
 			{
@@ -153,7 +155,8 @@ auto nano::transport::tcp_server::perform_handshake () -> asio::awaitable<proces
 	// Failed to complete handshake, abort
 	node.stats.inc (nano::stat::type::tcp_server, nano::stat::detail::handshake_failed);
 	node.logger.debug (nano::log::type::tcp_server, "Failed to complete handshake ({})", get_remote_endpoint ());
-	co_return process_result::abort;
+
+	co_return handshake_status::abort;
 }
 
 auto nano::transport::tcp_server::run_realtime () -> asio::awaitable<void>
@@ -191,8 +194,6 @@ auto nano::transport::tcp_server::run_realtime () -> asio::awaitable<void>
 		{
 			debug_assert (status != nano::deserialize_message_status::success);
 
-			node.stats.inc (nano::stat::type::tcp_server_error, to_stat_detail (status));
-
 			switch (status)
 			{
 				// Avoid too much noise about `duplicate_publish_message` errors
@@ -221,6 +222,23 @@ auto nano::transport::tcp_server::run_realtime () -> asio::awaitable<void>
 }
 
 auto nano::transport::tcp_server::receive_message () -> asio::awaitable<nano::deserialize_message_result>
+{
+	auto result = co_await receive_message_impl ();
+
+	auto const & [message, status] = result;
+	if (message)
+	{
+		node.stats.inc (nano::stat::type::tcp_server_message, to_stat_detail (message->type ()), nano::stat::dir::in);
+	}
+	else
+	{
+		node.stats.inc (nano::stat::type::tcp_server_message_error, to_stat_detail (status), nano::stat::dir::in);
+	}
+
+	co_return result;
+}
+
+auto nano::transport::tcp_server::receive_message_impl () -> asio::awaitable<nano::deserialize_message_result>
 {
 	debug_assert (strand.running_in_this_thread ());
 
@@ -262,12 +280,6 @@ auto nano::transport::tcp_server::receive_message () -> asio::awaitable<nano::de
 	&node.network.filter,
 	&node.block_uniquer,
 	&node.vote_uniquer);
-
-	auto const & [message, status] = result;
-	if (message)
-	{
-		node.stats.inc (nano::stat::type::tcp_server_message, to_stat_detail (message->type ()), nano::stat::dir::in);
-	}
 
 	co_return result;
 }

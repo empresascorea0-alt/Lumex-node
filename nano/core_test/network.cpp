@@ -310,7 +310,7 @@ TEST (network, send_insufficient_work)
 	nano::publish publish{ nano::dev::network_params.network, block };
 	tcp_channel->send (publish, nano::transport::traffic_type::test);
 
-	ASSERT_TIMELY_EQ (5s, 1, node2.stats.count (nano::stat::type::tcp_server_error, nano::stat::detail::insufficient_work));
+	ASSERT_TIMELY_EQ (5s, 1, node2.stats.count (nano::stat::type::tcp_server_message_error, nano::stat::detail::insufficient_work));
 }
 
 TEST (receivable_processor, confirm_insufficient_pos)
@@ -922,7 +922,7 @@ TEST (network, filter_invalid_network_bytes)
 	const_cast<nano::networks &> (keepalive.header.network) = nano::networks::invalid;
 	channel->send (keepalive, nano::transport::traffic_type::test);
 
-	ASSERT_TIMELY_EQ (5s, 1, node1.stats.count (nano::stat::type::tcp_server_error, nano::stat::detail::invalid_network));
+	ASSERT_TIMELY_EQ (5s, 1, node1.stats.count (nano::stat::type::tcp_server_message_error, nano::stat::detail::invalid_network));
 }
 
 // Ensure the network filters messages with the incorrect minimum version
@@ -941,7 +941,7 @@ TEST (network, filter_invalid_version_using)
 	const_cast<uint8_t &> (keepalive.header.version_using) = nano::dev::network_params.network.protocol_version_min - 1;
 	channel->send (keepalive, nano::transport::traffic_type::test);
 
-	ASSERT_TIMELY_EQ (5s, 1, node1.stats.count (nano::stat::type::tcp_server_error, nano::stat::detail::outdated_version));
+	ASSERT_TIMELY_EQ (5s, 1, node1.stats.count (nano::stat::type::tcp_server_message_error, nano::stat::detail::outdated_version));
 }
 
 TEST (network, fill_keepalive_self)

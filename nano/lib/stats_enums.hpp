@@ -39,6 +39,7 @@ enum class type
 	tcp_socket_timeout,
 	tcp_server,
 	tcp_server_message,
+	tcp_server_message_error,
 	tcp_server_read,
 	tcp_server_error,
 	tcp_channel,

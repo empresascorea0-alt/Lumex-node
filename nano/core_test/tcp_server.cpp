@@ -10,6 +10,7 @@ using namespace std::chrono_literals;
 
 /*
  * Test case for valid handshake to ensure normal operation still works
+ * TODO: This is very non tcp_server specific, should be rewritten
  */
 TEST (tcp_server, handshake_success)
 {
@@ -171,4 +172,197 @@ TEST (tcp_server, handshake_invalid_message_type_aborts)
 
 	// Verify the handshake was aborted
 	ASSERT_TIMELY_EQ (5s, node->stats.count (nano::stat::type::tcp_server, nano::stat::detail::handshake_abort), 1);
+}
+
+/*
+ * Test that a node rejects a connection from itself (same node ID)
+ */
+TEST (tcp_server, handshake_self_connection_rejected)
+{
+	nano::test::system system;
+	auto node = system.add_node ();
+
+	auto client_socket = std::make_shared<nano::transport::tcp_socket> (*node);
+
+	// Connect to the node
+	auto ec = client_socket->blocking_connect (node->network.endpoint ());
+	ASSERT_FALSE (ec);
+
+	ASSERT_TIMELY_EQ (5s, node->tcp_listener.all_sockets ().size (), 1);
+
+	// Create a handshake response claiming to be from the same node
+	nano::node_id_handshake::query_payload query{ nano::random_pool::generate<nano::uint256_union> () };
+
+	nano::node_id_handshake::response_payload response;
+	response.node_id = node->node_id.pub; // Use our own node ID
+	response.v2 = nano::node_id_handshake::response_payload::v2_payload{
+		nano::random_pool::generate<nano::uint256_union> (), // salt
+		node->network_params.ledger.genesis->hash () // genesis
+	};
+	response.sign (query.cookie, node->node_id); // Sign with our own key
+
+	nano::node_id_handshake handshake_msg (node->network_params.network, query, response);
+
+	// Send the handshake with our own node ID
+	auto shared_const_buffer = handshake_msg.to_shared_const_buffer ();
+	auto [write_ec, bytes_written] = client_socket->blocking_write (shared_const_buffer, shared_const_buffer.size ());
+	ASSERT_FALSE (write_ec);
+	ASSERT_EQ (bytes_written, shared_const_buffer.size ());
+
+	// The server should reject the connection due to self-connection
+	ASSERT_TIMELY (5s, node->tcp_listener.all_sockets ().empty ());
+
+	// Verify the handshake was rejected
+	ASSERT_TIMELY_EQ (5s, node->stats.count (nano::stat::type::handshake, nano::stat::detail::invalid_node_id), 1);
+}
+
+/*
+ * Test that multiple handshake queries are rejected (only one query allowed per connection)
+ */
+TEST (tcp_server, handshake_multiple_queries_rejected)
+{
+	nano::test::system system;
+	auto node = system.add_node ();
+
+	auto client_socket = std::make_shared<nano::transport::tcp_socket> (*node);
+
+	// Connect to node1
+	auto ec = client_socket->blocking_connect (node->network.endpoint ());
+	ASSERT_FALSE (ec);
+
+	ASSERT_TIMELY_EQ (5s, node->tcp_listener.all_sockets ().size (), 1);
+
+	// Send first handshake query
+	nano::node_id_handshake::query_payload query1{ nano::random_pool::generate<nano::uint256_union> () };
+	nano::node_id_handshake handshake1 (node->network_params.network, query1);
+
+	auto buffer1 = handshake1.to_shared_const_buffer ();
+	auto [write_ec1, bytes_written1] = client_socket->blocking_write (buffer1, buffer1.size ());
+	ASSERT_FALSE (write_ec1);
+	ASSERT_EQ (bytes_written1, buffer1.size ());
+
+	// Send second handshake query (should be rejected)
+	nano::node_id_handshake::query_payload query2{ nano::random_pool::generate<nano::uint256_union> () };
+	nano::node_id_handshake handshake2 (node->network_params.network, query2);
+
+	auto buffer2 = handshake2.to_shared_const_buffer ();
+	auto [write_ec2, bytes_written2] = client_socket->blocking_write (buffer2, buffer2.size ());
+	ASSERT_FALSE (write_ec2);
+	ASSERT_EQ (bytes_written2, buffer2.size ());
+
+	// The server should abort the connection due to multiple queries
+	ASSERT_TIMELY (5s, node->tcp_listener.all_sockets ().empty ());
+
+	// Verify the handshake was aborted due to multiple queries
+	ASSERT_TIMELY_EQ (5s, node->stats.count (nano::stat::type::tcp_server, nano::stat::detail::handshake_error), 1);
+}
+
+/*
+ * Test that messages with outdated protocol version are rejected
+ */
+TEST (tcp_server, handshake_outdated_protocol_version)
+{
+	nano::test::system system;
+	auto node = system.add_node ();
+
+	auto client_socket = std::make_shared<nano::transport::tcp_socket> (*node);
+
+	// Connect to the node
+	auto ec = client_socket->blocking_connect (node->network.endpoint ());
+	ASSERT_FALSE (ec);
+
+	ASSERT_TIMELY_EQ (5s, node->tcp_listener.all_sockets ().size (), 1);
+
+	// Create a handshake message with outdated protocol version
+	std::vector<uint8_t> handshake_data;
+
+	nano::message_header header (nano::dev::network_params.network, nano::message_type::node_id_handshake);
+	header.version_using = node->network_params.network.protocol_version_min - 1; // Use version below minimum
+	header.version_min = node->network_params.network.protocol_version_min - 1;
+	header.extensions = 0;
+
+	// Serialize the header
+	{
+		nano::vectorstream stream (handshake_data);
+		header.serialize (stream);
+	}
+
+	// Add a basic handshake payload
+	nano::node_id_handshake::query_payload query{ nano::random_pool::generate<nano::uint256_union> () };
+	nano::node_id_handshake handshake_msg (node->network_params.network, query);
+	{
+		nano::vectorstream stream (handshake_data);
+		handshake_msg.serialize (stream);
+	}
+
+	// Send the handshake with outdated protocol version
+	auto buffer = std::make_shared<std::vector<uint8_t>> (handshake_data);
+	auto [write_ec, bytes_written] = client_socket->blocking_write (buffer, handshake_data.size ());
+	ASSERT_FALSE (write_ec);
+	ASSERT_EQ (bytes_written, handshake_data.size ());
+
+	// The server should reject the connection due to outdated protocol version
+	ASSERT_TIMELY (5s, node->tcp_listener.all_sockets ().empty ());
+
+	// Verify the handshake was aborted
+	ASSERT_TIMELY_EQ (5s, node->stats.count (nano::stat::type::tcp_server, nano::stat::detail::handshake_abort), 1);
+	ASSERT_TIMELY_EQ (5s, node->stats.count (nano::stat::type::tcp_server_message_error, nano::stat::detail::outdated_version), 1);
+}
+
+/*
+ * Test that messages with wrong network ID are rejected
+ */
+TEST (tcp_server, handshake_wrong_network_id)
+{
+	nano::test::system system;
+	auto node = system.add_node ();
+
+	auto client_socket = std::make_shared<nano::transport::tcp_socket> (*node);
+
+	// Connect to the node
+	auto ec = client_socket->blocking_connect (node->network.endpoint ());
+	ASSERT_FALSE (ec);
+
+	ASSERT_TIMELY_EQ (5s, node->tcp_listener.all_sockets ().size (), 1);
+
+	// Create a handshake message with wrong network ID
+	std::vector<uint8_t> handshake_data;
+
+	// Use a different network ID - create a different network_constants
+	nano::networks wrong_network = (node->network_params.network.current_network == nano::networks::nano_live_network)
+	? nano::networks::nano_beta_network
+	: nano::networks::nano_live_network;
+	nano::network_constants wrong_network_constants (nano::work_thresholds::publish_dev, wrong_network);
+
+	nano::message_header header (wrong_network_constants, nano::message_type::node_id_handshake);
+	header.version_using = node->network_params.network.protocol_version;
+	header.version_min = node->network_params.network.protocol_version_min;
+	header.extensions = 0;
+
+	// Serialize the header
+	{
+		nano::vectorstream stream (handshake_data);
+		header.serialize (stream);
+	}
+
+	// Add a basic handshake payload
+	nano::node_id_handshake::query_payload query{ nano::random_pool::generate<nano::uint256_union> () };
+	nano::node_id_handshake handshake_msg (node->network_params.network, query);
+	{
+		nano::vectorstream stream (handshake_data);
+		handshake_msg.serialize (stream);
+	}
+
+	// Send the handshake with wrong network ID
+	auto buffer = std::make_shared<std::vector<uint8_t>> (handshake_data);
+	auto [write_ec, bytes_written] = client_socket->blocking_write (buffer, handshake_data.size ());
+	ASSERT_FALSE (write_ec);
+	ASSERT_EQ (bytes_written, handshake_data.size ());
+
+	// The server should reject the connection due to wrong network ID
+	ASSERT_TIMELY (5s, node->tcp_listener.all_sockets ().empty ());
+
+	// Verify the handshake was aborted
+	ASSERT_TIMELY_EQ (5s, node->stats.count (nano::stat::type::tcp_server, nano::stat::detail::handshake_abort), 1);
+	ASSERT_TIMELY_EQ (5s, node->stats.count (nano::stat::type::tcp_server_message_error, nano::stat::detail::invalid_network), 1);
 }

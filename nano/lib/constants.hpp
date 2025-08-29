@@ -76,7 +76,7 @@ class network_constants
 	static constexpr std::chrono::seconds default_cleanup_period = std::chrono::seconds (60);
 
 public:
-	network_constants (nano::work_thresholds & work_, nano::networks network_a) :
+	network_constants (nano::work_thresholds const & work_, nano::networks network_a) :
 		current_network (network_a),
 		work (work_),
 		principal_weight_factor (1000), // 0.1% A representative is classified as principal based on its weight and this factor
@@ -140,7 +140,7 @@ public:
 
 	/** The network this param object represents. This may differ from the global active network; this is needed for certain --debug... commands */
 	nano::networks current_network{ nano::network_constants::active_network };
-	nano::work_thresholds & work;
+	nano::work_thresholds const & work;
 
 	unsigned principal_weight_factor;
 	uint16_t default_node_port;
