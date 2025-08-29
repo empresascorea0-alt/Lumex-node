@@ -39,20 +39,6 @@ public:
 	}
 
 private:
-	void stop ();
-
-	enum class process_result
-	{
-		abort,
-		progress,
-	};
-
-	asio::awaitable<void> start_impl ();
-	asio::awaitable<process_result> perform_handshake ();
-	asio::awaitable<void> run_realtime ();
-	asio::awaitable<nano::deserialize_message_result> receive_message ();
-	asio::awaitable<nano::buffer_view> read_socket (size_t size) const;
-
 	enum class handshake_status
 	{
 		abort,
@@ -60,6 +46,15 @@ private:
 		realtime,
 		bootstrap,
 	};
+
+	void stop ();
+
+	asio::awaitable<void> start_impl ();
+	asio::awaitable<handshake_status> perform_handshake ();
+	asio::awaitable<void> run_realtime ();
+	asio::awaitable<nano::deserialize_message_result> receive_message ();
+	asio::awaitable<nano::deserialize_message_result> receive_message_impl ();
+	asio::awaitable<nano::buffer_view> read_socket (size_t size) const;
 
 	asio::awaitable<handshake_status> process_handshake (nano::node_id_handshake const & message);
 	asio::awaitable<void> send_handshake_response (nano::node_id_handshake::query_payload const & query, bool v2);
