@@ -80,6 +80,9 @@ public:
 	// Notify this container about a new block (potential fork)
 	bool publish (std::shared_ptr<nano::block> const &);
 
+	// Trigger an immediate election update (e.g. after it is confirmed)
+	bool trigger (nano::qualified_root const &);
+
 	/// Is the root of this block in the roots container
 	bool active (nano::block const &) const;
 	bool active (nano::qualified_root const &) const;
@@ -111,13 +114,20 @@ public: // Events
 	nano::observer_set<> vacancy_updated;
 
 private:
+	bool predicate () const;
 	void run ();
 	void tick_elections (nano::unique_lock<nano::mutex> &);
 
 	// Erase all blocks from active and, if not confirmed, clear digests from network filters
 	void erase_election (nano::unique_lock<nano::mutex> & lock_a, std::shared_ptr<nano::election>);
 
-	using block_cemented_result = std::pair<nano::election_status, std::vector<nano::vote_with_weight_info>>;
+	struct block_cemented_result
+	{
+		std::shared_ptr<nano::election> election;
+		nano::election_status status;
+		std::vector<nano::vote_with_weight_info> votes;
+	};
+
 	block_cemented_result block_cemented (std::shared_ptr<nano::block> const & block, nano::block_hash const & confirmation_root, std::shared_ptr<nano::election> const & source_election);
 	void notify_observers (nano::secure::transaction const &, nano::election_status const & status, std::vector<nano::vote_with_weight_info> const & votes) const;
 
@@ -152,22 +162,8 @@ private:
 	nano::interval bootstrap_stale_interval;
 	nano::interval warning_interval;
 
-	friend class election;
-
 public: // Tests
 	void clear ();
-
-	friend class node_fork_storm_Test;
-	friend class system_block_sequence_Test;
-	friend class node_mass_block_new_Test;
-	friend class active_elections_vote_replays_Test;
-	friend class frontiers_confirmation_prioritize_frontiers_Test;
-	friend class frontiers_confirmation_prioritize_frontiers_max_optimistic_elections_Test;
-	friend class confirmation_height_prioritize_frontiers_overwrite_Test;
-	friend class active_elections_confirmation_consistency_Test;
-	friend class node_deferred_dependent_elections_Test;
-	friend class active_elections_pessimistic_elections_Test;
-	friend class frontiers_confirmation_expired_optimistic_elections_removal_Test;
 };
 
 nano::stat::type to_stat_type (nano::election_state);
