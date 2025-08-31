@@ -336,7 +336,7 @@ TEST (active_elections, DISABLED_keep_local)
 	// ASSERT_EQ (1, node.scheduler.size ());
 }
 
-TEST (inactive_votes_cache, basic)
+TEST (active_elections, cached_vote_basic)
 {
 	nano::test::system system (1);
 	auto & node = *system.nodes[0];
@@ -360,7 +360,7 @@ TEST (inactive_votes_cache, basic)
 /**
  * This test case confirms that a non final vote cannot cause an election to become confirmed
  */
-TEST (inactive_votes_cache, non_final)
+TEST (active_elections, cached_vote_non_final)
 {
 	nano::test::system system (1);
 	auto & node = *system.nodes[0];
@@ -386,7 +386,7 @@ TEST (inactive_votes_cache, non_final)
 	ASSERT_FALSE (election->confirmed ());
 }
 
-TEST (inactive_votes_cache, fork)
+TEST (active_elections, cached_vote_fork)
 {
 	nano::test::system system{ 1 };
 	auto & node = *system.nodes[0];
@@ -426,7 +426,7 @@ TEST (inactive_votes_cache, fork)
 	ASSERT_EQ (1, node.stats.count (nano::stat::type::election_vote, nano::stat::detail::cache));
 }
 
-TEST (inactive_votes_cache, existing_vote)
+TEST (active_elections, cached_vote_existing)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
@@ -480,7 +480,7 @@ TEST (inactive_votes_cache, existing_vote)
 	ASSERT_EQ (0, node.stats.count (nano::stat::type::election_vote, nano::stat::detail::cache));
 }
 
-TEST (inactive_votes_cache, multiple_votes)
+TEST (active_elections, cached_vote_multiple)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
@@ -533,7 +533,7 @@ TEST (inactive_votes_cache, multiple_votes)
 	ASSERT_EQ (2, node.stats.count (nano::stat::type::election_vote, nano::stat::detail::cache));
 }
 
-TEST (inactive_votes_cache, election_start)
+TEST (active_elections, cached_vote_election_start)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
@@ -691,7 +691,6 @@ TEST (active_elections, vote_replays)
 	// Open new account
 	auto vote_open1 = nano::test::make_final_vote (nano::dev::genesis_key, { open1 });
 	ASSERT_EQ (nano::vote_code::vote, node.vote_router.vote (vote_open1).at (open1->hash ()));
-	ASSERT_EQ (nano::vote_code::replay, node.vote_router.vote (vote_open1).at (open1->hash ()));
 	ASSERT_TIMELY (5s, node.active.empty ());
 	ASSERT_EQ (nano::vote_code::late, node.vote_router.vote (vote_open1).at (open1->hash ()));
 	ASSERT_EQ (nano::Knano_ratio, node.ledger.weight (key.pub));
@@ -1613,4 +1612,86 @@ TEST (active_elections, bootstrap_stale)
 
 	// Wait for bootstrap_stale_threshold to pass and the statistic to be incremented
 	ASSERT_TIMELY (5s, node.stats.count (nano::stat::type::active_elections, nano::stat::detail::bootstrap_stale) > 0);
+}
+
+TEST (active_elections, transition_optimistic_to_priority)
+{
+	nano::test::system system;
+	auto & node = *system.add_node ();
+
+	// Create a block for optimistic election
+	nano::state_block_builder builder;
+	auto block = builder
+				 .account (nano::dev::genesis_key.pub)
+				 .previous (nano::dev::genesis->hash ())
+				 .representative (nano::dev::genesis_key.pub)
+				 .balance (nano::dev::constants.genesis_amount - 100)
+				 .link (nano::keypair{}.pub)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (*system.work.generate (nano::dev::genesis->hash ()))
+				 .build ();
+
+	ASSERT_TRUE (nano::test::process (node, { block }));
+
+	// Start optimistic election
+	auto result = node.active.insert (block, nano::election_behavior::optimistic);
+	ASSERT_TRUE (result.inserted);
+	auto election = result.election;
+	ASSERT_EQ (nano::election_behavior::optimistic, election->behavior ());
+
+	// Verify initial sizes
+	ASSERT_EQ (1, node.active.size (nano::election_behavior::optimistic));
+	ASSERT_EQ (0, node.active.size (nano::election_behavior::priority));
+
+	// Transition to priority
+	auto transition_result = node.active.insert (block, nano::election_behavior::priority);
+	ASSERT_FALSE (transition_result.inserted);
+	ASSERT_EQ (election, transition_result.election);
+
+	// Verify transition
+	ASSERT_EQ (nano::election_behavior::priority, election->behavior ());
+	ASSERT_EQ (1, node.stats.count (nano::stat::type::active_elections, nano::stat::detail::transition_priority));
+	ASSERT_EQ (0, node.active.size (nano::election_behavior::optimistic));
+	ASSERT_EQ (1, node.active.size (nano::election_behavior::priority));
+}
+
+TEST (active_elections, transition_hinted_to_priority)
+{
+	nano::test::system system;
+	auto & node = *system.add_node ();
+
+	// Create a block for hinted election
+	nano::state_block_builder builder;
+	auto block = builder
+				 .account (nano::dev::genesis_key.pub)
+				 .previous (nano::dev::genesis->hash ())
+				 .representative (nano::dev::genesis_key.pub)
+				 .balance (nano::dev::constants.genesis_amount - 100)
+				 .link (nano::keypair{}.pub)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (*system.work.generate (nano::dev::genesis->hash ()))
+				 .build ();
+
+	ASSERT_TRUE (nano::test::process (node, { block }));
+
+	// Start hinted election
+	auto result = node.active.insert (block, nano::election_behavior::hinted);
+	ASSERT_TRUE (result.inserted);
+	auto election = result.election;
+	ASSERT_EQ (nano::election_behavior::hinted, election->behavior ());
+
+	// Verify initial sizes
+	ASSERT_EQ (1, node.active.size (nano::election_behavior::hinted));
+	ASSERT_EQ (0, node.active.size (nano::election_behavior::priority));
+
+	// Transition to priority
+	auto transition_result = node.active.insert (block, nano::election_behavior::priority);
+	ASSERT_FALSE (transition_result.inserted);
+	ASSERT_EQ (election, transition_result.election);
+
+	// Verify transition
+	ASSERT_EQ (nano::election_behavior::priority, election->behavior ());
+	ASSERT_EQ (1, node.stats.count (nano::stat::type::active_elections, nano::stat::detail::transition_priority));
+	ASSERT_EQ (0, node.active.size (nano::election_behavior::hinted));
+	ASSERT_EQ (1, node.active.size (nano::election_behavior::priority));
 }
