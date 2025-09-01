@@ -33,10 +33,13 @@ public:
 	bool enable{ true };
 
 	/** Minimum difference between confirmation frontier and account frontier to become a candidate for optimistic confirmation */
-	uint64_t gap_threshold{ 32 };
+	uint64_t gap_threshold{ 16 };
 
 	/** Maximum number of candidates stored in memory */
 	std::size_t max_size{ 1024 * 4 };
+
+	/** How much to delay activation of optimistic elections to avoid interfering with election scheduler */
+	std::chrono::milliseconds activation_delay{ 1s };
 };
 
 class optimistic final

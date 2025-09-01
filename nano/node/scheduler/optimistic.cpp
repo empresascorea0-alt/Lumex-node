@@ -126,7 +126,7 @@ bool nano::scheduler::optimistic::predicate () const
 	auto candidate = candidates.get<tag_unconfirmed_height> ().begin ();
 	debug_assert (candidate != candidates.get<tag_unconfirmed_height> ().end ());
 
-	return elapsed (candidate->timestamp, network_constants.optimistic_activation_delay);
+	return elapsed (candidate->timestamp, config.activation_delay);
 }
 
 void nano::scheduler::optimistic::run ()
@@ -136,7 +136,7 @@ void nano::scheduler::optimistic::run ()
 	{
 		stats.inc (nano::stat::type::optimistic_scheduler, nano::stat::detail::loop);
 
-		condition.wait_for (lock, network_constants.optimistic_activation_delay / 2, [this] () {
+		condition.wait_for (lock, config.activation_delay / 2, [this] () {
 			return stopped || predicate ();
 		});
 
@@ -204,6 +204,7 @@ nano::error nano::scheduler::optimistic_config::deserialize (nano::tomlconfig & 
 	toml.get ("enable", enable);
 	toml.get ("gap_threshold", gap_threshold);
 	toml.get ("max_size", max_size);
+	toml.get_duration ("activation_delay", activation_delay);
 
 	return toml.get_error ();
 }
@@ -213,6 +214,7 @@ nano::error nano::scheduler::optimistic_config::serialize (nano::tomlconfig & to
 	toml.put ("enable", enable, "Enable or disable optimistic elections\ntype:bool");
 	toml.put ("gap_threshold", gap_threshold, "Minimum difference between confirmation frontier and account frontier to become a candidate for optimistic confirmation\ntype:uint64");
 	toml.put ("max_size", max_size, "Maximum number of candidates stored in memory\ntype:uint64");
+	toml.put ("activation_delay", activation_delay.count (), "How much to delay activation of optimistic elections to avoid interfering with election scheduler\ntype:milliseconds");
 
 	return toml.get_error ();
 }
