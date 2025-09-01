@@ -72,34 +72,42 @@ bool nano::scheduler::optimistic::activate_predicate (const nano::account_info &
 
 bool nano::scheduler::optimistic::activate (const nano::account & account, const nano::account_info & account_info, const nano::confirmation_height_info & conf_info)
 {
+	debug_assert (account_info.block_count >= conf_info.height);
+
 	if (!config.enable)
 	{
 		return false;
 	}
 
-	debug_assert (account_info.block_count >= conf_info.height);
+	bool activated = false;
+
 	if (activate_predicate (account_info, conf_info))
 	{
+		nano::lock_guard<nano::mutex> lock{ mutex };
+
+		// Assume gap_threshold for accounts with nothing confirmed
+		auto const unconfirmed_height = std::max (account_info.block_count - conf_info.height, config.gap_threshold);
+
+		auto [it, inserted] = candidates.push_back ({ account, nano::clock::now (), unconfirmed_height });
+
+		stats.inc (nano::stat::type::optimistic_scheduler, inserted ? nano::stat::detail::activated : nano::stat::detail::duplicate);
+
+		// Limit candidates container size
+		if (candidates.size () > config.max_size)
 		{
-			nano::lock_guard<nano::mutex> lock{ mutex };
-
-			// Prevent duplicate candidate accounts
-			if (candidates.get<tag_account> ().contains (account))
-			{
-				return false; // Not activated
-			}
-			// Limit candidates container size
-			if (candidates.size () >= config.max_size)
-			{
-				return false; // Not activated
-			}
-
-			stats.inc (nano::stat::type::optimistic_scheduler, nano::stat::detail::activated);
-			candidates.push_back ({ account, nano::clock::now () });
+			// Remove oldest candidate
+			candidates.pop_front ();
 		}
-		return true; // Activated
+
+		activated = inserted;
 	}
-	return false; // Not activated
+
+	if (activated)
+	{
+		condition.notify_all ();
+	}
+
+	return activated;
 }
 
 bool nano::scheduler::optimistic::predicate () const
@@ -115,9 +123,10 @@ bool nano::scheduler::optimistic::predicate () const
 		return false;
 	}
 
-	auto candidate = candidates.front ();
-	bool result = nano::elapsed (candidate.timestamp, network_constants.optimistic_activation_delay);
-	return result;
+	auto candidate = candidates.get<tag_unconfirmed_height> ().begin ();
+	debug_assert (candidate != candidates.get<tag_unconfirmed_height> ().end ());
+
+	return elapsed (candidate->timestamp, network_constants.optimistic_activation_delay);
 }
 
 void nano::scheduler::optimistic::run ()
@@ -127,27 +136,36 @@ void nano::scheduler::optimistic::run ()
 	{
 		stats.inc (nano::stat::type::optimistic_scheduler, nano::stat::detail::loop);
 
-		if (predicate ())
-		{
-			auto transaction = ledger.tx_begin_read ();
-
-			while (predicate ())
-			{
-				debug_assert (!candidates.empty ());
-				auto candidate = candidates.front ();
-				candidates.pop_front ();
-
-				lock.unlock ();
-
-				run_one (transaction, candidate);
-
-				lock.lock ();
-			}
-		}
-
 		condition.wait_for (lock, network_constants.optimistic_activation_delay / 2, [this] () {
 			return stopped || predicate ();
 		});
+
+		if (stopped)
+		{
+			return;
+		}
+
+		lock.unlock ();
+
+		// Acquire transaction outside of the lock
+		auto transaction = ledger.tx_begin_read ();
+
+		lock.lock ();
+
+		while (predicate () && !stopped)
+		{
+			debug_assert (!candidates.empty ());
+			auto & height_index = candidates.get<tag_unconfirmed_height> ();
+			auto candidate = *height_index.begin ();
+			height_index.erase (height_index.begin ());
+
+			lock.unlock ();
+
+			transaction.refresh_if_needed ();
+			run_one (transaction, candidate);
+
+			lock.lock ();
+		}
 	}
 }
 
@@ -160,7 +178,7 @@ void nano::scheduler::optimistic::run_one (secure::transaction const & transacti
 		if (!node.block_confirmed_or_being_confirmed (transaction, block->hash ()))
 		{
 			// Try to insert it into AEC
-			// We check for AEC vacancy inside our predicate
+			// We check for AEC vacancy inside the predicate
 			auto result = node.active.insert (block, nano::election_behavior::optimistic);
 
 			stats.inc (nano::stat::type::optimistic_scheduler, result.inserted ? nano::stat::detail::insert : nano::stat::detail::insert_failed);

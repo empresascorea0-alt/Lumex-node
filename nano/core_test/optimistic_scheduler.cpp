@@ -17,8 +17,11 @@ using namespace std::chrono_literals;
  */
 TEST (optimistic_scheduler, activate_one)
 {
-	nano::test::system system{};
-	auto & node = *system.add_node ();
+	nano::test::system system;
+
+	nano::node_config config;
+	config.priority_scheduler.enable = false; // Disable priority scheduler to avoid interference
+	auto & node = *system.add_node (config);
 
 	// Needs to be greater than optimistic scheduler `gap_threshold`
 	const int howmany_blocks = 64;
@@ -41,8 +44,11 @@ TEST (optimistic_scheduler, activate_one)
  */
 TEST (optimistic_scheduler, activate_one_zero_conf)
 {
-	nano::test::system system{};
-	auto & node = *system.add_node ();
+	nano::test::system system;
+
+	nano::node_config config;
+	config.priority_scheduler.enable = false; // Disable priority scheduler to avoid interference
+	auto & node = *system.add_node (config);
 
 	// Can be smaller than optimistic scheduler `gap_threshold`
 	// This is meant to activate short account chains (eg. binary tree spam leaf accounts)
@@ -63,8 +69,11 @@ TEST (optimistic_scheduler, activate_one_zero_conf)
  */
 TEST (optimistic_scheduler, activate_many)
 {
-	nano::test::system system{};
-	auto & node = *system.add_node ();
+	nano::test::system system;
+
+	nano::node_config config;
+	config.priority_scheduler.enable = false; // Disable priority scheduler to avoid interference
+	auto & node = *system.add_node (config);
 
 	// Needs to be greater than optimistic scheduler `gap_threshold`
 	const int howmany_blocks = 64;
@@ -86,7 +95,8 @@ TEST (optimistic_scheduler, activate_many)
  */
 TEST (optimistic_scheduler, under_gap_threshold)
 {
-	nano::test::system system{};
+	nano::test::system system;
+
 	nano::node_config config = system.default_config ();
 	config.backlog_scan.enable = false;
 	auto & node = *system.add_node (config);

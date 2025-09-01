@@ -33,10 +33,10 @@ public:
 	bool enable{ true };
 
 	/** Minimum difference between confirmation frontier and account frontier to become a candidate for optimistic confirmation */
-	std::size_t gap_threshold{ 32 };
+	uint64_t gap_threshold{ 32 };
 
 	/** Maximum number of candidates stored in memory */
-	std::size_t max_size{ 1024 * 64 };
+	std::size_t max_size{ 1024 * 4 };
 };
 
 class optimistic final
@@ -82,17 +82,21 @@ private:
 	{
 		nano::account account;
 		nano::clock::time_point timestamp;
+		uint64_t unconfirmed_height;
 	};
 
 	// clang-format off
 	class tag_sequenced {};
 	class tag_account {};
+	class tag_unconfirmed_height {};
 
 	using ordered_candidates = boost::multi_index_container<entry,
 	mi::indexed_by<
 		mi::sequenced<mi::tag<tag_sequenced>>,
 		mi::hashed_unique<mi::tag<tag_account>,
-			mi::member<entry, nano::account, &entry::account>>
+			mi::member<entry, nano::account, &entry::account>>,
+		mi::ordered_non_unique<mi::tag<tag_unconfirmed_height>,
+			mi::member<entry, uint64_t, &entry::unconfirmed_height>, std::greater<uint64_t>> // Descending
 	>>;
 	// clang-format on
 
