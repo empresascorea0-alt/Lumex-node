@@ -118,10 +118,13 @@ std::shared_ptr<nano::state_block> & block3 ()
 }
 }
 
-TEST (election_scheduler, activate_one_timely)
+TEST (election_scheduler, activate_one)
 {
 	nano::test::system system;
-	auto & node = *system.add_node ();
+
+	nano::node_config config;
+	config.backlog_scan.enable = false;
+	auto & node = *system.add_node (config);
 
 	nano::state_block_builder builder;
 	auto send1 = builder.make_block ()
@@ -135,26 +138,7 @@ TEST (election_scheduler, activate_one_timely)
 				 .build ();
 	node.ledger.process (node.ledger.tx_begin_write (), send1);
 	node.scheduler.priority.activate (node.ledger.tx_begin_read (), nano::dev::genesis_key.pub);
-	ASSERT_TIMELY (5s, node.active.election (send1->qualified_root ()));
-}
-
-TEST (election_scheduler, activate_one_flush)
-{
-	nano::test::system system;
-	auto & node = *system.add_node ();
-
-	nano::state_block_builder builder;
-	auto send1 = builder.make_block ()
-				 .account (nano::dev::genesis_key.pub)
-				 .previous (nano::dev::genesis->hash ())
-				 .representative (nano::dev::genesis_key.pub)
-				 .balance (nano::dev::constants.genesis_amount - nano::Knano_ratio)
-				 .link (nano::dev::genesis_key.pub)
-				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
-				 .work (*system.work.generate (nano::dev::genesis->hash ()))
-				 .build ();
-	node.ledger.process (node.ledger.tx_begin_write (), send1);
-	node.scheduler.priority.activate (node.ledger.tx_begin_read (), nano::dev::genesis_key.pub);
+	ASSERT_TIMELY (5s, node.scheduler.priority.empty ());
 	ASSERT_TIMELY (5s, node.active.election (send1->qualified_root ()));
 }
 
@@ -230,6 +214,7 @@ TEST (election_scheduler, no_vacancy)
 
 	nano::node_config config = system.default_config ();
 	config.active_elections.size = 1;
+	config.priority_scheduler.reserved_elections = 0;
 	config.backlog_scan.enable = false;
 	auto & node = *system.add_node (config);
 
@@ -279,6 +264,7 @@ TEST (election_scheduler, no_vacancy)
 	node.scheduler.priority.activate (node.ledger.tx_begin_read (), nano::dev::genesis_key.pub);
 	std::shared_ptr<nano::election> election{};
 	ASSERT_TIMELY (5s, (election = node.active.election (block1->qualified_root ())) != nullptr);
+	ASSERT_TIMELY_EQ (5s, node.scheduler.priority.size (), 0);
 
 	auto block2 = builder.make_block ()
 				  .account (key.pub)
@@ -294,6 +280,7 @@ TEST (election_scheduler, no_vacancy)
 	// There is no vacancy so it should stay queued
 	node.scheduler.priority.activate (node.ledger.tx_begin_read (), key.pub);
 	ASSERT_TIMELY_EQ (5s, node.scheduler.priority.size (), 1);
+	ASSERT_ALWAYS_EQ (500ms, node.scheduler.priority.size (), 1);
 	ASSERT_EQ (node.active.election (block2->qualified_root ()), nullptr);
 
 	// Election confirmed, next in queue should begin
