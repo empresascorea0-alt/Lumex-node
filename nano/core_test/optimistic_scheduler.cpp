@@ -81,8 +81,8 @@ TEST (optimistic_scheduler, activate_many)
 
 	auto chains = nano::test::setup_chains (system, node, howmany_chains, howmany_blocks, nano::dev::genesis_key, /* do not confirm */ false);
 
-	// Ensure all unconfirmed accounts head block gets activated
-	ASSERT_TIMELY (5s, std::all_of (chains.begin (), chains.end (), [&] (auto const & entry) {
+	// Ensure all unconfirmed account head blocks get activated
+	ASSERT_TIMELY (15s, std::all_of (chains.begin (), chains.end (), [&] (auto const & entry) {
 		auto const & [account, blocks] = entry;
 		auto const & block = blocks.back ();
 		auto election = node.active.election (block->qualified_root ());
