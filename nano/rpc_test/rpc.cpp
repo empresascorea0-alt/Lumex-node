@@ -6820,8 +6820,7 @@ TEST (rpc, confirmation_active)
 				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
 				 .work (*system.work.generate (send1->hash ()))
 				 .build ();
-	node1->process_active (send1);
-	node1->process_active (send2);
+	nano::test::process (*node1, { send1, send2 });
 	ASSERT_TRUE (nano::test::start_elections (system, *node1, { send1, send2 }));
 	ASSERT_EQ (2, node1->active.size ());
 	auto election (node1->active.election (send1->qualified_root ()));

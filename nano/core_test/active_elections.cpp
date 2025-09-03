@@ -658,7 +658,6 @@ TEST (active_elections, vote_replays)
 				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
 				 .work (*system.work.generate (nano::dev::genesis->hash ()))
 				 .build ();
-	ASSERT_NE (nullptr, send1);
 
 	// create open block for key receing Knano_ratio raw
 	auto open1 = builder.make_block ()
@@ -670,11 +669,9 @@ TEST (active_elections, vote_replays)
 				 .sign (key.prv, key.pub)
 				 .work (*system.work.generate (key.pub))
 				 .build ();
-	ASSERT_NE (nullptr, open1);
 
 	// wait for elections objects to appear in the AEC
-	node.process_active (send1);
-	node.process_active (open1);
+	nano::test::process (node, { send1, open1 });
 	ASSERT_TRUE (nano::test::start_elections (system, node, { send1, open1 }));
 	ASSERT_EQ (2, node.active.size ());
 
@@ -709,8 +706,7 @@ TEST (active_elections, vote_replays)
 				 .sign (key.prv, key.pub)
 				 .work (*system.work.generate (open1->hash ()))
 				 .build ();
-	ASSERT_NE (nullptr, send2);
-	node.process_active (send2);
+	nano::test::process (node, { send2 });
 	ASSERT_TRUE (nano::test::start_elections (system, node, { send2 }));
 	ASSERT_EQ (1, node.active.size ());
 
