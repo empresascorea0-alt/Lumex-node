@@ -52,7 +52,11 @@ void nano::scheduler::optimistic::stop ()
 
 void nano::scheduler::optimistic::notify ()
 {
-	condition.notify_all ();
+	// Only wake up the thread if there is space inside AEC for optimistic elections
+	if (active.vacancy (nano::election_behavior::optimistic) > 0)
+	{
+		condition.notify_all ();
+	}
 }
 
 bool nano::scheduler::optimistic::activate_predicate (const nano::account_info & account_info, const nano::confirmation_height_info & conf_info) const
@@ -79,8 +83,6 @@ bool nano::scheduler::optimistic::activate (const nano::account & account, const
 		return false;
 	}
 
-	bool activated = false;
-
 	if (activate_predicate (account_info, conf_info))
 	{
 		nano::lock_guard<nano::mutex> lock{ mutex };
@@ -99,15 +101,12 @@ bool nano::scheduler::optimistic::activate (const nano::account & account, const
 			candidates.pop_front ();
 		}
 
-		activated = inserted;
+		// Not notifying the thread immediately here, since we need to wait for activation_delay to elapse
+
+		return inserted;
 	}
 
-	if (activated)
-	{
-		condition.notify_all ();
-	}
-
-	return activated;
+	return false; // Not activated
 }
 
 bool nano::scheduler::optimistic::predicate () const
@@ -134,8 +133,6 @@ void nano::scheduler::optimistic::run ()
 	nano::unique_lock<nano::mutex> lock{ mutex };
 	while (!stopped)
 	{
-		stats.inc (nano::stat::type::optimistic_scheduler, nano::stat::detail::loop);
-
 		condition.wait_for (lock, config.activation_delay / 2, [this] () {
 			return stopped || predicate ();
 		});
@@ -145,26 +142,31 @@ void nano::scheduler::optimistic::run ()
 			return;
 		}
 
-		lock.unlock ();
-
-		// Acquire transaction outside of the lock
-		auto transaction = ledger.tx_begin_read ();
-
-		lock.lock ();
-
-		while (predicate () && !stopped)
+		if (predicate ())
 		{
-			debug_assert (!candidates.empty ());
-			auto & height_index = candidates.get<tag_unconfirmed_height> ();
-			auto candidate = *height_index.begin ();
-			height_index.erase (height_index.begin ());
+			stats.inc (nano::stat::type::optimistic_scheduler, nano::stat::detail::loop);
 
 			lock.unlock ();
 
-			transaction.refresh_if_needed ();
-			run_one (transaction, candidate);
+			// Acquire transaction outside of the lock
+			auto transaction = ledger.tx_begin_read ();
 
 			lock.lock ();
+
+			while (predicate () && !stopped)
+			{
+				debug_assert (!candidates.empty ());
+				auto & height_index = candidates.get<tag_unconfirmed_height> ();
+				auto candidate = *height_index.begin ();
+				height_index.erase (height_index.begin ());
+
+				lock.unlock ();
+
+				transaction.refresh_if_needed ();
+				run_one (transaction, candidate);
+
+				lock.lock ();
+			}
 		}
 	}
 }
