@@ -152,10 +152,12 @@ TEST (election, quorum_minimum_confirm_success)
 				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
 				 .build ();
 	node1.work_generate_blocking (*send1);
-	node1.process_active (send1);
+
+	nano::test::process (node1, { send1 });
 	auto election = nano::test::start_election (system, node1, send1->hash ());
 	ASSERT_NE (nullptr, election);
 	ASSERT_EQ (1, election->blocks ().size ());
+
 	auto vote = nano::test::make_final_vote (nano::dev::genesis_key, { send1->hash () });
 	ASSERT_EQ (nano::vote_code::vote, node1.vote_router.vote (vote).at (send1->hash ()));
 	ASSERT_NE (nullptr, node1.block (send1->hash ()));
@@ -182,7 +184,7 @@ TEST (election, quorum_minimum_confirm_fail)
 				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
 				 .build ();
 
-	node1.process_active (send1);
+	nano::test::process (node1, { send1 });
 	auto election = nano::test::start_election (system, node1, send1->hash ());
 	ASSERT_NE (nullptr, election);
 	ASSERT_EQ (1, election->blocks ().size ());

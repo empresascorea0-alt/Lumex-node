@@ -4,41 +4,73 @@
 #include <nano/lib/numbers.hpp>
 #include <nano/node/fwd.hpp>
 
-#include <boost/optional.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/mem_fun.hpp>
+#include <boost/multi_index/member.hpp>
+#include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index_container.hpp>
 
-#include <deque>
+#include <condition_variable>
+#include <future>
 #include <memory>
-#include <mutex>
+#include <thread>
+
+namespace mi = boost::multi_index;
 
 namespace nano::scheduler
 {
-class buckets;
-
 class manual final
 {
-	std::deque<std::tuple<std::shared_ptr<nano::block>, boost::optional<nano::uint128_t>, nano::election_behavior>> queue;
-	nano::node & node;
-	mutable nano::mutex mutex;
-	nano::condition_variable condition;
-	bool stopped{ false };
-	std::thread thread;
-	void notify ();
-	bool predicate () const;
-	void run ();
-
 public:
-	explicit manual (nano::node & node);
+	explicit manual (nano::node &);
 	~manual ();
 
 	void start ();
 	void stop ();
 
-	// Manually start an election for a block
-	// Call action with confirmed block, may be different than what we started with
-	void push (std::shared_ptr<nano::block> const &, boost::optional<nano::uint128_t> const & = boost::none);
+	std::future<std::shared_ptr<nano::election>> push (std::shared_ptr<nano::block> const & block);
 
 	bool contains (nano::block_hash const &) const;
 
 	nano::container_info container_info () const;
+
+private:
+	bool predicate () const;
+	void notify ();
+	void run ();
+
+private: // Dependencies
+	nano::node & node;
+
+private:
+	struct entry
+	{
+		std::shared_ptr<nano::block> block;
+		mutable std::promise<std::shared_ptr<nano::election>> promise;
+
+		nano::block_hash hash () const
+		{
+			return block->hash ();
+		}
+	};
+
+	// clang-format off
+	class tag_sequenced {};
+	class tag_hash {};
+
+	using ordered_queue = boost::multi_index_container<entry,
+	mi::indexed_by<
+		mi::sequenced<mi::tag<tag_sequenced>>,
+		mi::hashed_unique<mi::tag<tag_hash>,
+			mi::const_mem_fun<entry, nano::block_hash, &entry::hash>>
+	>>;
+	// clang-format on
+
+	ordered_queue queue;
+
+	bool stopped{ false };
+	nano::condition_variable condition;
+	mutable nano::mutex mutex;
+	std::thread thread;
 };
 }

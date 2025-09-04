@@ -30,7 +30,7 @@ void nano::scheduler::manual::stop ()
 		nano::lock_guard<nano::mutex> lock{ mutex };
 		stopped = true;
 	}
-	notify ();
+	condition.notify_all ();
 	nano::join_or_pass (thread);
 }
 
@@ -39,23 +39,43 @@ void nano::scheduler::manual::notify ()
 	condition.notify_all ();
 }
 
-void nano::scheduler::manual::push (std::shared_ptr<nano::block> const & block_a, boost::optional<nano::uint128_t> const & previous_balance_a)
+auto nano::scheduler::manual::push (std::shared_ptr<nano::block> const & block) -> std::future<std::shared_ptr<nano::election>>
 {
 	nano::lock_guard<nano::mutex> lock{ mutex };
-	queue.push_back (std::make_tuple (block_a, previous_balance_a, nano::election_behavior::manual));
-	notify ();
+
+	// Check if block already exists
+	auto & hash_index = queue.get<tag_hash> ();
+
+	if (hash_index.contains (block->hash ()))
+	{
+		// Block already exists, return future that immediately resolves to nullptr
+		std::promise<std::shared_ptr<nano::election>> promise;
+		auto future = promise.get_future ();
+		promise.set_value (nullptr);
+		return future;
+	}
+
+	// Create entry and get future before inserting
+	entry new_entry{ block };
+	auto future = new_entry.promise.get_future ();
+
+	auto [it, inserted] = queue.push_back (std::move (new_entry));
+	debug_assert (inserted);
+
+	condition.notify_all ();
+	return future;
 }
 
 bool nano::scheduler::manual::contains (nano::block_hash const & hash) const
 {
 	nano::lock_guard<nano::mutex> lock{ mutex };
-	return std::any_of (queue.cbegin (), queue.cend (), [&hash] (auto const & item) {
-		return std::get<0> (item)->hash () == hash;
-	});
+	auto & hash_index = queue.get<tag_hash> ();
+	return hash_index.contains (hash);
 }
 
 bool nano::scheduler::manual::predicate () const
 {
+	debug_assert (!mutex.try_lock ());
 	return !queue.empty ();
 }
 
@@ -67,28 +87,37 @@ void nano::scheduler::manual::run ()
 		condition.wait (lock, [this] () {
 			return stopped || predicate ();
 		});
-		debug_assert ((std::this_thread::yield (), true)); // Introduce some random delay in debug builds
-		if (!stopped)
+
+		if (stopped)
+		{
+			return;
+		}
+
+		debug_assert ((std::this_thread::yield (), true));
+
+		if (predicate ())
 		{
 			node.stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::loop);
 
-			if (predicate ())
+			auto promise = std::move (queue.front ().promise);
+			auto block = queue.front ().block;
+			queue.pop_front ();
+
+			lock.unlock ();
+
+			auto result = node.active.insert (block, nano::election_behavior::manual);
+			if (result.inserted)
 			{
-				auto const [block, previous_balance, election_behavior] = queue.front ();
-				queue.pop_front ();
-				lock.unlock ();
 				node.stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::insert_manual);
-				auto result = node.active.insert (block, election_behavior);
-				if (result.election != nullptr)
-				{
-					result.election->transition_active ();
-				}
 			}
-			else
+			if (result.election != nullptr)
 			{
-				lock.unlock ();
+				result.election->transition_active ();
 			}
-			notify ();
+
+			// Fulfill the promise
+			promise.set_value (result.election);
+
 			lock.lock ();
 		}
 	}
