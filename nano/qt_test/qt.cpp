@@ -833,32 +833,48 @@ TEST (wallet, import)
 TEST (wallet, republish)
 {
 	nano_qt::eventloop_processor processor;
-	nano::test::system system (2);
+
+	// Configure nodes to disable bootstrap, election schedulers, and other background processes for test isolation
+	nano::node_config node_config;
+	node_config.bootstrap.enable = false;
+	node_config.priority_scheduler.enable = false;
+	node_config.optimistic_scheduler.enable = false;
+	node_config.hinted_scheduler.enable = false;
+
+	nano::test::system system;
+	auto & node1 = *system.add_node (node_config);
+	auto & node2 = *system.add_node (node_config);
+
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 	nano::keypair key;
 	nano::block_hash hash;
 	{
-		auto transaction = system.nodes[0]->ledger.tx_begin_write ();
-		auto latest (system.nodes[0]->ledger.any.account_head (transaction, nano::dev::genesis_key.pub));
+		auto transaction = node1.ledger.tx_begin_write ();
+		auto latest (node1.ledger.any.account_head (transaction, nano::dev::genesis_key.pub));
 		auto block = std::make_shared<nano::send_block> (latest, key.pub, 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (latest));
 		hash = block->hash ();
-		ASSERT_EQ (nano::block_status::progress, system.nodes[0]->ledger.process (transaction, block));
+		ASSERT_EQ (nano::block_status::progress, node1.ledger.process (transaction, block));
 	}
+
+	// Ensure node2 does not have the block initially
+	ASSERT_FALSE (node2.ledger.any.block_exists (node2.ledger.tx_begin_read (), hash));
+
 	auto account (nano::dev::genesis_key.pub);
-	auto wallet (std::make_shared<nano_qt::wallet> (*test_application, processor, *system.nodes[0], system.wallet (0), account));
+	auto wallet (std::make_shared<nano_qt::wallet> (*test_application, processor, node1, system.wallet (0), account));
 	wallet->start ();
 	QTest::mouseClick (wallet->show_advanced, Qt::LeftButton);
 	ASSERT_EQ (wallet->advanced.window, wallet->main_stack->currentWidget ());
 	QTest::mouseClick (wallet->advanced.block_viewer, Qt::LeftButton);
 	ASSERT_EQ (wallet->block_viewer.window, wallet->main_stack->currentWidget ());
 	QTest::keyClicks (wallet->block_viewer.hash, hash.to_string ().c_str ());
+
+	// Verify the block exists in node1 before rebroadcast
+	ASSERT_TRUE (node1.ledger.any.block_exists (node1.ledger.tx_begin_read (), hash));
+
 	QTest::mouseClick (wallet->block_viewer.rebroadcast, Qt::LeftButton);
-	ASSERT_FALSE (system.nodes[1]->balance (nano::dev::genesis_key.pub).is_zero ());
-	system.deadline_set (10s);
-	while (system.nodes[1]->balance (nano::dev::genesis_key.pub).is_zero ())
-	{
-		ASSERT_NO_ERROR (system.poll ());
-	}
+
+	// Now verify that the block was received by node2 due to the rebroadcast
+	ASSERT_TIMELY (10s, node2.ledger.any.block_exists (node2.ledger.tx_begin_read (), hash));
 }
 
 TEST (wallet, ignore_empty_adhoc)
