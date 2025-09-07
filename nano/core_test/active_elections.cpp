@@ -1580,13 +1580,13 @@ TEST (active_elections, broadcast_block_on_activation)
 	ASSERT_TIMELY (5s, node2->block_or_pruned_exists (send1->hash ()));
 }
 
-TEST (active_elections, bootstrap_stale)
+TEST (active_elections, stale_election)
 {
 	nano::test::system system;
 
 	// Configure node with short stale threshold for testing
 	nano::node_config node_config = system.default_config ();
-	node_config.active_elections.bootstrap_stale_threshold = 2s; // Short threshold for faster testing
+	node_config.active_elections.stale_threshold = 2s; // Short threshold for faster testing
 
 	auto & node = *system.add_node (node_config);
 
@@ -1603,6 +1603,12 @@ TEST (active_elections, bootstrap_stale)
 				.work (*system.work.generate (nano::dev::genesis->hash ()))
 				.build ();
 
+	std::atomic<bool> stale_detected{ false };
+	node.active.election_stale.add ([&] (auto const & election) {
+		EXPECT_EQ (send->qualified_root (), election->qualified_root);
+		stale_detected = true;
+	});
+
 	// Process the block and start an election
 	node.process_active (send);
 
@@ -1611,10 +1617,59 @@ TEST (active_elections, bootstrap_stale)
 	ASSERT_TIMELY (5s, (election = node.active.election (send->qualified_root ())) != nullptr);
 
 	// Check initial state
-	ASSERT_EQ (0, node.stats.count (nano::stat::type::active_elections, nano::stat::detail::bootstrap_stale));
+	ASSERT_EQ (0, node.stats.count (nano::stat::type::active_elections, nano::stat::detail::stale));
 
-	// Wait for bootstrap_stale_threshold to pass and the statistic to be incremented
-	ASSERT_TIMELY (5s, node.stats.count (nano::stat::type::active_elections, nano::stat::detail::bootstrap_stale) > 0);
+	// Wait for stale_threshold to pass and stats to be incremented
+	ASSERT_TIMELY (5s, stale_detected);
+	ASSERT_TIMELY (5s, node.stats.count (nano::stat::type::active_elections, nano::stat::detail::stale) > 0);
+}
+
+TEST (active_elections, stale_election_multiple)
+{
+	nano::test::system system;
+
+	// Configure node with short stale threshold for testing
+	nano::node_config node_config = system.default_config ();
+	node_config.active_elections.stale_threshold = 2s; // Short threshold for faster testing
+
+	auto & node = *system.add_node (node_config);
+
+	// Create 10 independent blocks that will each have their own election
+	auto blocks = nano::test::setup_independent_blocks (system, node, 10);
+
+	// Track which elections had stale events fired
+	nano::locked<std::set<nano::qualified_root>> stale_detected;
+
+	node.active.election_stale.add ([&] (auto const & election) {
+		stale_detected.lock ()->insert (election->qualified_root);
+	});
+
+	// Start elections for all blocks
+	ASSERT_TRUE (nano::test::start_elections (system, node, blocks));
+
+	// Ensure all elections are active
+	ASSERT_TIMELY_EQ (5s, node.active.size (), blocks.size ());
+	for (auto const & block : blocks)
+	{
+		ASSERT_TRUE (node.active.active (block->qualified_root ()));
+	}
+
+	// Check initial state
+	ASSERT_EQ (0, node.stats.count (nano::stat::type::active_elections, nano::stat::detail::stale));
+
+	// Wait for stale_threshold to pass (2s) plus some buffer
+	// The stale event should fire for ALL elections that are stale
+	ASSERT_TIMELY (5s, node.stats.count (nano::stat::type::active_elections, nano::stat::detail::stale) >= blocks.size ());
+
+	// Check that all elections had their stale event fired
+	ASSERT_TIMELY_EQ (5s, blocks.size (), stale_detected.lock ()->size ());
+
+	// Verify each block's election was marked as stale
+	for (auto const & block : blocks)
+	{
+		ASSERT_TRUE (stale_detected.lock ()->count (block->qualified_root ()) > 0)
+		<< "Election for block " << block->hash ().to_string () << " was not marked as stale";
+	}
 }
 
 TEST (active_elections, transition_optimistic_to_priority)

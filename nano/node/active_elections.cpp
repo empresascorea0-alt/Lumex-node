@@ -4,7 +4,6 @@
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/node/active_elections.hpp>
-#include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/confirmation_solicitor.hpp>
 #include <nano/node/election.hpp>
@@ -507,9 +506,6 @@ void nano::active_elections::tick_elections (nano::unique_lock<nano::mutex> & lo
 	nano::confirmation_solicitor solicitor (node.network, node.config);
 	solicitor.prepare (node.rep_crawler.principal_representatives (std::numeric_limits<std::size_t>::max ()));
 
-	nano::timer<std::chrono::milliseconds> elapsed (nano::timer_state::started);
-
-	std::deque<std::shared_ptr<nano::election>> stale_elections;
 	for (auto const & election : election_list)
 	{
 		bool tick_result = election->tick (solicitor);
@@ -517,33 +513,9 @@ void nano::active_elections::tick_elections (nano::unique_lock<nano::mutex> & lo
 		{
 			erase (election->qualified_root);
 		}
-		else if (election->duration () > config.stale_threshold)
-		{
-			stale_elections.push_back (election);
-		}
 	}
 
 	solicitor.flush ();
-
-	if (stale_interval.elapse (config.stale_threshold / 2))
-	{
-		node.stats.add (nano::stat::type::active_elections, nano::stat::detail::bootstrap_stale, stale_elections.size ());
-
-		for (auto const & election : stale_elections)
-		{
-			node.logger.debug (nano::log::type::active_elections, "Bootstrapping account: {} with stale election with root: {}, blocks: {} (behavior: {}, state: {}, voters: {}, blocks: {}, duration: {}ms)",
-			election->account,
-			election->qualified_root,
-			fmt::join (election->blocks_hashes (), ", "), // TODO: Lazy eval
-			to_string (election->behavior ()),
-			to_string (election->state ()),
-			election->voter_count (),
-			election->block_count (),
-			election->duration ().count ());
-
-			node.bootstrap.prioritize (election->account);
-		}
-	}
 }
 
 bool nano::active_elections::predicate () const
@@ -601,6 +573,8 @@ void nano::active_elections::checkup_elections (nano::unique_lock<nano::mutex> &
 	auto const now = std::chrono::steady_clock::now ();
 	auto const min_duration = node.network_params.network.aec_loop_interval * 3;
 
+	std::deque<std::shared_ptr<nano::election>> stale_elections;
+
 	for (auto const & election : all_elections)
 	{
 		// Only cancel elections if they have been running for a minimum duration of time
@@ -620,6 +594,33 @@ void nano::active_elections::checkup_elections (nano::unique_lock<nano::mutex> &
 				election->block_count (),
 				election->duration ().count ());
 			}
+		}
+		else if (election->duration () > config.stale_threshold)
+		{
+			stale_elections.push_back (election);
+		}
+	}
+
+	node.logger.debug (nano::log::type::active_elections, "Checkup found {} stale elections", stale_elections.size ());
+
+	// Notify about stale elections at most once per half stale threshold, avoid too frequent notifications
+	if (stale_interval.elapse (config.stale_threshold / 2))
+	{
+		node.stats.add (nano::stat::type::active_elections, nano::stat::detail::stale, stale_elections.size ());
+
+		for (auto const & election : stale_elections)
+		{
+			node.logger.debug (nano::log::type::active_elections, "Stale election for account: {} with root: {} blocks: {} (behavior: {}, state: {}, voters: {}, blocks: {}, duration: {}ms)",
+			election->account,
+			election->qualified_root,
+			fmt::join (election->blocks_hashes (), ", "), // TODO: Lazy eval
+			to_string (election->behavior ()),
+			to_string (election->state ()),
+			election->voter_count (),
+			election->block_count (),
+			election->duration ().count ());
+
+			election_stale.notify (election);
 		}
 	}
 }

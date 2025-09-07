@@ -111,6 +111,7 @@ public:
 
 public: // Events
 	nano::observer_set<> vacancy_updated;
+	nano::observer_set<std::shared_ptr<nano::election>> election_stale;
 
 private:
 	bool predicate () const;

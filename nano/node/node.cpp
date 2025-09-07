@@ -18,6 +18,7 @@
 #include <nano/node/bucketing.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/daemonconfig.hpp>
+#include <nano/node/election.hpp>
 #include <nano/node/election_status.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/fork_cache.hpp>
@@ -216,6 +217,11 @@ nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, std::filesy
 	vote_cache.rep_weight_query = [this] (nano::account const & rep) {
 		return ledger.weight (rep);
 	};
+
+	// Prioritize bootstrapping accounts with stale elections to find alternative forks
+	active.election_stale.add ([this] (auto const & election) {
+		bootstrap.prioritize (election->account);
+	});
 
 	// TODO: Hook this direclty in the schedulers
 	backlog_scan.batch_activated.add ([this] (auto const & batch) {

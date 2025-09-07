@@ -519,6 +519,7 @@ enum class detail
 	cancel_dependent,
 	cancel_checkup,
 	forks_cached,
+	stale,
 	bootstrap_stale,
 
 	// unchecked

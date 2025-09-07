@@ -57,25 +57,30 @@
 	}
 
 /** Expects that the condition becomes true within the deadline */
-#define EXPECT_TIMELY(time, condition)                  \
-	system.deadline_set (time);                         \
-	{                                                   \
-		std::error_code _ec;                            \
-		while (!(condition) && !(_ec = system.poll ())) \
-		{                                               \
-		}                                               \
-		EXPECT_NO_ERROR (_ec);                          \
+#define EXPECT_TIMELY(time, condition) \
+	system.deadline_set (time);        \
+	{                                  \
+		std::error_code _ec;           \
+		while (!_ec && !(condition))   \
+		{                              \
+			_ec = system.poll ();      \
+		}                              \
+		EXPECT_NO_ERROR (_ec);         \
 	}
 
 /*
  * Asserts that the `val1 == val2` condition becomes true within the deadline
  * Condition must hold for at least 2 consecutive reads
  */
-#define ASSERT_TIMELY_EQ(time, val1, val2)         \
-	system.deadline_set (time);                    \
-	while (!((val1) == (val2)) && !system.poll ()) \
-	{                                              \
-	}                                              \
+#define ASSERT_TIMELY_EQ(time, val1, val2)  \
+	system.deadline_set (time);             \
+	{                                       \
+		std::error_code _ec;                \
+		while (!_ec && !((val1) == (val2))) \
+		{                                   \
+			_ec = system.poll ();           \
+		}                                   \
+	}                                       \
 	ASSERT_EQ (val1, val2);
 
 /*
