@@ -337,6 +337,8 @@ std::error_code nano::test::system::poll (std::chrono::nanoseconds const & wait_
 		}
 	}
 
+	std::this_thread::yield ();
+
 	std::error_code ec;
 	if (std::chrono::steady_clock::now () > deadline)
 	{

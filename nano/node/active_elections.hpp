@@ -37,14 +37,13 @@ public:
 	std::size_t hinted_limit_percentage{ 20 };
 	// Limit of optimistic elections as percentage of `active_elections_size`
 	std::size_t optimistic_limit_percentage{ 10 };
-	// Maximum confirmation history size
-	std::size_t confirmation_history_size{ 2048 };
 	// Maximum cache size for recently_confirmed
-	std::size_t confirmation_cache{ 65536 };
+	std::size_t confirmation_cache{ 1024 * 64 };
 	// Maximum size of election winner details set
 	std::size_t max_election_winners{ 1024 * 16 };
 
-	std::chrono::seconds bootstrap_stale_threshold{ 60s };
+	std::chrono::milliseconds checkup_interval{ 1s };
+	std::chrono::seconds stale_threshold{ nano::is_dev_run () ? 1s : 60s };
 };
 
 /**
@@ -112,11 +111,14 @@ public:
 
 public: // Events
 	nano::observer_set<> vacancy_updated;
+	nano::observer_set<std::shared_ptr<nano::election>> election_stale;
 
 private:
 	bool predicate () const;
 	void run ();
+	void run_checkup ();
 	void tick_elections (nano::unique_lock<nano::mutex> &);
+	void checkup_elections (nano::unique_lock<nano::mutex> &);
 
 	// Erase all blocks from active and, if not confirmed, clear digests from network filters
 	void erase_election (nano::unique_lock<nano::mutex> & lock_a, std::shared_ptr<nano::election>);
@@ -156,10 +158,11 @@ private:
 	nano::condition_variable condition;
 	bool stopped{ false };
 	std::thread thread;
+	std::thread checkup_thread;
 
 	nano::thread_pool workers;
 
-	nano::interval bootstrap_stale_interval;
+	nano::interval stale_interval;
 	nano::interval warning_interval;
 
 public: // Tests

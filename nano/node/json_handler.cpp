@@ -2062,14 +2062,16 @@ void nano::json_handler::confirmation_history ()
 	}
 	if (!ec)
 	{
-		for (auto const & status : node.active.recently_cemented.list ())
+		// TODO: Allow passing a count parameter to limit the number of results
+		// Default to 2000 for now since it was the previous limit
+		for (auto const & status : node.active.recently_cemented.list (2000))
 		{
 			if (hash.is_zero () || status.winner->hash () == hash)
 			{
 				boost::property_tree::ptree election;
 				election.put ("hash", status.winner->hash ().to_string ());
 				election.put ("duration", status.election_duration.count ());
-				election.put ("time", status.election_end.count ());
+				election.put ("time", milliseconds_since_epoch (status.election_end));
 				election.put ("tally", status.tally.to_string_dec ());
 				election.add ("final", status.final_tally.to_string_dec ());
 				election.put ("blocks", std::to_string (status.block_count));

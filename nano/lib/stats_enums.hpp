@@ -144,6 +144,7 @@ enum class detail
 	total,
 	loop,
 	loop_cleanup,
+	loop_checkup,
 	process,
 	processed,
 	ignored,
@@ -516,7 +517,9 @@ enum class detail
 	stopped,
 	confirm_dependent,
 	cancel_dependent,
+	cancel_checkup,
 	forks_cached,
+	stale,
 	bootstrap_stale,
 
 	// unchecked

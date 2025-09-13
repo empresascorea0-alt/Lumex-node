@@ -4,7 +4,6 @@
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/node/active_elections.hpp>
-#include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/confirmation_solicitor.hpp>
 #include <nano/node/election.hpp>
@@ -17,6 +16,7 @@
 #include <nano/node/vote_router.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
+#include <nano/secure/ledger_set_confirmed.hpp>
 #include <nano/store/component.hpp>
 
 #include <ranges>
@@ -29,7 +29,7 @@ nano::active_elections::active_elections (nano::node & node_a, nano::ledger_noti
 	ledger_notifications{ ledger_notifications_a },
 	cementing_set{ cementing_set_a },
 	recently_confirmed{ config.confirmation_cache },
-	recently_cemented{ config.confirmation_history_size },
+	recently_cemented{ config.confirmation_cache },
 	workers{ 1, nano::thread_role::name::aec_notifications }
 {
 	// Cementing blocks might implicitly confirm dependent elections
@@ -116,6 +116,11 @@ void nano::active_elections::start ()
 		nano::thread_role::set (nano::thread_role::name::aec_loop);
 		run ();
 	});
+
+	checkup_thread = std::thread ([this] () {
+		nano::thread_role::set (nano::thread_role::name::aec_checkup);
+		run_checkup ();
+	});
 }
 
 void nano::active_elections::stop ()
@@ -125,10 +130,8 @@ void nano::active_elections::stop ()
 		stopped = true;
 	}
 	condition.notify_all ();
-	if (thread.joinable ())
-	{
-		thread.join ();
-	}
+	join_or_pass (thread);
+	join_or_pass (checkup_thread);
 	workers.stop ();
 
 	clear ();
@@ -153,7 +156,7 @@ auto nano::active_elections::insert (std::shared_ptr<nano::block> const & block,
 
 	if (!index.exists (root))
 	{
-		if (!recently_confirmed.exists (root))
+		if (!recently_confirmed.contains (root) && !recently_cemented.contains (root))
 		{
 			result.inserted = true;
 
@@ -303,7 +306,7 @@ void nano::active_elections::erase_election (nano::unique_lock<nano::mutex> & lo
 {
 	debug_assert (!mutex.try_lock ());
 	debug_assert (lock.owns_lock ());
-	debug_assert (!election->confirmed () || recently_confirmed.exists (election->qualified_root));
+	debug_assert (!election->confirmed () || recently_confirmed.contains (election->qualified_root));
 
 	auto blocks_l = election->blocks ();
 	node.vote_router.disconnect (*election);
@@ -421,6 +424,11 @@ auto nano::active_elections::block_cemented (std::shared_ptr<nano::block> const 
 	node.stats.inc (nano::stat::type::active_elections, nano::stat::detail::cemented);
 	node.stats.inc (nano::stat::type::active_elections_cemented, to_stat_detail (status.type));
 
+	node.logger.debug (nano::log::type::active_elections, "Cemented root: {} with block: {} (status: {})",
+	block->qualified_root (),
+	block->hash (),
+	to_string (status.type));
+
 	node.logger.trace (nano::log::type::active_elections, nano::log::detail::active_cemented,
 	nano::log::arg{ "block", block },
 	nano::log::arg{ "confirmation_root", confirmation_root },
@@ -498,9 +506,6 @@ void nano::active_elections::tick_elections (nano::unique_lock<nano::mutex> & lo
 	nano::confirmation_solicitor solicitor (node.network, node.config);
 	solicitor.prepare (node.rep_crawler.principal_representatives (std::numeric_limits<std::size_t>::max ()));
 
-	nano::timer<std::chrono::milliseconds> elapsed (nano::timer_state::started);
-
-	std::deque<std::shared_ptr<nano::election>> stale_elections;
 	for (auto const & election : election_list)
 	{
 		bool tick_result = election->tick (solicitor);
@@ -508,33 +513,9 @@ void nano::active_elections::tick_elections (nano::unique_lock<nano::mutex> & lo
 		{
 			erase (election->qualified_root);
 		}
-		else if (election->duration () > config.bootstrap_stale_threshold)
-		{
-			stale_elections.push_back (election);
-		}
 	}
 
 	solicitor.flush ();
-
-	if (bootstrap_stale_interval.elapse (config.bootstrap_stale_threshold / 2))
-	{
-		node.stats.add (nano::stat::type::active_elections, nano::stat::detail::bootstrap_stale, stale_elections.size ());
-
-		for (auto const & election : stale_elections)
-		{
-			node.logger.debug (nano::log::type::active_elections, "Bootstrapping account: {} with stale election with root: {}, blocks: {} (behavior: {}, state: {}, voters: {}, blocks: {}, duration: {}ms)",
-			election->account,
-			election->qualified_root,
-			fmt::join (election->blocks_hashes (), ", "), // TODO: Lazy eval
-			to_string (election->behavior ()),
-			to_string (election->state ()),
-			election->voter_count (),
-			election->block_count (),
-			election->duration ().count ());
-
-			node.bootstrap.prioritize (election->account);
-		}
-	}
 }
 
 bool nano::active_elections::predicate () const
@@ -563,6 +544,109 @@ void nano::active_elections::run ()
 			condition.wait_for (lock, node.network_params.network.aec_loop_interval / 2, [this] {
 				return stopped || predicate ();
 			});
+		}
+	}
+}
+
+void nano::active_elections::checkup_elections (nano::unique_lock<nano::mutex> & lock)
+{
+	auto all_elections = index.list ();
+
+	lock.unlock ();
+
+	auto transaction = node.ledger.tx_begin_read ();
+
+	auto should_cancel = [&] (std::shared_ptr<nano::election> const & election) {
+		auto const target = node.ledger.any.block_successor (transaction, election->qualified_root);
+		if (target)
+		{
+			// Cancel if the election's block is already cemented
+			return node.ledger.confirmed.block_exists (transaction, *target);
+		}
+		else
+		{
+			// No successor means the block is not in the ledger, rather unexpected
+			return true; // Cancel the election
+		}
+	};
+
+	auto const now = std::chrono::steady_clock::now ();
+	auto const min_duration = node.network_params.network.aec_loop_interval * 3;
+
+	std::deque<std::shared_ptr<nano::election>> stale_elections;
+
+	for (auto const & election : all_elections)
+	{
+		// Only cancel elections if they have been running for a minimum duration of time
+		// Usually the normal cemented callback will handle the cleanup
+		if ((now - election->get_state_start ()) > min_duration && should_cancel (election))
+		{
+			bool cancelled = election->cancel ();
+			if (cancelled)
+			{
+				node.stats.inc (nano::stat::type::active_elections, nano::stat::detail::cancel_checkup);
+				node.logger.debug (nano::log::type::active_elections, "Checkup cancelled election for root: {} with blocks: {} (behavior: {}, state: {}, voters: {}, blocks: {}, duration: {}ms)",
+				election->qualified_root,
+				fmt::join (election->blocks_hashes (), ", "), // TODO: Lazy eval
+				to_string (election->behavior ()),
+				to_string (election->state ()),
+				election->voter_count (),
+				election->block_count (),
+				election->duration ().count ());
+			}
+		}
+		else if (election->duration () > config.stale_threshold)
+		{
+			stale_elections.push_back (election);
+		}
+	}
+
+	node.logger.debug (nano::log::type::active_elections, "Checkup found {} stale elections", stale_elections.size ());
+
+	// Notify about stale elections at most once per half stale threshold, avoid too frequent notifications
+	if (stale_interval.elapse (config.stale_threshold / 2))
+	{
+		node.stats.add (nano::stat::type::active_elections, nano::stat::detail::stale, stale_elections.size ());
+
+		for (auto const & election : stale_elections)
+		{
+			node.logger.debug (nano::log::type::active_elections, "Stale election for account: {} with root: {} blocks: {} (behavior: {}, state: {}, voters: {}, blocks: {}, duration: {}ms)",
+			election->account,
+			election->qualified_root,
+			fmt::join (election->blocks_hashes (), ", "), // TODO: Lazy eval
+			to_string (election->behavior ()),
+			to_string (election->state ()),
+			election->voter_count (),
+			election->block_count (),
+			election->duration ().count ());
+
+			election_stale.notify (election);
+		}
+	}
+}
+
+void nano::active_elections::run_checkup ()
+{
+	nano::unique_lock<nano::mutex> lock{ mutex };
+	while (!stopped)
+	{
+		// Ignore predicate in condition, this loop should be woken up periodically
+		condition.wait_for (lock, config.checkup_interval, [this] {
+			return stopped;
+		});
+
+		if (stopped)
+		{
+			return;
+		}
+
+		if (!index.empty ())
+		{
+			node.stats.inc (nano::stat::type::active, nano::stat::detail::loop_checkup);
+
+			checkup_elections (lock);
+			debug_assert (!lock.owns_lock ());
+			lock.lock ();
 		}
 	}
 }
@@ -637,7 +721,7 @@ std::vector<std::shared_ptr<nano::election>> nano::active_elections::list_active
 		{
 			break;
 		}
-		result_l.push_back (entry.election);
+		result_l.push_back (entry);
 	}
 	return result_l;
 }
@@ -731,10 +815,9 @@ nano::error nano::active_elections_config::serialize (nano::tomlconfig & toml) c
 	toml.put ("size", size, "Number of active elections. Elections beyond this limit have limited survival time.\nWarning: modifying this value may result in a lower confirmation rate. \ntype:uint64,[250..]");
 	toml.put ("hinted_limit_percentage", hinted_limit_percentage, "Limit of hinted elections as percentage of `active_elections_size` \ntype:uint64");
 	toml.put ("optimistic_limit_percentage", optimistic_limit_percentage, "Limit of optimistic elections as percentage of `active_elections_size`. \ntype:uint64");
-	toml.put ("confirmation_history_size", confirmation_history_size, "Maximum confirmation history size. If tracking the rate of block confirmations, the websocket feature is recommended instead. \ntype:uint64");
 	toml.put ("confirmation_cache", confirmation_cache, "Maximum number of confirmed elections kept in cache to prevent restarting an election. \ntype:uint64");
 	toml.put ("max_election_winners", max_election_winners, "Maximum size of election winner details set. \ntype:uint64");
-	toml.put ("bootstrap_stale_threshold", bootstrap_stale_threshold.count (), "Time after which additional bootstrap attempts are made to find missing blocks for an election. \ntype:seconds");
+	toml.put ("stale_threshold", stale_threshold.count (), "Time after which additional bootstrap attempts are made to find missing blocks for an election. \ntype:seconds");
 	return toml.get_error ();
 }
 
@@ -743,10 +826,9 @@ nano::error nano::active_elections_config::deserialize (nano::tomlconfig & toml)
 	toml.get ("size", size);
 	toml.get ("hinted_limit_percentage", hinted_limit_percentage);
 	toml.get ("optimistic_limit_percentage", optimistic_limit_percentage);
-	toml.get ("confirmation_history_size", confirmation_history_size);
 	toml.get ("confirmation_cache", confirmation_cache);
 	toml.get ("max_election_winners", max_election_winners);
-	toml.get_duration ("bootstrap_stale_threshold", bootstrap_stale_threshold);
+	toml.get_duration ("stale_threshold", stale_threshold);
 
 	return toml.get_error ();
 }
@@ -776,6 +858,11 @@ nano::stat::type nano::to_stat_type (nano::election_state state)
 	}
 	debug_assert (false);
 	return {};
+}
+
+std::string_view nano::to_string (nano::election_status_type type)
+{
+	return nano::enum_util::name (type);
 }
 
 nano::stat::detail nano::to_stat_detail (nano::election_status_type type)
