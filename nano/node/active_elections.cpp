@@ -208,6 +208,9 @@ auto nano::active_elections::insert (std::shared_ptr<nano::block> const & block,
 	{
 		result.election = index.election (root);
 
+		// The existing election should already contain this block
+		debug_assert (result.election->contains (hash));
+
 		// Upgrade to priority election to enable immediate vote broadcasting.
 		auto previous_behavior = result.election->behavior ();
 		if (behavior == nano::election_behavior::priority && previous_behavior != nano::election_behavior::priority)

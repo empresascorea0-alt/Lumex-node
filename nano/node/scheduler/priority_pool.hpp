@@ -24,6 +24,13 @@ namespace mi = boost::multi_index;
 
 namespace nano::scheduler
 {
+struct priority_entry
+{
+	std::shared_ptr<nano::block> block;
+	nano::bucket_index bucket;
+	nano::priority_timestamp priority;
+};
+
 /*
  * A global pool of priority blocks to be scheduled for election
  * Blocks are grouped by their bucket and ordered by their priority (lower priority value goes first)
@@ -38,21 +45,15 @@ public:
 	/// Add a block to the pool with given bucket and priority
 	bool push (std::shared_ptr<nano::block> const & block, nano::bucket_index bucket, nano::priority_timestamp priority);
 
-	struct priority_result
-	{
-		std::shared_ptr<nano::block> block;
-		nano::bucket_index bucket;
-		nano::priority_timestamp priority;
-	};
-
 	/// Peek or pop the next priority block (lower priority value goes first) for a given bucket
-	std::optional<priority_result> top (nano::bucket_index bucket) const;
-	std::optional<priority_result> pop (nano::bucket_index bucket);
+	std::optional<priority_entry> top (nano::bucket_index bucket) const;
+	std::optional<priority_entry> pop (nano::bucket_index bucket);
 
 	/// Get the best priority block for all non-empty buckets
-	std::map<nano::bucket_index, priority_result> top_all () const;
+	std::map<nano::bucket_index, priority_entry> top_all () const;
 
 	bool erase (nano::block_hash const & hash);
+	size_t erase_all (std::deque<nano::block_hash> const & hashes);
 
 	/// Evict the worst priority block (highest priority value) from a given bucket
 	nano::block_hash evict (nano::bucket_index bucket);

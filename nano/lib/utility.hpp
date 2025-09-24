@@ -88,6 +88,17 @@ std::deque<typename Container::value_type> erase_if_and_collect (Container & con
 	return removed_elements;
 }
 
+/**
+ * Finds the value associated with a key in a map, or returns a default-constructed value if the key is not found.
+ */
+template <typename Map, typename Key>
+auto find_or_default (const Map & map, const Key & key)
+{
+	using Value = typename Map::mapped_type;
+	auto it = map.find (key);
+	return it != map.end () ? it->second : Value{};
+}
+
 /** Safe narrowing cast which silences warnings and asserts on data loss in debug builds. This is optimized away. */
 template <typename TARGET_TYPE, typename SOURCE_TYPE>
 constexpr TARGET_TYPE narrow_cast (SOURCE_TYPE const & val)

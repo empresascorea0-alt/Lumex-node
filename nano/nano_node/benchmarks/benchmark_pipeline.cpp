@@ -117,9 +117,9 @@ void run_pipeline_benchmark (boost::program_options::variables_map const & vm, s
 	node_config.max_unchecked_blocks = 1024 * 1024; // Large unchecked blocks cache to avoid dropping blocks
 	node_config.vote_processor.max_pr_queue = std::numeric_limits<size_t>::max (); // Unlimited vote processing queue
 
-	node_config.priority_bucket.max_blocks = std::numeric_limits<size_t>::max (); // Unlimited priority bucket
-	node_config.priority_bucket.max_elections = std::numeric_limits<size_t>::max (); // Unlimited bucket elections
-	node_config.priority_bucket.reserved_elections = std::numeric_limits<size_t>::max (); // Unlimited bucket elections
+	node_config.priority_scheduler.max_blocks = std::numeric_limits<size_t>::max (); // Unlimited priority pool
+	node_config.priority_scheduler.max_elections = std::numeric_limits<size_t>::max (); // Unlimited bucket elections
+	node_config.priority_scheduler.reserved_elections = std::numeric_limits<size_t>::max (); // Unlimited bucket elections
 
 	auto node = std::make_shared<nano::node> (io_ctx, nano::unique_path (), node_config, work_pool, node_flags);
 	node->start ();
@@ -130,8 +130,8 @@ void run_pipeline_benchmark (boost::program_options::variables_map const & vm, s
 	std::cout << fmt::format ("  Block processor threads: {}\n", 1); // TODO: Log number of block processor threads when upstreamed
 	std::cout << fmt::format ("  Vote processor threads: {}\n", node->config.vote_processor.threads);
 	std::cout << fmt::format ("  Active elections limit: {}\n", node->config.active_elections.size);
-	std::cout << fmt::format ("  Priority bucket max blocks: {}\n", node->config.priority_bucket.max_blocks);
-	std::cout << fmt::format ("  Priority bucket max elections: {}\n", node->config.priority_bucket.max_elections);
+	std::cout << fmt::format ("  Priority pool max blocks: {}\n", node->config.priority_scheduler.max_blocks);
+	std::cout << fmt::format ("  Priority bucket max elections: {}\n", node->config.priority_scheduler.max_elections);
 	std::cout << fmt::format ("  Block processor max peer queue: {}\n", node->config.block_processor.max_peer_queue);
 	std::cout << fmt::format ("  Block processor max system queue: {}\n", node->config.block_processor.max_system_queue);
 	std::cout << fmt::format ("  Vote processor max pr queue: {}\n", node->config.vote_processor.max_pr_queue);

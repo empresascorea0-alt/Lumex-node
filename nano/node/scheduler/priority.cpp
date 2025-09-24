@@ -18,11 +18,12 @@ nano::scheduler::priority::priority (nano::node_config & node_config, nano::node
 	active{ active_a },
 	cementing_set{ cementing_set_a },
 	stats{ stats_a },
-	logger{ logger_a }
+	logger{ logger_a },
+	pool{ config.max_blocks, config.reserved_blocks }
 {
 	for (auto const & index : bucketing.bucket_indices ())
 	{
-		buckets[index] = std::make_unique<scheduler::bucket> (index, node_config.priority_bucket, active, stats);
+		buckets[index] = std::make_unique<scheduler::bucket> (index, config, active, stats);
 	}
 
 	if (!config.enable)
@@ -64,6 +65,11 @@ nano::scheduler::priority::~priority ()
 	// Thread must be stopped before destruction
 	debug_assert (!thread.joinable ());
 	debug_assert (!cleanup_thread.joinable ());
+}
+
+void nano::scheduler::priority::notify ()
+{
+	condition.notify_all ();
 }
 
 void nano::scheduler::priority::start ()
@@ -132,9 +138,7 @@ bool nano::scheduler::priority::activate (secure::transaction const & transactio
 
 		bool added = false;
 		{
-			auto const & bucket = buckets.at (bucket_index);
-			release_assert (bucket);
-			added = bucket->push (priority_timestamp, block);
+			added = pool.lock ()->push (block, bucket_index, priority_timestamp);
 		}
 		if (added)
 		{
@@ -173,34 +177,24 @@ bool nano::scheduler::priority::activate_successors (secure::transaction const &
 
 bool nano::scheduler::priority::contains (nano::block_hash const & hash) const
 {
-	return std::any_of (buckets.begin (), buckets.end (), [&hash] (auto const & bucket) {
-		return bucket.second->contains (hash);
-	});
-}
-
-void nano::scheduler::priority::notify ()
-{
-	condition.notify_all ();
+	return pool.lock ()->contains (hash);
 }
 
 std::size_t nano::scheduler::priority::size () const
 {
-	return std::accumulate (buckets.begin (), buckets.end (), std::size_t{ 0 }, [] (auto const & sum, auto const & bucket) {
-		return sum + bucket.second->size ();
-	});
+	return pool.lock ()->size ();
 }
 
 bool nano::scheduler::priority::empty () const
 {
-	return std::all_of (buckets.begin (), buckets.end (), [] (auto const & bucket) {
-		return bucket.second->empty ();
-	});
+	return pool.lock ()->empty ();
 }
 
 bool nano::scheduler::priority::predicate () const
 {
-	return std::any_of (buckets.begin (), buckets.end (), [] (auto const & bucket) {
-		return bucket.second->available ();
+	auto tops = pool.lock ()->top_all ();
+	return std::any_of (buckets.begin (), buckets.end (), [&tops] (auto const & bucket) {
+		return bucket.second->available (find_or_default (tops, bucket.first));
 	});
 }
 
@@ -212,23 +206,41 @@ void nano::scheduler::priority::run ()
 		condition.wait (lock, [this] () {
 			return stopped || predicate ();
 		});
+
 		debug_assert ((std::this_thread::yield (), true)); // Introduce some random delay in debug builds
-		if (!stopped)
+
+		if (stopped)
 		{
-			stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::loop);
-
-			lock.unlock ();
-
-			for (auto const & [index, bucket] : buckets)
-			{
-				if (bucket->available ())
-				{
-					bucket->activate ();
-				}
-			}
-
-			lock.lock ();
+			return;
 		}
+
+		stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::loop);
+
+		lock.unlock ();
+
+		// Get the top blocks for each bucket
+		auto tops = pool.lock ()->top_all ();
+
+		std::deque<nano::block_hash> activated;
+
+		for (auto const & [index, top] : tops)
+		{
+			auto const & bucket = buckets.at (index);
+
+			if (bucket->available (top))
+			{
+				bucket->activate (top);
+				activated.push_back (top.block->hash ());
+			}
+		}
+
+		// Erase activated blocks from the pool
+		if (!activated.empty ())
+		{
+			pool.lock ()->erase_all (activated);
+		}
+
+		lock.lock ();
 	}
 }
 
@@ -258,15 +270,6 @@ void nano::scheduler::priority::run_cleanup ()
 
 nano::container_info nano::scheduler::priority::container_info () const
 {
-	auto collect_blocks = [&] () {
-		nano::container_info info;
-		for (auto const & [index, bucket] : buckets)
-		{
-			info.put (std::to_string (index), bucket->size ());
-		}
-		return info;
-	};
-
 	auto collect_elections = [&] () {
 		nano::container_info info;
 		for (auto const & [index, bucket] : buckets)
@@ -277,8 +280,8 @@ nano::container_info nano::scheduler::priority::container_info () const
 	};
 
 	nano::container_info info;
-	info.add ("blocks", collect_blocks ());
 	info.add ("elections", collect_elections ());
+	info.add ("pool", pool.lock ()->container_info ());
 	return info;
 }
 
@@ -288,7 +291,11 @@ nano::container_info nano::scheduler::priority::container_info () const
 
 nano::error nano::scheduler::priority_config::serialize (nano::tomlconfig & toml) const
 {
-	toml.put ("enable", enable, "Enable or disable priority scheduler\ntype:bool");
+	toml.put ("enable", enable, "Enable priority scheduler. \nType: bool");
+	toml.put ("max_blocks", max_blocks, "Total shared pool size across all buckets. \nType: uint64");
+	toml.put ("reserved_blocks", reserved_blocks, "Reserved blocks per bucket. \nType: uint64");
+	toml.put ("reserved_elections", reserved_elections, "Guaranteed election slots per bucket. \nType: uint64");
+	toml.put ("max_elections", max_elections, "Maximum election slots per bucket when AEC has space. \nType: uint64");
 
 	return toml.get_error ();
 }
@@ -296,6 +303,10 @@ nano::error nano::scheduler::priority_config::serialize (nano::tomlconfig & toml
 nano::error nano::scheduler::priority_config::deserialize (nano::tomlconfig & toml)
 {
 	toml.get ("enable", enable);
+	toml.get ("max_blocks", max_blocks);
+	toml.get ("reserved_blocks", reserved_blocks);
+	toml.get ("reserved_elections", reserved_elections);
+	toml.get ("max_elections", max_elections);
 
 	return toml.get_error ();
 }

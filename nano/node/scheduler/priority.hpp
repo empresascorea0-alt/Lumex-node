@@ -13,8 +13,6 @@
 
 namespace nano::scheduler
 {
-class buckets;
-
 class priority_config
 {
 public:
@@ -23,6 +21,14 @@ public:
 
 public:
 	bool enable{ true };
+
+	// Pool configuration
+	size_t max_blocks{ 1024 * 64 }; // Total shared pool size across all buckets
+	size_t reserved_blocks{ 1024 * 8 }; // Reserved blocks per bucket
+
+	// Election configuration
+	size_t reserved_elections{ 100 }; // Guaranteed election slots per bucket
+	size_t max_elections{ 150 }; // Maximum election slots per bucket when AEC has space
 };
 
 class priority final
@@ -44,7 +50,7 @@ public:
 
 	bool contains (nano::block_hash const &) const;
 	void notify ();
-	std::size_t size () const;
+	size_t size () const;
 	bool empty () const;
 
 	nano::container_info container_info () const;
@@ -67,6 +73,7 @@ private:
 
 private:
 	std::map<nano::bucket_index, std::unique_ptr<scheduler::bucket>> buckets;
+	nano::locked<priority_pool> pool;
 
 	bool stopped{ false };
 	nano::condition_variable condition;

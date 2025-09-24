@@ -63,7 +63,7 @@ nano::block_hash priority_pool::evict (nano::bucket_index bucket)
 	return nano::block_hash{ 0 }; // Nothing evicted
 }
 
-std::optional<priority_pool::priority_result> priority_pool::top (nano::bucket_index bucket) const
+std::optional<priority_entry> priority_pool::top (nano::bucket_index bucket) const
 {
 	auto & bucket_priority_index = pool.get<tag_bucket_priority> ();
 	auto range = bucket_priority_index.equal_range (bucket);
@@ -71,15 +71,15 @@ std::optional<priority_pool::priority_result> priority_pool::top (nano::bucket_i
 	if (range.first != range.second)
 	{
 		auto const & entry = *range.first;
-		return priority_result{ entry.block, entry.bucket, entry.priority };
+		return priority_entry{ entry.block, entry.bucket, entry.priority };
 	}
 
 	return std::nullopt;
 }
 
-std::map<nano::bucket_index, priority_pool::priority_result> priority_pool::top_all () const
+std::map<nano::bucket_index, priority_entry> priority_pool::top_all () const
 {
-	std::map<nano::bucket_index, priority_result> result;
+	std::map<nano::bucket_index, priority_entry> result;
 
 	for (auto const & [bucket, size] : bucket_sizes)
 	{
@@ -96,7 +96,7 @@ std::map<nano::bucket_index, priority_pool::priority_result> priority_pool::top_
 	return result;
 }
 
-std::optional<priority_pool::priority_result> priority_pool::pop (nano::bucket_index bucket)
+std::optional<priority_entry> priority_pool::pop (nano::bucket_index bucket)
 {
 	auto & bucket_priority_index = pool.get<tag_bucket_priority> ();
 	auto range = bucket_priority_index.equal_range (bucket);
@@ -104,7 +104,7 @@ std::optional<priority_pool::priority_result> priority_pool::pop (nano::bucket_i
 	if (range.first != range.second)
 	{
 		auto const & entry = *range.first;
-		priority_result result{ entry.block, entry.bucket, entry.priority };
+		priority_entry result{ entry.block, entry.bucket, entry.priority };
 
 		bucket_priority_index.erase (range.first);
 		bucket_sizes[bucket]--;
@@ -126,6 +126,16 @@ bool priority_pool::erase (nano::block_hash const & hash)
 		return true;
 	}
 	return false;
+}
+
+size_t priority_pool::erase_all (std::deque<nano::block_hash> const & hashes)
+{
+	size_t erased_count = 0;
+	for (auto const & hash : hashes)
+	{
+		erased_count += erase (hash) ? 1 : 0;
+	}
+	return erased_count;
 }
 
 bool priority_pool::contains (nano::block_hash const & hash) const

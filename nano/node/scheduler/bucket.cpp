@@ -8,7 +8,7 @@
  * bucket
  */
 
-nano::scheduler::bucket::bucket (nano::bucket_index index_a, priority_bucket_config const & config_a, nano::active_elections & active_a, nano::stats & stats_a) :
+nano::scheduler::bucket::bucket (nano::bucket_index index_a, priority_config const & config_a, nano::active_elections & active_a, nano::stats & stats_a) :
 	index{ index_a },
 	config{ config_a },
 	active{ active_a },
@@ -20,28 +20,36 @@ nano::scheduler::bucket::~bucket ()
 {
 }
 
-bool nano::scheduler::bucket::available () const
+bool nano::scheduler::bucket::available (priority_entry top) const
 {
 	nano::lock_guard<nano::mutex> lock{ mutex };
 
-	if (queue.empty ())
+	if (!top.block)
 	{
-		return false;
+		return false; // No block available
 	}
 	else
 	{
-		return election_vacancy (queue.begin ()->time);
+		return activate_predicate (top.priority);
 	}
 }
 
-bool nano::scheduler::bucket::election_vacancy (nano::priority_timestamp candidate) const
+bool nano::scheduler::bucket::activate_predicate (nano::priority_timestamp candidate) const
 {
 	debug_assert (!mutex.try_lock ());
 
-	if (elections.size () < config.reserved_elections || elections.size () < config.max_elections)
+	if (elections.size () < config.reserved_elections)
 	{
+		// Always activate within reserved capacity
+		return true;
+	}
+	if (elections.size () < config.max_elections)
+	{
+		// Only activate above reserved capacity if there is vacancy in active elections
 		return active.vacancy (nano::election_behavior::priority) > 0;
 	}
+
+	// We are at max election capacity, only activate if candidate has better priority than the worst priority election
 	if (!elections.empty ())
 	{
 		auto lowest = elections.get<tag_priority> ().begin ()->priority;
@@ -49,53 +57,49 @@ bool nano::scheduler::bucket::election_vacancy (nano::priority_timestamp candida
 		// Compare to equal to drain duplicates
 		if (candidate <= lowest)
 		{
-			// Bound number of reprioritizations
+			// Bound number of reprioritizations up to twice the max election capacity
 			return elections.size () < config.max_elections * 2;
 		};
 	}
+
 	return false;
 }
 
-bool nano::scheduler::bucket::election_overfill () const
+bool nano::scheduler::bucket::overfill_predicate () const
 {
 	debug_assert (!mutex.try_lock ());
 
 	if (elections.size () < config.reserved_elections)
 	{
+		// Never overfill within reserved capacity
 		return false;
 	}
-	if (elections.size () < config.max_elections)
+	if (elections.size () <= config.max_elections)
 	{
+		// Only overfill above reserved capacity if there is no vacancy in active elections
 		return active.vacancy (nano::election_behavior::priority) < 0;
 	}
-	return true;
+
+	return true; // Overfill since we are at or above max election capacity
 }
 
-bool nano::scheduler::bucket::activate ()
+bool nano::scheduler::bucket::activate (priority_entry top)
 {
+	debug_assert (top.block);
+	debug_assert (top.bucket == index);
+
 	nano::lock_guard<nano::mutex> lock{ mutex };
-
-	if (queue.empty ())
-	{
-		return false; // Not activated
-	}
-
-	block_entry top = *queue.begin ();
-	queue.erase (queue.begin ());
-
-	auto block = top.block;
-	auto priority = top.time;
 
 	auto erase_callback = [this] (std::shared_ptr<nano::election> election) {
 		nano::lock_guard<nano::mutex> lock{ mutex };
 		elections.get<tag_root> ().erase (election->qualified_root);
 	};
 
-	auto result = active.insert (block, nano::election_behavior::priority, index, priority, erase_callback);
+	auto result = active.insert (top.block, nano::election_behavior::priority, index, top.priority, erase_callback);
 	if (result.inserted)
 	{
 		release_assert (result.election);
-		elections.get<tag_root> ().insert ({ result.election, result.election->qualified_root, priority });
+		elections.get<tag_root> ().insert ({ result.election, result.election->qualified_root, top.priority });
 
 		stats.inc (nano::stat::type::election_bucket, nano::stat::detail::activate_success);
 	}
@@ -111,44 +115,10 @@ void nano::scheduler::bucket::update ()
 {
 	nano::lock_guard<nano::mutex> lock{ mutex };
 
-	if (election_overfill ())
+	if (overfill_predicate ())
 	{
 		cancel_lowest_election ();
 	}
-}
-
-// Returns true if the block was inserted
-bool nano::scheduler::bucket::push (uint64_t time, std::shared_ptr<nano::block> block)
-{
-	nano::lock_guard<nano::mutex> lock{ mutex };
-
-	auto [it, inserted] = queue.insert ({ time, block });
-	release_assert (!queue.empty ());
-	bool was_last = (it == --queue.end ());
-	if (queue.size () > config.max_blocks)
-	{
-		queue.erase (--queue.end ());
-		return inserted && !was_last;
-	}
-	return inserted;
-}
-
-bool nano::scheduler::bucket::contains (nano::block_hash const & hash) const
-{
-	nano::lock_guard<nano::mutex> lock{ mutex };
-	return queue.get<tag_hash> ().contains (hash);
-}
-
-size_t nano::scheduler::bucket::size () const
-{
-	nano::lock_guard<nano::mutex> lock{ mutex };
-	return queue.size ();
-}
-
-bool nano::scheduler::bucket::empty () const
-{
-	nano::lock_guard<nano::mutex> lock{ mutex };
-	return queue.empty ();
 }
 
 size_t nano::scheduler::bucket::election_count () const
@@ -167,46 +137,4 @@ void nano::scheduler::bucket::cancel_lowest_election ()
 
 		stats.inc (nano::stat::type::election_bucket, nano::stat::detail::cancel_lowest);
 	}
-}
-
-std::deque<std::shared_ptr<nano::block>> nano::scheduler::bucket::blocks () const
-{
-	nano::lock_guard<nano::mutex> lock{ mutex };
-
-	std::deque<std::shared_ptr<nano::block>> result;
-	for (auto const & item : queue)
-	{
-		result.push_back (item.block);
-	}
-	return result;
-}
-
-void nano::scheduler::bucket::dump () const
-{
-	for (auto const & item : queue)
-	{
-		std::cerr << item.time << ' ' << item.block->hash ().to_string () << '\n';
-	}
-}
-
-/*
- * priority_bucket_config
- */
-
-nano::error nano::scheduler::priority_bucket_config::serialize (nano::tomlconfig & toml) const
-{
-	toml.put ("max_blocks", max_blocks, "Maximum number of blocks to sort by priority per bucket. \nType: uint64");
-	toml.put ("reserved_elections", reserved_elections, "Number of guaranteed slots per bucket available for election activation. \nType: uint64");
-	toml.put ("max_elections", max_elections, "Maximum number of slots per bucket available for election activation if the active election count is below the configured limit. \nType: uint64");
-
-	return toml.get_error ();
-}
-
-nano::error nano::scheduler::priority_bucket_config::deserialize (nano::tomlconfig & toml)
-{
-	toml.get ("max_blocks", max_blocks);
-	toml.get ("reserved_elections", reserved_elections);
-	toml.get ("max_elections", max_elections);
-
-	return toml.get_error ();
 }
