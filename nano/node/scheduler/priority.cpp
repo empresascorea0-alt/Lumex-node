@@ -246,25 +246,33 @@ void nano::scheduler::priority::run ()
 
 void nano::scheduler::priority::run_cleanup ()
 {
+	// As long as there is work done, keep the cleanup loop busy with shorter sleeps
+	bool did_work = false;
+
 	nano::unique_lock<nano::mutex> lock{ mutex };
 	while (!stopped)
 	{
-		condition.wait_for (lock, 1s, [this] () {
+		condition.wait_for (lock, did_work ? config.cleanup_interval / 10 : config.cleanup_interval, [this] () {
 			return stopped;
 		});
-		if (!stopped)
+
+		did_work = false;
+
+		if (stopped)
 		{
-			stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::cleanup);
-
-			lock.unlock ();
-
-			for (auto const & [index, bucket] : buckets)
-			{
-				bucket->update ();
-			}
-
-			lock.lock ();
+			return;
 		}
+
+		stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::cleanup);
+
+		lock.unlock ();
+
+		for (auto const & [index, bucket] : buckets)
+		{
+			did_work |= bucket->cleanup ();
+		}
+
+		lock.lock ();
 	}
 }
 
@@ -296,6 +304,7 @@ nano::error nano::scheduler::priority_config::serialize (nano::tomlconfig & toml
 	toml.put ("reserved_blocks", reserved_blocks, "Reserved blocks per bucket. \nType: uint64");
 	toml.put ("reserved_elections", reserved_elections, "Guaranteed election slots per bucket. \nType: uint64");
 	toml.put ("max_elections", max_elections, "Maximum election slots per bucket when AEC has space. \nType: uint64");
+	toml.put ("cleanup_interval", cleanup_interval.count (), "Interval between cleanup runs when idle. \nType: milliseconds");
 
 	return toml.get_error ();
 }
@@ -307,6 +316,7 @@ nano::error nano::scheduler::priority_config::deserialize (nano::tomlconfig & to
 	toml.get ("reserved_blocks", reserved_blocks);
 	toml.get ("reserved_elections", reserved_elections);
 	toml.get ("max_elections", max_elections);
+	toml.get_duration ("cleanup_interval", cleanup_interval);
 
 	return toml.get_error ();
 }

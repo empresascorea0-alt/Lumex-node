@@ -40,14 +40,14 @@ public:
 
 	bool available (priority_entry top) const;
 	bool activate (priority_entry top);
-	void update ();
+	bool cleanup ();
 
 	size_t election_count () const;
 
 private:
 	bool activate_predicate (nano::priority_timestamp candidate) const;
 	bool overfill_predicate () const;
-	void cancel_lowest_election ();
+	bool cancel_lowest_election ();
 
 private: // Dependencies
 	priority_config const & config;

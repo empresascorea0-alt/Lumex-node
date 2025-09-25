@@ -29,6 +29,8 @@ public:
 	// Election configuration
 	size_t reserved_elections{ 100 }; // Guaranteed election slots per bucket
 	size_t max_elections{ 150 }; // Maximum election slots per bucket when AEC has space
+
+	std::chrono::milliseconds cleanup_interval{ 100 };
 };
 
 class priority final

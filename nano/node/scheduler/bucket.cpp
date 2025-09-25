@@ -4,10 +4,6 @@
 #include <nano/node/node.hpp>
 #include <nano/node/scheduler/bucket.hpp>
 
-/*
- * bucket
- */
-
 nano::scheduler::bucket::bucket (nano::bucket_index index_a, priority_config const & config_a, nano::active_elections & active_a, nano::stats & stats_a) :
 	index{ index_a },
 	config{ config_a },
@@ -111,14 +107,16 @@ bool nano::scheduler::bucket::activate (priority_entry top)
 	return result.inserted;
 }
 
-void nano::scheduler::bucket::update ()
+bool nano::scheduler::bucket::cleanup ()
 {
 	nano::lock_guard<nano::mutex> lock{ mutex };
 
 	if (overfill_predicate ())
 	{
-		cancel_lowest_election ();
+		return cancel_lowest_election ();
 	}
+
+	return false; // Nothing cancelled
 }
 
 size_t nano::scheduler::bucket::election_count () const
@@ -127,7 +125,7 @@ size_t nano::scheduler::bucket::election_count () const
 	return elections.size ();
 }
 
-void nano::scheduler::bucket::cancel_lowest_election ()
+bool nano::scheduler::bucket::cancel_lowest_election ()
 {
 	debug_assert (!mutex.try_lock ());
 
@@ -136,5 +134,9 @@ void nano::scheduler::bucket::cancel_lowest_election ()
 		elections.get<tag_priority> ().begin ()->election->cancel ();
 
 		stats.inc (nano::stat::type::election_bucket, nano::stat::detail::cancel_lowest);
+
+		return true; // Cancelled
 	}
+
+	return false;
 }
