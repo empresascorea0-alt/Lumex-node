@@ -35,7 +35,7 @@ public:
 	nano::bucket_index const index;
 
 public:
-	bucket (nano::bucket_index, priority_config const &, nano::active_elections &, nano::stats &);
+	bucket (nano::bucket_index, priority_config const &, nano::active_elections &, nano::stats &, nano::logger &);
 	~bucket ();
 
 	bool available (priority_entry top) const;
@@ -53,6 +53,7 @@ private: // Dependencies
 	priority_config const & config;
 	nano::active_elections & active;
 	nano::stats & stats;
+	nano::logger & logger;
 
 private: // Elections
 	struct election_entry

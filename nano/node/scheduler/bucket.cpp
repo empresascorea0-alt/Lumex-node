@@ -1,14 +1,16 @@
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/scheduler/bucket.hpp>
 
-nano::scheduler::bucket::bucket (nano::bucket_index index_a, priority_config const & config_a, nano::active_elections & active_a, nano::stats & stats_a) :
+nano::scheduler::bucket::bucket (nano::bucket_index index_a, priority_config const & config_a, nano::active_elections & active_a, nano::stats & stats_a, nano::logger & logger_a) :
 	index{ index_a },
 	config{ config_a },
 	active{ active_a },
-	stats{ stats_a }
+	stats{ stats_a },
+	logger{ logger_a }
 {
 }
 
@@ -98,6 +100,14 @@ bool nano::scheduler::bucket::activate (priority_entry top)
 		elections.get<tag_root> ().insert ({ result.election, result.election->qualified_root, top.priority });
 
 		stats.inc (nano::stat::type::election_bucket, nano::stat::detail::activate_success);
+
+		logger.debug (nano::log::type::election_scheduler,
+		"Inserted election for block: {}, root: {} (account: {}, bucket: {}, priority timestamp: {})",
+		top.block->hash (),
+		top.block->qualified_root (),
+		top.block->account (),
+		index,
+		top.priority);
 	}
 	else
 	{
@@ -131,9 +141,22 @@ bool nano::scheduler::bucket::cancel_lowest_election ()
 
 	if (!elections.empty ())
 	{
-		elections.get<tag_priority> ().begin ()->election->cancel ();
+		auto & by_priority = elections.get<tag_priority> ();
+		auto it = by_priority.begin ();
+		release_assert (it != by_priority.end ());
+
+		auto election = it->election;
+
+		logger.debug (nano::log::type::election_scheduler,
+		"Cancelling lowest-priority election for root: {} (account: {}, bucket: {}, priority timestamp: {})",
+		election->qualified_root,
+		election->account,
+		index,
+		it->priority);
 
 		stats.inc (nano::stat::type::election_bucket, nano::stat::detail::cancel_lowest);
+
+		election->cancel ();
 
 		return true; // Cancelled
 	}

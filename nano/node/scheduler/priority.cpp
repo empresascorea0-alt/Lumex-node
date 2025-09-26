@@ -23,7 +23,7 @@ nano::scheduler::priority::priority (nano::node_config & node_config, nano::node
 {
 	for (auto const & index : bucketing.bucket_indices ())
 	{
-		buckets[index] = std::make_unique<scheduler::bucket> (index, config, active, stats);
+		buckets[index] = std::make_unique<scheduler::bucket> (index, config, active, stats, logger);
 	}
 
 	if (!config.enable)
@@ -143,6 +143,10 @@ bool nano::scheduler::priority::activate (secure::transaction const & transactio
 		if (added)
 		{
 			stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::activated);
+
+			logger.debug (nano::log::type::election_scheduler, "Activated block: {} for account: {} (bucket: {}, priority timestamp: {})",
+			block->hash (), account, bucket_index, priority_timestamp);
+
 			logger.trace (nano::log::type::election_scheduler, nano::log::detail::block_activated,
 			nano::log::arg{ "account", account },
 			nano::log::arg{ "block", block },
