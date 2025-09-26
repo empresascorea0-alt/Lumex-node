@@ -76,7 +76,7 @@ private: // Elections
 		mi::hashed_unique<mi::tag<tag_root>,
 			mi::member<election_entry, nano::qualified_root, &election_entry::root>>,
 		mi::ordered_non_unique<mi::tag<tag_priority>,
-			mi::member<election_entry, nano::priority_timestamp, &election_entry::priority>>
+			mi::member<election_entry, nano::priority_timestamp, &election_entry::priority>, std::greater<>> // Descending
 	>>;
 	// clang-format on
 
