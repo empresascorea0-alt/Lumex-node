@@ -21,7 +21,7 @@ jobs:
           # Bug when running with TSAN: "ThreadSanitizer: CHECK failed: sanitizer_deadlock_detector"
           - BACKEND: rocksdb
             SANITIZER: { name: TSAN }
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       COMPILER: ${{ matrix.COMPILER }}
       BACKEND: ${{ matrix.BACKEND }}
