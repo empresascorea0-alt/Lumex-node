@@ -50,10 +50,12 @@ bool nano::scheduler::bucket::activate_predicate (nano::priority_timestamp candi
 	// We are at max election capacity, only activate if candidate has better priority than the worst priority election
 	if (!elections.empty ())
 	{
-		auto lowest = elections.get<tag_priority> ().begin ()->priority;
+		auto & by_priority = elections.get<tag_priority> ();
+		auto worst_it = by_priority.begin (); // Worst priority (highest priority value)
+		release_assert (worst_it != by_priority.end ());
 
-		// Compare to equal to drain duplicates
-		if (candidate <= lowest)
+		// Lower priority value is better
+		if (candidate < worst_it->priority)
 		{
 			// Bound number of reprioritizations up to twice the max election capacity
 			return elections.size () < config.max_elections * 2;
@@ -67,7 +69,7 @@ bool nano::scheduler::bucket::overfill_predicate () const
 {
 	debug_assert (!mutex.try_lock ());
 
-	if (elections.size () < config.reserved_elections)
+	if (elections.size () <= config.reserved_elections)
 	{
 		// Never overfill within reserved capacity
 		return false;
@@ -142,17 +144,17 @@ bool nano::scheduler::bucket::cancel_lowest_election ()
 	if (!elections.empty ())
 	{
 		auto & by_priority = elections.get<tag_priority> ();
-		auto it = by_priority.begin ();
-		release_assert (it != by_priority.end ());
+		auto worst_it = by_priority.begin (); // Worst priority (highest priority value)
+		release_assert (worst_it != by_priority.end ());
 
-		auto election = it->election;
+		auto election = worst_it->election;
 
 		logger.debug (nano::log::type::election_scheduler,
 		"Cancelling lowest-priority election for root: {} (account: {}, bucket: {}, priority timestamp: {})",
 		election->qualified_root,
 		election->account,
 		index,
-		it->priority);
+		worst_it->priority);
 
 		stats.inc (nano::stat::type::election_bucket, nano::stat::detail::cancel_lowest);
 
