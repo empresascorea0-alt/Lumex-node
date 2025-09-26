@@ -150,7 +150,7 @@ bool nano::scheduler::priority::activate (secure::transaction const & transactio
 			nano::log::arg{ "priority_balance", priority_balance },
 			nano::log::arg{ "priority_timestamp", priority_timestamp });
 
-			notify ();
+			condition.notify_all ();
 		}
 		else
 		{
@@ -162,6 +162,13 @@ bool nano::scheduler::priority::activate (secure::transaction const & transactio
 
 	stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::activate_failed);
 	return false; // Not activated
+}
+
+bool nano::scheduler::priority::push (std::shared_ptr<nano::block> const & block, nano::bucket_index bucket, nano::priority_timestamp priority)
+{
+	bool result = pool.lock ()->push (block, bucket, priority);
+	condition.notify_all ();
+	return result;
 }
 
 bool nano::scheduler::priority::activate_successors (secure::transaction const & transaction, nano::block const & block)
@@ -188,6 +195,22 @@ std::size_t nano::scheduler::priority::size () const
 bool nano::scheduler::priority::empty () const
 {
 	return pool.lock ()->empty ();
+}
+
+size_t nano::scheduler::priority::pool_size () const
+{
+	return pool.lock ()->size ();
+}
+
+size_t nano::scheduler::priority::pool_size (nano::bucket_index bucket) const
+{
+	return pool.lock ()->size (bucket);
+}
+
+size_t nano::scheduler::priority::election_count (nano::bucket_index bucket) const
+{
+	auto it = buckets.find (bucket);
+	return it != buckets.end () ? it->second->election_count () : 0;
 }
 
 bool nano::scheduler::priority::predicate () const

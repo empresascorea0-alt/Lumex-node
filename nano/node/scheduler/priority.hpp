@@ -55,7 +55,14 @@ public:
 	size_t size () const;
 	bool empty () const;
 
+	size_t pool_size () const;
+	size_t pool_size (nano::bucket_index) const;
+	size_t election_count (nano::bucket_index) const;
+
 	nano::container_info container_info () const;
+
+public: // Testing
+	bool push (std::shared_ptr<nano::block> const & block, nano::bucket_index, nano::priority_timestamp);
 
 private: // Dependencies
 	priority_config const & config;
