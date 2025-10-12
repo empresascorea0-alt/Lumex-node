@@ -1,4 +1,5 @@
 #include <nano/boost/process/process.hpp>
+#include <nano/boost/stacktrace.hpp>
 #include <nano/crypto_lib/random_pool.hpp>
 #include <nano/lib/block_type.hpp>
 #include <nano/lib/blocks.hpp>
@@ -30,12 +31,6 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/range/adaptor/reversed.hpp>
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#endif
-#include <boost/stacktrace.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 

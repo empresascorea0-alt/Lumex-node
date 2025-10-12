@@ -1,3 +1,4 @@
+#include <nano/boost/stacktrace.hpp>
 #include <nano/lib/jsonconfig.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/thread_roles.hpp>
@@ -8,13 +9,6 @@
 #include <nano/store/lmdb/transaction_impl.hpp>
 
 #include <boost/format.hpp>
-
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#endif
-#include <boost/stacktrace.hpp>
 
 namespace
 {

@@ -1,6 +1,5 @@
+#include <nano/boost/stacktrace.hpp>
 #include <nano/lib/stacktrace.hpp>
-
-#include <boost/stacktrace.hpp>
 
 #include <sstream>
 
