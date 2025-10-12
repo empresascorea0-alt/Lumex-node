@@ -132,9 +132,8 @@ void nano::add_node_flag_options (boost::program_options::options_description & 
 	// clang-format on
 }
 
-std::error_code nano::update_flags (nano::node_flags & flags_a, boost::program_options::variables_map const & vm)
+void nano::update_flags (nano::node_flags & flags_a, boost::program_options::variables_map const & vm)
 {
-	std::error_code ec;
 	flags_a.disable_add_initial_peers = (vm.count ("disable_add_initial_peers") > 0);
 	flags_a.disable_max_peers_per_ip = (vm.count ("disable_max_peers_per_ip") > 0);
 	flags_a.disable_max_peers_per_subnetwork = (vm.count ("disable_max_peers_per_subnetwork") > 0);
@@ -209,7 +208,6 @@ std::error_code nano::update_flags (nano::node_flags & flags_a, boost::program_o
 	{
 		flags_a.rpc_config_overrides = nano::config_overrides (rpcconfig->second.as<std::vector<nano::config_key_value_pair>> ());
 	}
-	return ec;
 }
 
 std::error_code nano::flags_config_conflicts (nano::node_flags const & flags_a, nano::node_config const & config_a)

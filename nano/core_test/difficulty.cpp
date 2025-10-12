@@ -10,11 +10,8 @@
 
 #include <gtest/gtest.h>
 
-TEST (difficultyDeathTest, multipliers)
+TEST (difficulty, multipliers)
 {
-	// For ASSERT_DEATH_IF_SUPPORTED
-	testing::FLAGS_gtest_death_test_style = "threadsafe";
-
 	{
 		uint64_t base = 0xff00000000000000;
 		uint64_t difficulty = 0xfff27e7a57c285cd;
@@ -51,19 +48,14 @@ TEST (difficultyDeathTest, multipliers)
 		ASSERT_EQ (difficulty, nano::difficulty::from_multiplier (expected_multiplier, base));
 	}
 
-	// The death checks don't fail on a release config, so guard against them
-#ifndef NDEBUG
-	// Causes valgrind to be noisy
-	if (!nano::running_within_valgrind ())
 	{
 		uint64_t base = 0xffffffc000000000;
 		uint64_t difficulty_nil = 0;
 		double multiplier_nil = 0.;
 
-		ASSERT_DEATH_IF_SUPPORTED (nano::difficulty::to_multiplier (difficulty_nil, base), "");
-		ASSERT_DEATH_IF_SUPPORTED (nano::difficulty::from_multiplier (multiplier_nil, base), "");
+		ASSERT_EQ (0., nano::difficulty::to_multiplier (difficulty_nil, base));
+		ASSERT_EQ (0, nano::difficulty::from_multiplier (multiplier_nil, base));
 	}
-#endif
 }
 
 TEST (difficulty, overflow)
