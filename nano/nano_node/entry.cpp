@@ -1,3 +1,4 @@
+#include <nano/boost/process/process.hpp>
 #include <nano/crypto_lib/random_pool.hpp>
 #include <nano/lib/block_type.hpp>
 #include <nano/lib/blocks.hpp>
@@ -27,7 +28,6 @@
 #include <boost/dll/runtime_symbol_info.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/process/v1.hpp>
 #include <boost/program_options.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 #ifdef _WIN32
