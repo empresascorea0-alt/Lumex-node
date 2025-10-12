@@ -14,8 +14,6 @@
 #include <nano/node/openclwork.hpp>
 #include <nano/rpc/rpc.hpp>
 
-#include <boost/process.hpp>
-
 #include <csignal>
 #include <iostream>
 #include <latch>

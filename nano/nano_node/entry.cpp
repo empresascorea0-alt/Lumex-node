@@ -27,7 +27,7 @@
 #include <boost/dll/runtime_symbol_info.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/process.hpp>
+#include <boost/process/v1.hpp>
 #include <boost/program_options.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 #ifdef _WIN32
