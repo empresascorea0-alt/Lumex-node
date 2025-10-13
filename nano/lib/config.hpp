@@ -14,20 +14,6 @@
 
 using namespace std::chrono_literals;
 
-#define xstr(a) ver_str (a)
-#define ver_str(a) #a
-
-/**
- * Returns build version information
- */
-char const * const NANO_VERSION_STRING = xstr (TAG_VERSION_STRING);
-char const * const NANO_MAJOR_VERSION_STRING = xstr (MAJOR_VERSION_STRING);
-char const * const NANO_MINOR_VERSION_STRING = xstr (MINOR_VERSION_STRING);
-char const * const NANO_PATCH_VERSION_STRING = xstr (PATCH_VERSION_STRING);
-char const * const NANO_PRE_RELEASE_VERSION_STRING = xstr (PRE_RELEASE_VERSION_STRING);
-
-char const * const BUILD_INFO = xstr (GIT_COMMIT_HASH BOOST_COMPILER) " \"BOOST " xstr (BOOST_VERSION) "\" BUILT " xstr (__DATE__);
-
 /*
  * Sanitizer info
  */
@@ -74,11 +60,6 @@ consteval bool is_sanitizer_build ()
 
 namespace nano
 {
-uint8_t get_major_node_version ();
-uint8_t get_minor_node_version ();
-uint8_t get_patch_node_version ();
-uint8_t get_pre_release_node_version ();
-
 uint16_t test_node_port ();
 uint16_t test_rpc_port ();
 uint16_t test_ipc_port ();

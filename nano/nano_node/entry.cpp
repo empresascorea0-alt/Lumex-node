@@ -1,3 +1,5 @@
+#include <nano/boost/process/process.hpp>
+#include <nano/boost/stacktrace.hpp>
 #include <nano/crypto_lib/random_pool.hpp>
 #include <nano/lib/block_type.hpp>
 #include <nano/lib/blocks.hpp>
@@ -5,6 +7,7 @@
 #include <nano/lib/files.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/utility.hpp>
+#include <nano/lib/version.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/nano_node/benchmarks/benchmarks.hpp>
 #include <nano/nano_node/daemon.hpp>
@@ -27,15 +30,8 @@
 #include <boost/dll/runtime_symbol_info.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/process.hpp>
 #include <boost/program_options.hpp>
 #include <boost/range/adaptor/reversed.hpp>
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#endif
-#include <boost/stacktrace.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 
@@ -43,6 +39,8 @@
 #include <sstream>
 
 #include <argon2.h>
+
+using namespace nano;
 
 namespace
 {

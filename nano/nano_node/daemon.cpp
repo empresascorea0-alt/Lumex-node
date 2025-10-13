@@ -5,6 +5,7 @@
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/utility.hpp>
+#include <nano/lib/version.hpp>
 #include <nano/nano_node/daemon.hpp>
 #include <nano/node/cli.hpp>
 #include <nano/node/daemonconfig.hpp>
@@ -13,8 +14,6 @@
 #include <nano/node/node.hpp>
 #include <nano/node/openclwork.hpp>
 #include <nano/rpc/rpc.hpp>
-
-#include <boost/process.hpp>
 
 #include <csignal>
 #include <iostream>

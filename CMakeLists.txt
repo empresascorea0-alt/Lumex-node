@@ -8,6 +8,10 @@ if(CMAKE_VERSION VERSION_GREATER 3.13 OR CMAKE_VERSION VERSION_EQUAL 3.13)
   # option honors normal variables
   cmake_policy(SET CMP0077 NEW)
 endif()
+# De-duplicate libraries on link lines based on linker capabilities
+if(POLICY CMP0156)
+  cmake_policy(SET CMP0156 NEW)
+endif()
 
 # OSX compatibility needs to be set before project is declared
 set(CMAKE_OSX_DEPLOYMENT_TARGET

@@ -6,6 +6,7 @@
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/tomlconfig.hpp>
 #include <nano/lib/utility.hpp>
+#include <nano/lib/version.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/backlog_scan.hpp>

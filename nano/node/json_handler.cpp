@@ -5,6 +5,7 @@
 #include <nano/lib/jsonconfig.hpp>
 #include <nano/lib/stats_sinks.hpp>
 #include <nano/lib/timer.hpp>
+#include <nano/lib/version.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/bootstrap/bootstrap_service.hpp>

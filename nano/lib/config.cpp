@@ -5,6 +5,7 @@
 #include <nano/lib/constants.hpp>
 #include <nano/lib/env.hpp>
 #include <nano/lib/logging.hpp>
+#include <nano/lib/version.hpp>
 
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
@@ -14,23 +15,6 @@
 
 namespace nano
 {
-uint8_t get_major_node_version ()
-{
-	return boost::numeric_cast<uint8_t> (boost::lexical_cast<int> (NANO_MAJOR_VERSION_STRING));
-}
-uint8_t get_minor_node_version ()
-{
-	return boost::numeric_cast<uint8_t> (boost::lexical_cast<int> (NANO_MINOR_VERSION_STRING));
-}
-uint8_t get_patch_node_version ()
-{
-	return boost::numeric_cast<uint8_t> (boost::lexical_cast<int> (NANO_PATCH_VERSION_STRING));
-}
-uint8_t get_pre_release_node_version ()
-{
-	return boost::numeric_cast<uint8_t> (boost::lexical_cast<int> (NANO_PRE_RELEASE_VERSION_STRING));
-}
-
 void force_nano_dev_network ()
 {
 	nano::network_constants::set_active_network (nano::networks::nano_dev_network);

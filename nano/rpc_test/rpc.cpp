@@ -6,6 +6,7 @@
 #include <nano/lib/rpcconfig.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/threading.hpp>
+#include <nano/lib/version.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/cementing_set.hpp>
@@ -46,6 +47,7 @@
 
 using namespace std::chrono_literals;
 using namespace nano::test;
+using namespace nano;
 
 TEST (rpc, creation)
 {
