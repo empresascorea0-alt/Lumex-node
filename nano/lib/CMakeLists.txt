@@ -39,6 +39,8 @@ add_library(
   config.hpp
   config.cpp
   configbase.hpp
+  version.hpp
+  version.cpp
   constants.hpp
   constants.cpp
   container_info.hpp

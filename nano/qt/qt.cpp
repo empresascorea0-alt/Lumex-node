@@ -1,6 +1,7 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
 #include <nano/lib/stats_sinks.hpp>
+#include <nano/lib/version.hpp>
 #include <nano/node/election_status.hpp>
 #include <nano/node/vote_with_weight_info.hpp>
 #include <nano/qt/qt.hpp>
@@ -15,6 +16,8 @@
 #include <sstream>
 
 #include <fmt/format.h>
+
+using namespace nano;
 
 namespace
 {

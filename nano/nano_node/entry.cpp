@@ -7,6 +7,7 @@
 #include <nano/lib/files.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/utility.hpp>
+#include <nano/lib/version.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/nano_node/benchmarks/benchmarks.hpp>
 #include <nano/nano_node/daemon.hpp>
@@ -38,6 +39,8 @@
 #include <sstream>
 
 #include <argon2.h>
+
+using namespace nano;
 
 namespace
 {

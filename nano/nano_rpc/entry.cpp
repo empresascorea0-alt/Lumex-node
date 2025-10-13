@@ -6,6 +6,7 @@
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/utility.hpp>
+#include <nano/lib/version.hpp>
 #include <nano/node/cli.hpp>
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/rpc/rpc.hpp>
@@ -16,6 +17,8 @@
 #include <boost/program_options.hpp>
 
 #include <latch>
+
+using namespace nano;
 
 namespace
 {
