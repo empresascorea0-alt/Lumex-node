@@ -22,8 +22,6 @@
 #include <crypto/ed25519-donna/ed25519.h>
 #include <cryptopp/words.h>
 
-nano::networks nano::network_constants::active_network = nano::networks::ACTIVE_NETWORK;
-
 namespace
 {
 char const * dev_private_key_data = "34F0A37AAD20F4A260F0A5B3CB3D7FB50673212263E58A380BC10474BB039CE4";
@@ -82,7 +80,7 @@ std::shared_ptr<nano::block> parse_block_from_genesis_data (std::string const & 
  */
 
 nano::keypair nano::dev::genesis_key{ dev_private_key_data };
-nano::network_params nano::dev::network_params{ nano::networks::nano_dev_network };
+nano::network_params nano::dev::network_params{ nano::network_type::nano_dev_network };
 nano::ledger_constants & nano::dev::constants{ nano::dev::network_params.ledger };
 std::shared_ptr<nano::block> & nano::dev::genesis = nano::dev::constants.genesis;
 
@@ -90,24 +88,24 @@ std::shared_ptr<nano::block> & nano::dev::genesis = nano::dev::constants.genesis
  *
  */
 
-nano::work_thresholds nano::work_thresholds_for_network (nano::networks network_type)
+nano::work_thresholds nano::work_thresholds_for_network (nano::network_type network_type)
 {
 	switch (network_type)
 	{
-		case nano::networks::nano_live_network:
+		case nano::network_type::nano_live_network:
 			return nano::work_thresholds::publish_full;
-		case nano::networks::nano_beta_network:
+		case nano::network_type::nano_beta_network:
 			return nano::work_thresholds::publish_beta;
-		case nano::networks::nano_dev_network:
+		case nano::network_type::nano_dev_network:
 			return nano::work_thresholds::publish_dev;
-		case nano::networks::nano_test_network:
+		case nano::network_type::nano_test_network:
 			return nano::work_thresholds::publish_test;
 		default:
 			release_assert (false, "invalid network");
 	}
 }
 
-nano::network_params::network_params (nano::networks network_type) :
+nano::network_params::network_params (nano::network_type network_type) :
 	work{ work_thresholds_for_network (network_type) },
 	network{ work, network_type },
 	ledger{ network_type },
@@ -125,7 +123,7 @@ nano::network_params::network_params (nano::networks network_type) :
  *
  */
 
-nano::ledger_constants::ledger_constants (nano::networks network_type) :
+nano::ledger_constants::ledger_constants (nano::network_type network_type) :
 	zero_key{ "0" },
 	nano_beta_account{ beta_public_key_data },
 	nano_live_account{ live_public_key_data },
@@ -188,25 +186,25 @@ nano::ledger_constants::ledger_constants (nano::networks network_type) :
 	nano::account epoch_v2_signer;
 	switch (network_type)
 	{
-		case networks::nano_dev_network:
+		case nano::network_type::nano_dev_network:
 		{
 			genesis = nano_dev_genesis;
 			epoch_v2_signer = nano::dev::genesis_key.pub;
 		}
 		break;
-		case networks::nano_live_network:
+		case nano::network_type::nano_live_network:
 		{
 			genesis = nano_live_genesis;
 			epoch_v2_signer = nano::account::from_account ("nano_3qb6o6i1tkzr6jwr5s7eehfxwg9x6eemitdinbpi7u8bjjwsgqfj4wzser3x");
 		}
 		break;
-		case networks::nano_beta_network:
+		case nano::network_type::nano_beta_network:
 		{
 			genesis = nano_beta_genesis;
 			epoch_v2_signer = nano_beta_account;
 		}
 		break;
-		case networks::nano_test_network:
+		case nano::network_type::nano_test_network:
 		{
 			genesis = nano_test_genesis;
 			epoch_v2_signer = nano_test_account;
