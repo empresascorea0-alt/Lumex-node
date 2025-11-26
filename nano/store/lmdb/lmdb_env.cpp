@@ -124,3 +124,29 @@ MDB_txn * nano::store::lmdb::env::tx (store::transaction const & transaction_a) 
 	debug_assert (transaction_a.store_id () == store_id);
 	return static_cast<MDB_txn *> (transaction_a.get_handle ());
 }
+
+void nano::store::lmdb::env::create_backup_file (std::filesystem::path const & filepath, nano::logger & logger) const
+{
+	auto extension = filepath.extension ();
+	auto filename_without_extension = filepath.filename ().replace_extension ("");
+	auto orig_filepath = filepath;
+	auto & backup_path = orig_filepath.remove_filename ();
+	auto backup_filename = filename_without_extension;
+	backup_filename += "_backup_";
+	backup_filename += std::to_string (std::chrono::system_clock::now ().time_since_epoch ().count ());
+	backup_filename += extension;
+	auto backup_filepath = backup_path / backup_filename;
+
+	logger.info (nano::log::type::lmdb, "Performing {} backup before database upgrade...", filepath.filename ().string ());
+
+	auto error (mdb_env_copy (*this, backup_filepath.string ().c_str ()));
+	if (error)
+	{
+		logger.critical (nano::log::type::lmdb, "Database backup failed");
+		std::exit (1);
+	}
+	else
+	{
+		logger.info (nano::log::type::lmdb, "Database backup completed. Backup can be found at: {}", backup_filepath.string ());
+	}
+}

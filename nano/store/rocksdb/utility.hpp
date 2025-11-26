@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nano/store/db_val_templ.hpp>
 #include <nano/store/rocksdb/db_val.hpp>
 
 #include <variant>

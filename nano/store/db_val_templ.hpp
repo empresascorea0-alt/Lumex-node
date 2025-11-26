@@ -12,6 +12,12 @@ namespace nano::store
 {
 // Constructor implementations
 
+inline db_val::db_val (std::shared_ptr<std::vector<uint8_t>> buffer) noexcept :
+	buffer{ buffer }
+{
+	convert_buffer_to_value ();
+}
+
 inline db_val::db_val (uint64_t value) :
 	buffer{ std::make_shared<std::vector<uint8_t>> () }
 {

@@ -42,11 +42,7 @@ public:
 	{
 	}
 
-	db_val (std::shared_ptr<std::vector<uint8_t>> buffer) noexcept :
-		buffer{ buffer }
-	{
-		convert_buffer_to_value ();
-	}
+	db_val (std::shared_ptr<std::vector<uint8_t>> buffer) noexcept;
 
 	db_val (uint64_t value);
 	db_val (nano::uint128_union const &);
