@@ -64,6 +64,7 @@
 #include <nano/store/ledger/rep_weight.hpp>
 #include <nano/store/ledger/version.hpp>
 #include <nano/store/ledger_store.hpp>
+#include <nano/store/rocksdb/backend_rocksdb.hpp>
 
 #include <boost/format.hpp>
 #include <boost/property_tree/json_parser.hpp>
@@ -454,11 +455,6 @@ nano::node::~node ()
 {
 	logger.debug (nano::log::type::node, "Destructing node...");
 	stop ();
-}
-
-void nano::node::copy_with_compaction (std::filesystem::path const & destination)
-{
-	store.backend.copy_with_compaction (destination);
 }
 
 void nano::node::keepalive (std::string const & address_a, uint16_t port_a)
@@ -1023,6 +1019,15 @@ nano::container_info nano::node::container_info () const
 	info.add ("vote_rebroadcaster", vote_rebroadcaster.container_info ());
 	info.add ("fork_cache", fork_cache.container_info ());
 	return info;
+}
+
+/*
+ *
+ */
+
+void nano::node::copy_with_compaction (std::filesystem::path const & destination)
+{
+	store.backend.copy_with_compaction (destination);
 }
 
 /*

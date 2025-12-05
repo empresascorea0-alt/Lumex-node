@@ -104,6 +104,8 @@ add_library(
   message_processor.cpp
   messages.hpp
   messages.cpp
+  migrations.hpp
+  migrations.cpp
   monitor.hpp
   monitor.cpp
   network.hpp

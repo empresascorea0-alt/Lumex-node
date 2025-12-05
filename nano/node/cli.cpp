@@ -6,6 +6,7 @@
 #include <nano/node/daemonconfig.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/inactive_node.hpp>
+#include <nano/node/migrations.hpp>
 #include <nano/node/node.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
@@ -481,24 +482,30 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 	}
 	else if (vm.count ("migrate_database_lmdb_to_rocksdb"))
 	{
+		auto data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : nano::working_path ();
+
 		nano::logger::initialize (nano::log_config::daemon_default (), data_path);
 
-		auto data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : nano::working_path ();
-		auto node_flags = nano::inactive_node_flag_defaults ();
-		node_flags.config_overrides.push_back ("node.rocksdb.enable=false");
-		nano::update_flags (node_flags, vm);
+		nano::lmdb_config lmdb_config;
+		nano::rocksdb_config rocksdb_config;
+		{
+			nano::network_params network_params{ nano::get_active_network () };
+			nano::daemon_config daemon_config{ data_path, network_params };
+			if (!nano::read_node_config_toml (data_path, daemon_config))
+			{
+				lmdb_config = daemon_config.node.lmdb_config;
+				rocksdb_config = daemon_config.node.rocksdb_config;
+			}
+		}
+
 		try
 		{
-			nano::inactive_node node (data_path, node_flags);
-			auto error = node.node->ledger.migrate_lmdb_to_rocksdb (data_path);
-			if (error)
-			{
-				std::cerr << "There was an error migrating" << std::endl;
-			}
+			nano::migrate_lmdb_to_rocksdb (data_path, lmdb_config, rocksdb_config);
 		}
 		catch (std::exception const & e)
 		{
-			std::cerr << "Error initializing node for migration: " << e.what () << std::endl;
+			nano::default_logger ().error (nano::log::type::migration, "Migration failed: {}", e.what ());
+			std::cerr << "Migration failed: " << e.what () << std::endl;
 		}
 	}
 	else if (vm.count ("rollback"))

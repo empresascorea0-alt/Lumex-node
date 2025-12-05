@@ -28,6 +28,7 @@ enum class type
 	test,
 	system,
 	init,
+	cli,
 	config,
 	stats,
 	logging,
@@ -93,6 +94,7 @@ enum class type
 	bounded_backlog,
 	request_aggregator,
 	vote_rebroadcaster,
+	migration,
 
 	// bootstrap
 	bulk_pull_client,
