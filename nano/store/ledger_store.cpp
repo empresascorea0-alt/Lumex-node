@@ -263,12 +263,11 @@ void ledger_store::upgrade_v21_to_v22 ()
 
 	backend.open (schema_v21, nano::store::open_mode::read_write);
 	{
+		release_assert (backend.get_version (backend.tx_begin_read ()) == 21, "unexpected version during upgrade", std::to_string (backend.get_version (backend.tx_begin_read ())));
+
+		backend.drop_table ("unchecked");
+
 		auto transaction = backend.tx_begin_write ();
-		debug_assert (backend.get_version (transaction) == 21, "unexpected version during upgrade", std::to_string (backend.get_version (transaction)));
-
-		backend.drop_table (transaction, "unchecked");
-		transaction.refresh ();
-
 		backend.set_version (transaction, 22);
 	}
 	backend.close ();
@@ -285,13 +284,13 @@ void ledger_store::upgrade_v22_to_v23 ()
 	// This allows us to drop it if a previous upgrade attempt failed halfway
 	backend.open (schema_v23, nano::store::open_mode::read_write);
 	{
-		auto transaction = backend.tx_begin_write ();
-		debug_assert (backend.get_version (transaction) == 22, "unexpected version during upgrade", std::to_string (backend.get_version (transaction)));
+		release_assert (backend.get_version (backend.tx_begin_read ()) == 22, "unexpected version during upgrade", std::to_string (backend.get_version (backend.tx_begin_read ())));
 
 		// Always drop rep_weights table to ensure it's empty before populating
 		// This can happen if an upgrade was attempted but failed halfway through
-		backend.clear (transaction, tables::rep_weights);
-		transaction.refresh ();
+		backend.clear (tables::rep_weights);
+
+		auto transaction = backend.tx_begin_write ();
 
 		release_assert (rep_weight.begin (backend.tx_begin_read ()) == rep_weight.end (transaction), "rep weights table must be empty before upgrading to v23");
 
@@ -353,12 +352,11 @@ void ledger_store::upgrade_v23_to_v24 ()
 
 	backend.open (schema_v23, nano::store::open_mode::read_write);
 	{
+		release_assert (backend.get_version (backend.tx_begin_read ()) == 23, "unexpected version during upgrade", std::to_string (backend.get_version (backend.tx_begin_read ())));
+
+		backend.drop_table ("frontiers");
+
 		auto transaction = backend.tx_begin_write ();
-		debug_assert (backend.get_version (transaction) == 23, "unexpected version during upgrade", std::to_string (backend.get_version (transaction)));
-
-		backend.drop_table (transaction, "frontiers");
-		transaction.refresh ();
-
 		version.put (transaction, 24);
 	}
 	backend.close ();

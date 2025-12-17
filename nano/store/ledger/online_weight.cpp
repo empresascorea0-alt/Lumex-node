@@ -44,9 +44,9 @@ size_t online_weight_view::count (nano::store::transaction const & txn) const
 	return backend.count (txn, tables::online_weight);
 }
 
-void online_weight_view::clear (nano::store::write_transaction const & txn)
+void online_weight_view::clear ()
 {
-	auto status = backend.clear (txn, tables::online_weight);
+	auto status = backend.clear (tables::online_weight);
 	backend.release_assert_success (status);
 }
 }

@@ -245,8 +245,8 @@ TEST (ledger_upgrades, upgrade_v21_to_v22)
 		legacy_db.add_unchecked (2, 200);
 
 		// Verify unchecked table exists before upgrade
+		ASSERT_TRUE (legacy_db.backend->table_exists ("unchecked"));
 		auto tx = legacy_db.backend->tx_begin_read ();
-		ASSERT_TRUE (legacy_db.backend->table_exists (tx, "unchecked"));
 		ASSERT_EQ (legacy_db.backend->count (tx, nano::tables::unchecked), 2);
 	}
 
@@ -271,7 +271,7 @@ TEST (ledger_upgrades, upgrade_v21_to_v22)
 		backend->open (schema_v22, nano::store::open_mode::read_only);
 		auto tx = backend->tx_begin_read ();
 		ASSERT_EQ (backend->get_version (tx), 22);
-		ASSERT_FALSE (backend->table_exists (tx, "unchecked"));
+		ASSERT_FALSE (backend->table_exists ("unchecked"));
 	}
 }
 
@@ -551,8 +551,8 @@ TEST (ledger_upgrades, upgrade_v23_to_v24)
 		legacy_db.add_frontier (2, 200);
 
 		// Verify frontiers table exists before upgrade
+		ASSERT_TRUE (legacy_db.backend->table_exists ("frontiers"));
 		auto tx = legacy_db.backend->tx_begin_read ();
-		ASSERT_TRUE (legacy_db.backend->table_exists (tx, "frontiers"));
 		ASSERT_EQ (legacy_db.backend->count (tx, nano::tables::frontiers), 2);
 	}
 
@@ -577,7 +577,7 @@ TEST (ledger_upgrades, upgrade_v23_to_v24)
 		backend->open (nano::store::ledger_store::schema_current, nano::store::open_mode::read_only);
 		auto tx = backend->tx_begin_read ();
 		ASSERT_EQ (backend->get_version (tx), 24);
-		ASSERT_FALSE (backend->table_exists (tx, "frontiers"));
+		ASSERT_FALSE (backend->table_exists ("frontiers"));
 	}
 }
 

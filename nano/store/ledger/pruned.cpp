@@ -43,9 +43,9 @@ size_t pruned_view::count (nano::store::transaction const & txn) const
 	return backend.count (txn, tables::pruned);
 }
 
-void pruned_view::clear (nano::store::write_transaction const & txn)
+void pruned_view::clear ()
 {
-	auto status = backend.clear (txn, tables::pruned);
+	auto status = backend.clear (tables::pruned);
 	backend.release_assert_success (status);
 }
 

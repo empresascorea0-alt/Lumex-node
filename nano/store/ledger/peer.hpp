@@ -20,7 +20,7 @@ public:
 	void del (nano::store::write_transaction const &, nano::endpoint_key const &);
 	bool exists (nano::store::transaction const &, nano::endpoint_key const &) const;
 	size_t count (nano::store::transaction const &) const;
-	void clear (nano::store::write_transaction const &);
+	void clear ();
 	iterator begin (nano::store::transaction const &) const;
 	iterator end (nano::store::transaction const &) const;
 

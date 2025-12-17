@@ -1315,10 +1315,11 @@ TEST (block_store, confirmation_height)
 		ASSERT_FALSE (store->confirmation_height.get (transaction, account3, confirmation_height_info));
 		ASSERT_EQ (confirmation_height_info.height, 10);
 		ASSERT_EQ (confirmation_height_info.frontier, cemented_frontier3);
-
-		// Check clearing of confirmation heights
-		store->confirmation_height.clear (transaction);
 	}
+
+	// Check clearing of confirmation heights
+	store->confirmation_height.clear ();
+
 	auto transaction (store->tx_begin_read ());
 	ASSERT_TRUE (store->confirmation_height.empty (transaction));
 	nano::confirmation_height_info confirmation_height_info;
@@ -1335,19 +1336,25 @@ TEST (block_store, final_vote)
 	nano::stats stats{ logger };
 	auto store = nano::make_store (logger, stats, path, nano::dev::constants);
 
+	auto qualified_root = nano::dev::genesis->qualified_root ();
 	{
-		auto qualified_root = nano::dev::genesis->qualified_root ();
 		auto transaction (store->tx_begin_write ());
 		store->final_vote.put (transaction, qualified_root, nano::block_hash (2));
-		ASSERT_FALSE (store->final_vote.empty (transaction));
-		store->final_vote.clear (transaction);
-		ASSERT_TRUE (store->final_vote.empty (transaction));
+	}
+	ASSERT_FALSE (store->final_vote.empty (store->tx_begin_read ()));
+	store->final_vote.clear ();
+	ASSERT_TRUE (store->final_vote.empty (store->tx_begin_read ()));
+	{
+		auto transaction (store->tx_begin_write ());
 		store->final_vote.put (transaction, qualified_root, nano::block_hash (2));
-		ASSERT_FALSE (store->final_vote.empty (transaction));
+	}
+	ASSERT_FALSE (store->final_vote.empty (store->tx_begin_read ()));
+	{
+		auto transaction (store->tx_begin_write ());
 		// Clearing with correct root should remove
 		store->final_vote.del (transaction, qualified_root);
-		ASSERT_TRUE (store->final_vote.empty (transaction));
 	}
+	ASSERT_TRUE (store->final_vote.empty (store->tx_begin_read ()));
 }
 
 TEST (block_store, reset_renew_existing_transaction)

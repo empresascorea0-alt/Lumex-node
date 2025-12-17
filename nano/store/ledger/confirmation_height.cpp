@@ -66,14 +66,9 @@ bool confirmation_height_view::empty (nano::store::transaction const & txn) cons
 	return backend.empty (txn, tables::confirmation_height);
 }
 
-void confirmation_height_view::clear (nano::store::write_transaction const & txn, nano::account const & account)
+void confirmation_height_view::clear ()
 {
-	del (txn, account);
-}
-
-void confirmation_height_view::clear (nano::store::write_transaction const & txn)
-{
-	backend.clear (txn, nano::tables::confirmation_height);
+	backend.clear (nano::tables::confirmation_height);
 }
 
 auto confirmation_height_view::begin (nano::store::transaction const & txn, nano::account const & account) const -> iterator

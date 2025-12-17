@@ -79,9 +79,9 @@ public:
 	virtual uint64_t count (nano::store::transaction const &, tables) const = 0;
 	virtual bool count_is_exact (tables) const = 0; // Returns true if count() returns exact value, false if estimate
 	uint64_t count_exact (nano::store::transaction const &, tables) const; // Exact count via iteration (always accurate)
-	virtual int clear (nano::store::write_transaction const &, tables) = 0; // Empties the table but keeps it
-	virtual bool drop_table (nano::store::write_transaction const &, std::string const & name) = 0; // Deletes the table entirely
-	virtual bool table_exists (nano::store::transaction const &, std::string const & name) const = 0;
+	virtual int clear (tables) = 0; // Empties the table but keeps it
+	virtual bool drop_table (std::string const & name) = 0; // Deletes the table entirely
+	virtual bool table_exists (std::string const & name) const = 0;
 
 	// Iterator operations
 	virtual nano::store::iterator begin (nano::store::transaction const &, tables) const = 0;

@@ -42,9 +42,9 @@ size_t peer_view::count (nano::store::transaction const & txn) const
 	return backend.count (txn, tables::peers);
 }
 
-void peer_view::clear (nano::store::write_transaction const & txn)
+void peer_view::clear ()
 {
-	auto status = backend.clear (txn, tables::peers);
+	auto status = backend.clear (tables::peers);
 	backend.release_assert_success (status);
 }
 

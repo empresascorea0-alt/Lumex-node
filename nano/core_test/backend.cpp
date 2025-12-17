@@ -1101,8 +1101,7 @@ TEST (backend, clear_table)
 		}
 	}
 	{
-		auto write_tx = backend->tx_begin_write ();
-		auto status = backend->clear (write_tx, nano::tables::accounts);
+		auto status = backend->clear (nano::tables::accounts);
 		EXPECT_TRUE (backend->success (status));
 	}
 
@@ -1116,9 +1115,8 @@ TEST (backend, clear_empty_table)
 	backend->create (test_schema, 1);
 	backend->open (test_schema, nano::store::open_mode::read_write);
 
-	auto write_tx = backend->tx_begin_write ();
 	// Clear on empty table should succeed
-	auto status = backend->clear (write_tx, nano::tables::accounts);
+	auto status = backend->clear (nano::tables::accounts);
 	EXPECT_TRUE (backend->success (status));
 }
 
@@ -1128,10 +1126,9 @@ TEST (backend, table_exists)
 	backend->create (test_schema, 1);
 	backend->open (test_schema, nano::store::open_mode::read_write);
 
-	auto read_tx = backend->tx_begin_read ();
-	EXPECT_TRUE (backend->table_exists (read_tx, "accounts"));
-	EXPECT_TRUE (backend->table_exists (read_tx, "meta"));
-	EXPECT_FALSE (backend->table_exists (read_tx, "nonexistent_table"));
+	EXPECT_TRUE (backend->table_exists ("accounts"));
+	EXPECT_TRUE (backend->table_exists ("meta"));
+	EXPECT_FALSE (backend->table_exists ("nonexistent_table"));
 }
 
 TEST (backend, drop_table)
@@ -1145,26 +1142,14 @@ TEST (backend, drop_table)
 		backend->put (write_tx, nano::tables::accounts, nano::store::db_val{ make_key (1) }, nano::store::db_val{ make_value (1) });
 	}
 
-	{
-		auto read_tx = backend->tx_begin_read ();
-		EXPECT_TRUE (backend->table_exists (read_tx, "accounts"));
-	}
+	EXPECT_TRUE (backend->table_exists ("accounts"));
 
-	{
-		auto write_tx = backend->tx_begin_write ();
-		EXPECT_TRUE (backend->drop_table (write_tx, "accounts"));
-	}
+	EXPECT_TRUE (backend->drop_table ("accounts"));
 
-	{
-		auto read_tx = backend->tx_begin_read ();
-		EXPECT_FALSE (backend->table_exists (read_tx, "accounts"));
-	}
+	EXPECT_FALSE (backend->table_exists ("accounts"));
 
 	// Drop non-existent table should return false
-	{
-		auto write_tx = backend->tx_begin_write ();
-		EXPECT_FALSE (backend->drop_table (write_tx, "nonexistent_table"));
-	}
+	EXPECT_FALSE (backend->drop_table ("nonexistent_table"));
 }
 
 // Test dropping a table that exists in the database but not in the current schema
@@ -1193,18 +1178,9 @@ TEST (backend, drop_table_not_in_schema)
 
 	// Reopen with new schema (without frontiers) and drop the old table
 	backend->open (test_schema, nano::store::open_mode::read_write);
-	{
-		auto read_tx = backend->tx_begin_read ();
-		EXPECT_TRUE (backend->table_exists (read_tx, "frontiers"));
-	}
-	{
-		auto write_tx = backend->tx_begin_write ();
-		EXPECT_TRUE (backend->drop_table (write_tx, "frontiers"));
-	}
-	{
-		auto read_tx = backend->tx_begin_read ();
-		EXPECT_FALSE (backend->table_exists (read_tx, "frontiers"));
-	}
+	EXPECT_TRUE (backend->table_exists ("frontiers"));
+	EXPECT_TRUE (backend->drop_table ("frontiers"));
+	EXPECT_FALSE (backend->table_exists ("frontiers"));
 }
 
 /*

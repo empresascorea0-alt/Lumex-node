@@ -28,6 +28,6 @@ void nano::test::reset_confirmation_height (nano::store::ledger_store & store, n
 	nano::confirmation_height_info confirmation_height_info;
 	if (!store.confirmation_height.get (transaction, account, confirmation_height_info))
 	{
-		store.confirmation_height.clear (transaction, account);
+		store.confirmation_height.del (transaction, account);
 	}
 }

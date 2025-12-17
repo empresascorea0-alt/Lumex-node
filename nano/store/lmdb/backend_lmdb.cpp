@@ -140,13 +140,17 @@ bool backend_lmdb::count_is_exact (tables table) const
 	return true;
 }
 
-int backend_lmdb::clear (nano::store::write_transaction const & txn, tables table)
+int backend_lmdb::clear (tables table)
 {
-	return mdb_drop (env->tx (txn), table_to_dbi (table), /* only empty the db */ 0);
+	auto txn = tx_begin_write ();
+	auto status = mdb_drop (env->tx (txn), table_to_dbi (table), /* only empty the db */ 0);
+	return status;
 }
 
-bool backend_lmdb::drop_table (nano::store::write_transaction const & txn, std::string const & name)
+bool backend_lmdb::drop_table (std::string const & name)
 {
+	auto txn = tx_begin_write ();
+
 	MDB_dbi dbi;
 	auto status1 = mdb_dbi_open (env->tx (txn), name.c_str (), 0, &dbi);
 	if (not_found (status1))
@@ -166,8 +170,10 @@ bool backend_lmdb::drop_table (nano::store::write_transaction const & txn, std::
 	return true;
 }
 
-bool backend_lmdb::table_exists (nano::store::transaction const & txn, std::string const & name) const
+bool backend_lmdb::table_exists (std::string const & name) const
 {
+	auto txn = tx_begin_read ();
+
 	MDB_dbi dbi;
 	auto status = mdb_dbi_open (env->tx (txn), name.c_str (), 0, &dbi);
 	return success (status);

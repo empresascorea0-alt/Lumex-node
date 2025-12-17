@@ -22,7 +22,7 @@ public:
 	bool exists (nano::store::transaction const &, nano::block_hash const &) const;
 	nano::block_hash random (nano::store::transaction const &) const;
 	size_t count (nano::store::transaction const &) const;
-	void clear (nano::store::write_transaction const &);
+	void clear ();
 	iterator begin (nano::store::transaction const &, nano::block_hash const &) const;
 	iterator begin (nano::store::transaction const &) const;
 	iterator end (nano::store::transaction const &) const;

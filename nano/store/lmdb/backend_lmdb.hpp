@@ -27,9 +27,9 @@ public:
 
 	uint64_t count (nano::store::transaction const &, tables) const override;
 	bool count_is_exact (tables) const override;
-	int clear (nano::store::write_transaction const &, tables) override;
-	bool drop_table (nano::store::write_transaction const &, std::string const & name) override;
-	bool table_exists (nano::store::transaction const &, std::string const & name) const override;
+	int clear (tables) override;
+	bool drop_table (std::string const & name) override;
+	bool table_exists (std::string const & name) const override;
 
 	nano::store::iterator begin (nano::store::transaction const &, tables) const override;
 	nano::store::iterator begin (nano::store::transaction const &, tables, nano::store::db_val const & key) const override;

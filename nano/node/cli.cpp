@@ -20,7 +20,7 @@
 
 namespace
 {
-void reset_confirmation_heights (nano::store::write_transaction const & transaction, nano::ledger_constants & constants, nano::store::ledger_store & store);
+void reset_confirmation_heights (nano::ledger_constants & constants, nano::store::ledger_store & store);
 bool is_using_rocksdb (std::filesystem::path const & data_path, boost::program_options::variables_map const & vm, std::error_code & ec);
 }
 
@@ -254,19 +254,19 @@ void copy_database (std::filesystem::path const & data_path, boost::program_opti
 	}
 	if (vm.count ("online_weight_clear"))
 	{
-		node.node->store.online_weight.clear (store.tx_begin_write ());
+		node.node->store.online_weight.clear ();
 	}
 	if (vm.count ("peer_clear"))
 	{
-		node.node->store.peer.clear (store.tx_begin_write ());
+		node.node->store.peer.clear ();
 	}
 	if (vm.count ("confirmation_height_clear"))
 	{
-		reset_confirmation_heights (store.tx_begin_write (), node.node->network_params.ledger, store);
+		reset_confirmation_heights (node.node->network_params.ledger, store);
 	}
 	if (vm.count ("final_vote_clear"))
 	{
-		node.node->store.final_vote.clear (store.tx_begin_write ());
+		node.node->store.final_vote.clear ();
 	}
 	if (vm.count ("rebuild_database"))
 	{
@@ -618,8 +618,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 		try
 		{
 			nano::inactive_node node (data_path, node_flags);
-			auto transaction (node.node->store.tx_begin_write ());
-			node.node->store.online_weight.clear (transaction);
+			node.node->store.online_weight.clear ();
 			std::cout << "Online weight records are removed" << std::endl;
 		}
 		catch (std::exception const &)
@@ -636,8 +635,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 		try
 		{
 			nano::inactive_node node (data_path, node_flags);
-			auto transaction (node.node->store.tx_begin_write ());
-			node.node->store.peer.clear (transaction);
+			node.node->store.peer.clear ();
 			std::cout << "Database peers are removed" << std::endl;
 		}
 		catch (std::exception const &)
@@ -672,7 +670,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 						}
 						else
 						{
-							node.node->store.confirmation_height.clear (transaction, account);
+							node.node->store.confirmation_height.del (transaction, account);
 						}
 
 						std::cout << "Confirmation height of account " << account_str << " is set to " << conf_height_reset_num << std::endl;
@@ -685,8 +683,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 				}
 				else if (account_str == "all")
 				{
-					auto transaction (node.node->store.tx_begin_write ());
-					reset_confirmation_heights (transaction, node.node->network_params.ledger, node.node->store);
+					reset_confirmation_heights (node.node->network_params.ledger, node.node->store);
 					std::cout << "Confirmation heights of all accounts (except genesis which is set to 1) are set to 0" << std::endl;
 				}
 				else
@@ -733,7 +730,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 			}
 			else if (vm.count ("all"))
 			{
-				node.node->store.final_vote.clear (node.node->store.tx_begin_write ());
+				node.node->store.final_vote.clear ();
 				std::cout << "All final votes are cleared" << std::endl;
 			}
 			else
@@ -1430,12 +1427,13 @@ std::unique_ptr<nano::inactive_node> nano::default_inactive_node (std::filesyste
 
 namespace
 {
-void reset_confirmation_heights (nano::store::write_transaction const & transaction, nano::ledger_constants & constants, nano::store::ledger_store & store)
+void reset_confirmation_heights (nano::ledger_constants & constants, nano::store::ledger_store & store)
 {
 	// First do a clean sweep
-	store.confirmation_height.clear (transaction);
+	store.confirmation_height.clear ();
 
 	// Then make sure the confirmation height of the genesis account open block is 1
+	auto transaction = store.tx_begin_write ();
 	store.confirmation_height.put (transaction, constants.genesis->account (), { 1, constants.genesis->hash () });
 }
 

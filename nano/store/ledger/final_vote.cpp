@@ -54,9 +54,9 @@ bool final_vote_view::empty (nano::store::transaction const & txn) const
 	return backend.empty (txn, tables::final_votes);
 }
 
-void final_vote_view::clear (nano::store::write_transaction const & txn)
+void final_vote_view::clear ()
 {
-	auto status = backend.clear (txn, nano::tables::final_votes);
+	auto status = backend.clear (nano::tables::final_votes);
 	backend.release_assert_success (status);
 }
 
