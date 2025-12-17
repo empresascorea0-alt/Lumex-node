@@ -3,6 +3,7 @@
 #include <nano/lib/id_dispenser.hpp>
 #include <nano/store/tables.hpp>
 
+#include <chrono>
 #include <memory>
 
 namespace nano::store
@@ -92,4 +93,4 @@ public:
 private:
 	std::unique_ptr<write_transaction_impl> impl;
 };
-} // namespace nano::store
+}
