@@ -65,7 +65,6 @@ void nano::add_node_options (boost::program_options::options_description & descr
 	("unchecked_clear", "Clear unchecked blocks")
 	("confirmation_height_clear", "Clear confirmation height. Requires an <account> option that can be 'all' to clear all accounts")
 	("final_vote_clear", "Clear final votes")
-	("rebuild_database", "Rebuild LMDB database with vacuum for best compaction")
 	("migrate_database_lmdb_to_rocksdb", "Migrates LMDB database to RocksDB")
 	("rollback", "Rolls back the specified block hash, effectively removing this block and all blocks following it")
 	("diagnostics", "Run internal diagnostics")
@@ -235,7 +234,7 @@ void database_write_lock_error (std::error_code & ec)
 
 void copy_database (std::filesystem::path const & data_path, boost::program_options::variables_map const & vm, std::filesystem::path const & output_path)
 {
-	bool needs_to_write = vm.count ("unchecked_clear") || vm.count ("clear_send_ids") || vm.count ("online_weight_clear") || vm.count ("peer_clear") || vm.count ("confirmation_height_clear") || vm.count ("final_vote_clear") || vm.count ("rebuild_database");
+	bool needs_to_write = vm.count ("unchecked_clear") || vm.count ("clear_send_ids") || vm.count ("online_weight_clear") || vm.count ("peer_clear") || vm.count ("confirmation_height_clear") || vm.count ("final_vote_clear");
 
 	auto node_flags = nano::inactive_node_flag_defaults ();
 	node_flags.read_only = !needs_to_write;
@@ -267,11 +266,6 @@ void copy_database (std::filesystem::path const & data_path, boost::program_opti
 	if (vm.count ("final_vote_clear"))
 	{
 		node.node->store.final_vote.clear ();
-	}
-	if (vm.count ("rebuild_database"))
-	{
-		// TODO: Implement rebuild_db functionality or remove this option
-		// node.node->store.rebuild_db (store.tx_begin_write ());
 	}
 
 	node.node->copy_with_compaction (output_path);
