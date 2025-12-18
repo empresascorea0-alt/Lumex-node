@@ -12,6 +12,12 @@ namespace nano::store::lmdb
  */
 inline MDB_val to_mdb_val (nano::store::db_val const & val)
 {
+	// Empty value needs valid pointer to avoid UB in LMDB's memcpy
+	if (val.data () == nullptr || val.size () == 0)
+	{
+		debug_assert (val.size () == 0);
+		return MDB_val{ 0, const_cast<void *> (static_cast<void const *> ("")) };
+	}
 	return MDB_val{ val.size (), val.data () };
 }
 
@@ -21,6 +27,6 @@ inline MDB_val to_mdb_val (nano::store::db_val const & val)
 inline nano::store::db_val from_mdb_val (MDB_val const & val)
 {
 	auto span = std::span<uint8_t const>{ static_cast<uint8_t const *> (val.mv_data), val.mv_size };
-	return nano::store::db_val (span);
+	return nano::store::db_val{ span };
 }
 }
