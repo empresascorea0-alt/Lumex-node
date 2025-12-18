@@ -243,6 +243,16 @@ void backend::copy_to (backend & destination, copy_progress_callback callback, s
 		++table_index;
 	}
 }
+
+void backend::collect_txn_tracker (boost::property_tree::ptree &, std::chrono::milliseconds, std::chrono::milliseconds) const
+{
+	// Default implementation does nothing - backend-specific
+}
+
+void backend::collect_memory_stats (boost::property_tree::ptree &) const
+{
+	// Default implementation does nothing - backend-specific
+}
 }
 
 namespace nano

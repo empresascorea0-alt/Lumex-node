@@ -4,6 +4,7 @@
 #include <nano/store/lmdb/utility.hpp>
 
 #include <boost/format.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 #include <lmdb/libraries/liblmdb/lmdb.h>
 
@@ -274,6 +275,25 @@ std::string backend_lmdb::get_database_path () const
 	return database_path.string ();
 }
 
+void backend_lmdb::collect_txn_tracker (boost::property_tree::ptree & ptree, std::chrono::milliseconds min_read_time, std::chrono::milliseconds min_write_time) const
+{
+	mdb_txn_tracker.serialize_json (ptree, min_read_time, min_write_time);
+}
+
+void backend_lmdb::collect_memory_stats (boost::property_tree::ptree & ptree) const
+{
+	release_assert (env, "database must be open to collect memory stats");
+
+	MDB_stat stats;
+	auto status = mdb_env_stat (*env, &stats);
+	release_assert (success (status), error_string (status));
+	ptree.put ("branch_pages", stats.ms_branch_pages);
+	ptree.put ("depth", stats.ms_depth);
+	ptree.put ("entries", stats.ms_entries);
+	ptree.put ("leaf_pages", stats.ms_leaf_pages);
+	ptree.put ("overflow_pages", stats.ms_overflow_pages);
+	ptree.put ("page_size", stats.ms_psize);
+}
 /*
  *
  */

@@ -5775,12 +5775,6 @@ TEST (rpc, memory_stats)
 
 		ASSERT_EQ (response.get_child ("node").get_child ("vote_uniquer").get_child ("cache").get<std::string> ("count"), "1");
 	}
-
-	request.put ("type", "database");
-	{
-		auto response (wait_response (system, rpc_ctx, request));
-		ASSERT_TRUE (!response.empty ());
-	}
 }
 
 TEST (rpc, stats_samples)
@@ -5902,7 +5896,8 @@ TEST (rpc, block_confirmed)
 
 TEST (rpc, database_txn_tracker)
 {
-	if (nano::rocksdb_config::using_rocksdb_in_tests ())
+	// TODO: Reenable when RocksDB supports transaction tracking
+	if (nano::default_database_backend () == nano::database_backend::rocksdb)
 	{
 		// Don't test this in rocksdb mode
 		return;
@@ -5996,6 +5991,21 @@ TEST (rpc, database_txn_tracker)
 	// The best we can do is just check that there are entries.
 	ASSERT_TRUE (!std::get<3> (json_l.front ()).empty ());
 	thread.join ();
+}
+
+TEST (rpc, database_stats)
+{
+	nano::test::system system;
+	auto node = add_ipc_enabled_node (system);
+	auto const rpc_ctx = add_rpc (system, node);
+
+	boost::property_tree::ptree request;
+	request.put ("action", "stats");
+	request.put ("type", "database");
+	{
+		auto response (wait_response (system, rpc_ctx, request));
+		ASSERT_TRUE (!response.empty ());
+	}
 }
 
 TEST (rpc, active_difficulty)

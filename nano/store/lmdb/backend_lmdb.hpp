@@ -45,6 +45,9 @@ public:
 	void copy_with_compaction (std::filesystem::path const & destination) override;
 	void backup () override;
 
+	void collect_txn_tracker (boost::property_tree::ptree &, std::chrono::milliseconds min_read_time, std::chrono::milliseconds min_write_time) const override;
+	void collect_memory_stats (boost::property_tree::ptree &) const override;
+
 	std::string vendor_get () const override;
 	std::string get_database_path () const override;
 

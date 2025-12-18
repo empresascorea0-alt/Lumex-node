@@ -2241,9 +2241,8 @@ void nano::json_handler::database_txn_tracker ()
 
 		if (!ec)
 		{
-			// TODO: Implement serialize_mdb_tracker for new store architecture
-			// node.store.serialize_mdb_tracker (json, std::chrono::milliseconds (min_read_time_milliseconds), std::chrono::milliseconds (min_write_time_milliseconds));
-			// response_l.put_child ("txn_tracking", json);
+			node.store.backend.collect_txn_tracker (json, std::chrono::milliseconds (min_read_time_milliseconds), std::chrono::milliseconds (min_write_time_milliseconds));
+			response_l.put_child ("txn_tracking", json);
 		}
 	}
 	else
@@ -3989,8 +3988,7 @@ void nano::json_handler::stats ()
 	}
 	else if (type == "database")
 	{
-		// TODO: Implement serialize_memory_stats for new store architecture
-		// node.store.serialize_memory_stats (response_l);
+		node.store.backend.collect_memory_stats (response_l);
 	}
 	else
 	{

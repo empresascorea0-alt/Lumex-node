@@ -5,6 +5,7 @@
 #include <nano/store/rocksdb/utility.hpp>
 
 #include <boost/format.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 #include <set>
 
@@ -590,6 +591,179 @@ std::string backend_rocksdb::vendor_get () const
 std::string backend_rocksdb::get_database_path () const
 {
 	return database_path.string ();
+}
+
+void backend_rocksdb::collect_memory_stats (boost::property_tree::ptree & ptree) const
+{
+	uint64_t val = 0;
+
+	// Approximate size of active and unflushed immutable memtables (bytes)
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kCurSizeAllMemTables, &val);
+	ptree.put ("cur_size_all_mem_tables", val);
+
+	// Approximate size of active, unflushed immutable, and pinned immutable memtables (bytes)
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kSizeAllMemTables, &val);
+	ptree.put ("size_all_mem_tables", val);
+
+	// Estimated memory used for reading SST tables, excluding memory used in block cache (e.g. filter and index blocks)
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kEstimateTableReadersMem, &val);
+	ptree.put ("estimate_table_readers_mem", val);
+
+	// An estimate of the amount of live data in bytes
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kEstimateLiveDataSize, &val);
+	ptree.put ("estimate_live_data_size", val);
+
+	// Returns 1 if at least one compaction is pending; otherwise, returns 0
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kCompactionPending, &val);
+	ptree.put ("compaction_pending", val);
+
+	// Estimated number of total keys in the active and unflushed immutable memtables and storage
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kEstimateNumKeys, &val);
+	ptree.put ("estimate_num_keys", val);
+
+	// Estimated total number of bytes compaction needs to rewrite to get all levels down to under target size
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kEstimatePendingCompactionBytes, &val);
+	ptree.put ("estimate_pending_compaction_bytes", val);
+
+	// Total size (bytes) of all SST files (WARNING: may slow down online queries if there are too many files)
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kTotalSstFilesSize, &val);
+	ptree.put ("total_sst_files_size", val);
+
+	// Block cache capacity
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kBlockCacheCapacity, &val);
+	ptree.put ("block_cache_capacity", val);
+
+	// Memory size for the entries residing in block cache
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kBlockCacheUsage, &val);
+	ptree.put ("block_cache_usage", val);
+
+	// Memory size for the entries pinned in block cache
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kBlockCachePinnedUsage, &val);
+	ptree.put ("block_cache_pinned_usage", val);
+
+	// Returns 1 if a memtable flush is pending; otherwise, returns 0
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kMemTableFlushPending, &val);
+	ptree.put ("mem_table_flush_pending", val);
+
+	// Number of currently running flushes
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kNumRunningFlushes, &val);
+	ptree.put ("num_running_flushes", val);
+
+	// Number of currently running compactions
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kNumRunningCompactions, &val);
+	ptree.put ("num_running_compactions", val);
+
+	// Returns 1 if writes are currently stopped; otherwise, returns 0
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kIsWriteStopped, &val);
+	ptree.put ("is_write_stopped", val);
+
+	// Current delayed write rate (bytes/sec); 0 means no delay
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kActualDelayedWriteRate, &val);
+	ptree.put ("actual_delayed_write_rate", val);
+
+	// Total size (bytes) of all live SST files
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kLiveSstFilesSize, &val);
+	ptree.put ("live_sst_files_size", val);
+
+	// Base level for LSM compaction
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kBaseLevel, &val);
+	ptree.put ("base_level", val);
+
+	// Number of immutable memtables not yet flushed
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kNumImmutableMemTable, &val);
+	ptree.put ("num_immutable_mem_table", val);
+
+	// Number of immutable memtables that have been flushed
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kNumImmutableMemTableFlushed, &val);
+	ptree.put ("num_immutable_mem_table_flushed", val);
+
+	// Number of entries in the active memtable
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kNumEntriesActiveMemTable, &val);
+	ptree.put ("num_entries_active_mem_table", val);
+
+	// Number of entries in immutable memtables
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kNumEntriesImmMemTables, &val);
+	ptree.put ("num_entries_imm_mem_tables", val);
+
+	// Number of delete entries in the active memtable
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kNumDeletesActiveMemTable, &val);
+	ptree.put ("num_deletes_active_mem_table", val);
+
+	// Number of delete entries in immutable memtables
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kNumDeletesImmMemTables, &val);
+	ptree.put ("num_deletes_imm_mem_tables", val);
+
+	// Number of unreleased snapshots
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kNumSnapshots, &val);
+	ptree.put ("num_snapshots", val);
+
+	// Unix timestamp of the oldest unreleased snapshot
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kOldestSnapshotTime, &val);
+	ptree.put ("oldest_snapshot_time", val);
+
+	// Number of live versions
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kNumLiveVersions, &val);
+	ptree.put ("num_live_versions", val);
+
+	// Number of background errors
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kBackgroundErrors, &val);
+	ptree.put ("background_errors", val);
+
+	// Returns 1 if obsolete file deletions are enabled; otherwise, returns 0
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kIsFileDeletionsEnabled, &val);
+	ptree.put ("is_file_deletions_enabled", val);
+
+	// Minimum log number to keep
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kMinLogNumberToKeep, &val);
+	ptree.put ("min_log_number_to_keep", val);
+
+	// Minimum obsolete SST number to keep
+	db->GetAggregatedIntProperty (::rocksdb::DB::Properties::kMinObsoleteSstNumberToKeep, &val);
+	ptree.put ("min_obsolete_sst_number_to_keep", val);
+
+	// Per-level file counts
+	boost::property_tree::ptree levels;
+	for (int level = 0; level < 7; ++level)
+	{
+		std::string property = ::rocksdb::DB::Properties::kNumFilesAtLevelPrefix + std::to_string (level);
+		db->GetAggregatedIntProperty (property, &val);
+		levels.put ("l" + std::to_string (level) + "_num_files", val);
+	}
+	ptree.add_child ("levels", levels);
+
+	// Per-column family stats
+	boost::property_tree::ptree cf_stats;
+	for (auto const & [table, handle] : table_handles)
+	{
+		boost::property_tree::ptree cf_info;
+		uint64_t cf_memtable = 0;
+		uint64_t cf_num_keys = 0;
+
+		db->GetIntProperty (handle, ::rocksdb::DB::Properties::kCurSizeActiveMemTable, &cf_memtable);
+		db->GetIntProperty (handle, ::rocksdb::DB::Properties::kEstimateNumKeys, &cf_num_keys);
+
+		cf_info.put ("memtable_size", cf_memtable);
+		cf_info.put ("estimate_num_keys", cf_num_keys);
+
+		// Additional per-column family stats
+		db->GetIntProperty (handle, ::rocksdb::DB::Properties::kNumImmutableMemTable, &val);
+		cf_info.put ("num_immutable_mem_table", val);
+
+		db->GetIntProperty (handle, ::rocksdb::DB::Properties::kNumEntriesActiveMemTable, &val);
+		cf_info.put ("num_entries_active_mem_table", val);
+
+		db->GetIntProperty (handle, ::rocksdb::DB::Properties::kNumEntriesImmMemTables, &val);
+		cf_info.put ("num_entries_imm_mem_tables", val);
+
+		db->GetIntProperty (handle, ::rocksdb::DB::Properties::kNumDeletesActiveMemTable, &val);
+		cf_info.put ("num_deletes_active_mem_table", val);
+
+		db->GetIntProperty (handle, ::rocksdb::DB::Properties::kNumDeletesImmMemTables, &val);
+		cf_info.put ("num_deletes_imm_mem_tables", val);
+
+		cf_stats.add_child (handle->GetName (), cf_info);
+	}
+	ptree.add_child ("column_families", cf_stats);
 }
 
 void backend_rocksdb::generate_tombstone_map ()

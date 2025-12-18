@@ -9,6 +9,9 @@
 #include <nano/store/tables.hpp>
 #include <nano/store/transaction.hpp>
 
+#include <boost/property_tree/ptree_fwd.hpp>
+
+#include <chrono>
 #include <functional>
 #include <map>
 #include <memory>
@@ -99,6 +102,10 @@ public:
 
 	virtual void copy_with_compaction (std::filesystem::path const & destination) = 0;
 	virtual void backup () = 0;
+
+	// Diagnostics (optional, backend-specific)
+	virtual void collect_txn_tracker (boost::property_tree::ptree &, std::chrono::milliseconds min_read_time, std::chrono::milliseconds min_write_time) const;
+	virtual void collect_memory_stats (boost::property_tree::ptree &) const;
 
 	// Status checking
 	virtual bool success (int status) const = 0;
