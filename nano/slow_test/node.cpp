@@ -1127,11 +1127,7 @@ TEST (confirmation_height, many_accounts_send_receive_self)
 TEST (confirmation_height, many_accounts_send_receive_self_no_elections)
 {
 	nano::test::system system;
-	if (nano::rocksdb_config::using_rocksdb_in_tests ())
-	{
-		// Don't test this in rocksdb mode
-		return;
-	}
+
 	nano::logger logger;
 	auto path (nano::unique_path ());
 	nano::stats stats{ logger };

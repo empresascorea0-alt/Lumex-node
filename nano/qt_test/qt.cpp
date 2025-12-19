@@ -502,11 +502,6 @@ TEST (wallet, create_change)
 
 TEST (history, short_text)
 {
-	if (nano::rocksdb_config::using_rocksdb_in_tests ())
-	{
-		// Don't test this in rocksdb mode
-		return;
-	}
 	nano_qt::eventloop_processor processor;
 	nano::keypair key;
 	nano::test::system system (1);
@@ -539,11 +534,12 @@ TEST (history, short_text)
 
 TEST (history, pruned_source)
 {
-	if (nano::rocksdb_config::using_rocksdb_in_tests ())
+	if (nano::default_database_backend () == nano::database_backend::rocksdb)
 	{
 		// Don't test this in rocksdb mode
-		return;
+		GTEST_SKIP ();
 	}
+
 	nano_qt::eventloop_processor processor;
 	nano::keypair key;
 	nano::test::system system (1);
