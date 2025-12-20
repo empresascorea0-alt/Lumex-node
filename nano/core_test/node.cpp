@@ -2571,6 +2571,13 @@ TEST (node, peer_history_restart)
 /** This checks that a node can be opened (without being blocked) when a write lock is held elsewhere */
 TEST (node, dont_write_lock_node)
 {
+	// RocksDB does not support opening the same database from multiple instances
+	// TODO: Implement a guard mechanism to prevent multiple node instances from opening the same RocksDB database
+	if (nano::default_database_backend () == nano::database_backend::rocksdb)
+	{
+		GTEST_SKIP ();
+	}
+
 	auto path = nano::unique_path ();
 
 	std::promise<void> write_lock_held_promise;
