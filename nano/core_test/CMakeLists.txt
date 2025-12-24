@@ -4,6 +4,7 @@ add_executable(
   fakes/websocket_client.hpp
   fakes/work_peer.hpp
   active_elections.cpp
+  backend.cpp
   active_elections_index.cpp
   assert.cpp
   async.cpp
@@ -32,11 +33,13 @@ add_executable(
   ledger.cpp
   ledger_confirm.cpp
   ledger_priority.cpp
+  ledger_upgrades.cpp
   locks.cpp
   logging.cpp
   message.cpp
   message_deserializer.cpp
   memory_pool.cpp
+  migrations.cpp
   network.cpp
   network_filter.cpp
   network_functions.cpp

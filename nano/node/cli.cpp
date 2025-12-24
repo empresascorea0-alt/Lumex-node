@@ -6,16 +6,21 @@
 #include <nano/node/daemonconfig.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/inactive_node.hpp>
+#include <nano/node/migrations.hpp>
 #include <nano/node/node.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/store/ledger/confirmation_height.hpp>
+#include <nano/store/ledger/final_vote.hpp>
+#include <nano/store/ledger/online_weight.hpp>
+#include <nano/store/ledger/peer.hpp>
 
 #include <boost/format.hpp>
 
 namespace
 {
-void reset_confirmation_heights (nano::store::write_transaction const & transaction, nano::ledger_constants & constants, nano::store::component & store);
+void reset_confirmation_heights (nano::ledger_constants & constants, nano::store::ledger_store & store);
 bool is_using_rocksdb (std::filesystem::path const & data_path, boost::program_options::variables_map const & vm, std::error_code & ec);
 }
 
@@ -60,7 +65,6 @@ void nano::add_node_options (boost::program_options::options_description & descr
 	("unchecked_clear", "Clear unchecked blocks")
 	("confirmation_height_clear", "Clear confirmation height. Requires an <account> option that can be 'all' to clear all accounts")
 	("final_vote_clear", "Clear final votes")
-	("rebuild_database", "Rebuild LMDB database with vacuum for best compaction")
 	("migrate_database_lmdb_to_rocksdb", "Migrates LMDB database to RocksDB")
 	("rollback", "Rolls back the specified block hash, effectively removing this block and all blocks following it")
 	("diagnostics", "Run internal diagnostics")
@@ -228,54 +232,43 @@ void database_write_lock_error (std::error_code & ec)
 	ec = nano::error_cli::database_write_error;
 }
 
-bool copy_database (std::filesystem::path const & data_path, boost::program_options::variables_map const & vm, std::filesystem::path const & output_path, std::error_code & ec)
+void copy_database (std::filesystem::path const & data_path, boost::program_options::variables_map const & vm, std::filesystem::path const & output_path)
 {
-	bool success = false;
-	bool needs_to_write = vm.count ("unchecked_clear") || vm.count ("clear_send_ids") || vm.count ("online_weight_clear") || vm.count ("peer_clear") || vm.count ("confirmation_height_clear") || vm.count ("final_vote_clear") || vm.count ("rebuild_database");
+	bool needs_to_write = vm.count ("unchecked_clear") || vm.count ("clear_send_ids") || vm.count ("online_weight_clear") || vm.count ("peer_clear") || vm.count ("confirmation_height_clear") || vm.count ("final_vote_clear");
 
 	auto node_flags = nano::inactive_node_flag_defaults ();
 	node_flags.read_only = !needs_to_write;
 	nano::update_flags (node_flags, vm);
-	try
-	{
-		nano::inactive_node node (data_path, node_flags);
-		auto & store (node.node->store);
-		if (vm.count ("unchecked_clear"))
-		{
-			node.node->unchecked.clear ();
-		}
-		if (vm.count ("clear_send_ids"))
-		{
-			node.node->wallets.clear_send_ids (node.node->wallets.tx_begin_write ());
-		}
-		if (vm.count ("online_weight_clear"))
-		{
-			node.node->store.online_weight.clear (store.tx_begin_write ());
-		}
-		if (vm.count ("peer_clear"))
-		{
-			node.node->store.peer.clear (store.tx_begin_write ());
-		}
-		if (vm.count ("confirmation_height_clear"))
-		{
-			reset_confirmation_heights (store.tx_begin_write (), node.node->network_params.ledger, store);
-		}
-		if (vm.count ("final_vote_clear"))
-		{
-			node.node->store.final_vote.clear (store.tx_begin_write ());
-		}
-		if (vm.count ("rebuild_database"))
-		{
-			node.node->store.rebuild_db (store.tx_begin_write ());
-		}
 
-		success = node.node->copy_with_compaction (output_path);
-	}
-	catch (std::exception const &)
+	nano::inactive_node node (data_path, node_flags);
+
+	auto & store (node.node->store);
+	if (vm.count ("unchecked_clear"))
 	{
-		database_write_lock_error (ec);
+		node.node->unchecked.clear ();
 	}
-	return success;
+	if (vm.count ("clear_send_ids"))
+	{
+		node.node->wallets.clear_send_ids (node.node->wallets.tx_begin_write ());
+	}
+	if (vm.count ("online_weight_clear"))
+	{
+		node.node->store.online_weight.clear ();
+	}
+	if (vm.count ("peer_clear"))
+	{
+		node.node->store.peer.clear ();
+	}
+	if (vm.count ("confirmation_height_clear"))
+	{
+		reset_confirmation_heights (node.node->network_params.ledger, store);
+	}
+	if (vm.count ("final_vote_clear"))
+	{
+		node.node->store.final_vote.clear ();
+	}
+
+	node.node->copy_with_compaction (output_path);
 }
 }
 
@@ -400,30 +393,24 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 				}
 				std::cout << "This may take a while..." << std::endl;
 
-				bool success = copy_database (data_path, vm, vacuum_path, ec);
-				if (success)
+				copy_database (data_path, vm, vacuum_path);
+
+				// Note that these throw on failure
+				std::cout << "Finalizing" << std::endl;
+				if (using_rocksdb)
 				{
-					// Note that these throw on failure
-					std::cout << "Finalizing" << std::endl;
-					if (using_rocksdb)
-					{
-						nano::remove_all_files_in_dir (backup_path);
-						nano::move_all_files_to_dir (source_path, backup_path);
-						nano::move_all_files_to_dir (vacuum_path, source_path);
-						std::filesystem::remove_all (vacuum_path);
-					}
-					else
-					{
-						std::filesystem::remove (backup_path);
-						std::filesystem::rename (source_path, backup_path);
-						std::filesystem::rename (vacuum_path, source_path);
-					}
-					std::cout << "Vacuum completed" << std::endl;
+					nano::remove_all_files_in_dir (backup_path);
+					nano::move_all_files_to_dir (source_path, backup_path);
+					nano::move_all_files_to_dir (vacuum_path, source_path);
+					std::filesystem::remove_all (vacuum_path);
 				}
 				else
 				{
-					std::cerr << "Vacuum failed (copying returned false)" << std::endl;
+					std::filesystem::remove (backup_path);
+					std::filesystem::rename (source_path, backup_path);
+					std::filesystem::rename (vacuum_path, source_path);
 				}
+				std::cout << "Vacuum completed" << std::endl;
 			}
 			else
 			{
@@ -433,6 +420,10 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 		catch (std::filesystem::filesystem_error const & ex)
 		{
 			std::cerr << "Vacuum failed during a file operation: " << ex.what () << std::endl;
+		}
+		catch (std::exception const & ex)
+		{
+			std::cerr << "Vacuum failed: " << ex.what () << std::endl;
 		}
 		catch (...)
 		{
@@ -462,15 +453,8 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 				std::cout << "Database snapshot of " << source_path << " to " << snapshot_path << " in progress" << std::endl;
 				std::cout << "This may take a while..." << std::endl;
 
-				bool success = copy_database (data_path, vm, snapshot_path, ec);
-				if (success)
-				{
-					std::cout << "Snapshot completed, This can be found at " << snapshot_path << std::endl;
-				}
-				else
-				{
-					std::cerr << "Snapshot failed (copying returned false)" << std::endl;
-				}
+				copy_database (data_path, vm, snapshot_path);
+				std::cout << "Snapshot completed, This can be found at " << snapshot_path << std::endl;
 			}
 			else
 			{
@@ -481,6 +465,10 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 		{
 			std::cerr << "Snapshot failed during a file operation: " << ex.what () << std::endl;
 		}
+		catch (std::exception const & ex)
+		{
+			std::cerr << "Snapshot failed: " << ex.what () << std::endl;
+		}
 		catch (...)
 		{
 			std::cerr << "Snapshot failed (unknown reason)" << std::endl;
@@ -488,24 +476,30 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 	}
 	else if (vm.count ("migrate_database_lmdb_to_rocksdb"))
 	{
+		auto data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : nano::working_path ();
+
 		nano::logger::initialize (nano::log_config::daemon_default (), data_path);
 
-		auto data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : nano::working_path ();
-		auto node_flags = nano::inactive_node_flag_defaults ();
-		node_flags.config_overrides.push_back ("node.rocksdb.enable=false");
-		nano::update_flags (node_flags, vm);
+		nano::lmdb_config lmdb_config;
+		nano::rocksdb_config rocksdb_config;
+		{
+			nano::network_params network_params{ nano::get_active_network () };
+			nano::daemon_config daemon_config{ data_path, network_params };
+			if (!nano::read_node_config_toml (data_path, daemon_config))
+			{
+				lmdb_config = daemon_config.node.lmdb_config;
+				rocksdb_config = daemon_config.node.rocksdb_config;
+			}
+		}
+
 		try
 		{
-			nano::inactive_node node (data_path, node_flags);
-			auto error = node.node->ledger.migrate_lmdb_to_rocksdb (data_path);
-			if (error)
-			{
-				std::cerr << "There was an error migrating" << std::endl;
-			}
+			nano::migrate_lmdb_to_rocksdb (data_path, lmdb_config, rocksdb_config);
 		}
 		catch (std::exception const & e)
 		{
-			std::cerr << "Error initializing node for migration: " << e.what () << std::endl;
+			nano::default_logger ().error (nano::log::type::migration, "Migration failed: {}", e.what ());
+			std::cerr << "Migration failed: " << e.what () << std::endl;
 		}
 	}
 	else if (vm.count ("rollback"))
@@ -618,8 +612,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 		try
 		{
 			nano::inactive_node node (data_path, node_flags);
-			auto transaction (node.node->store.tx_begin_write ());
-			node.node->store.online_weight.clear (transaction);
+			node.node->store.online_weight.clear ();
 			std::cout << "Online weight records are removed" << std::endl;
 		}
 		catch (std::exception const &)
@@ -636,8 +629,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 		try
 		{
 			nano::inactive_node node (data_path, node_flags);
-			auto transaction (node.node->store.tx_begin_write ());
-			node.node->store.peer.clear (transaction);
+			node.node->store.peer.clear ();
 			std::cout << "Database peers are removed" << std::endl;
 		}
 		catch (std::exception const &)
@@ -672,7 +664,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 						}
 						else
 						{
-							node.node->store.confirmation_height.clear (transaction, account);
+							node.node->store.confirmation_height.del (transaction, account);
 						}
 
 						std::cout << "Confirmation height of account " << account_str << " is set to " << conf_height_reset_num << std::endl;
@@ -685,8 +677,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 				}
 				else if (account_str == "all")
 				{
-					auto transaction (node.node->store.tx_begin_write ());
-					reset_confirmation_heights (transaction, node.node->network_params.ledger, node.node->store);
+					reset_confirmation_heights (node.node->network_params.ledger, node.node->store);
 					std::cout << "Confirmation heights of all accounts (except genesis which is set to 1) are set to 0" << std::endl;
 				}
 				else
@@ -733,7 +724,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 			}
 			else if (vm.count ("all"))
 			{
-				node.node->store.final_vote.clear (node.node->store.tx_begin_write ());
+				node.node->store.final_vote.clear ();
 				std::cout << "All final votes are cleared" << std::endl;
 			}
 			else
@@ -1430,12 +1421,13 @@ std::unique_ptr<nano::inactive_node> nano::default_inactive_node (std::filesyste
 
 namespace
 {
-void reset_confirmation_heights (nano::store::write_transaction const & transaction, nano::ledger_constants & constants, nano::store::component & store)
+void reset_confirmation_heights (nano::ledger_constants & constants, nano::store::ledger_store & store)
 {
 	// First do a clean sweep
-	store.confirmation_height.clear (transaction);
+	store.confirmation_height.clear ();
 
 	// Then make sure the confirmation height of the genesis account open block is 1
+	auto transaction = store.tx_begin_write ();
 	store.confirmation_height.put (transaction, constants.genesis->account (), { 1, constants.genesis->hash () });
 }
 

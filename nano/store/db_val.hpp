@@ -38,15 +38,11 @@ public:
 	}
 
 	db_val (std::nullptr_t) noexcept :
-		span_view{ reinterpret_cast<uint8_t const *> (""), 0 } // Use empty string literal to provide valid pointer for zero-size memcpy
+		span_view{}
 	{
 	}
 
-	db_val (std::shared_ptr<std::vector<uint8_t>> buffer) noexcept :
-		buffer{ buffer }
-	{
-		convert_buffer_to_value ();
-	}
+	db_val (std::shared_ptr<std::vector<uint8_t>> buffer) noexcept;
 
 	db_val (uint64_t value);
 	db_val (nano::uint128_union const &);
@@ -87,6 +83,12 @@ public:
 	template <typename Block>
 	auto convert_to_block () const -> std::shared_ptr<Block>;
 
+	template <typename T>
+	T convert_to () const
+	{
+		return static_cast<T> (*this);
+	}
+
 	explicit operator std::shared_ptr<nano::send_block> () const;
 	explicit operator std::shared_ptr<nano::receive_block> () const;
 	explicit operator std::shared_ptr<nano::open_block> () const;
@@ -109,6 +111,6 @@ public:
 
 private:
 	template <typename T>
-	auto convert () const -> T;
+	auto read_as_bytes () const -> T;
 };
 }

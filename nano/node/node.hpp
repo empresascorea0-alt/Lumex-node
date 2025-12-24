@@ -45,7 +45,6 @@ public:
 
 	std::shared_ptr<nano::node> shared ();
 
-	bool copy_with_compaction (std::filesystem::path const &);
 	void keepalive (std::string const &, uint16_t);
 	int store_version ();
 	void inbound (nano::message const &, std::shared_ptr<nano::transport::channel> const &);
@@ -86,13 +85,18 @@ public:
 	 * Attempts to bootstrap block. This is the best effort, there is no guarantee that the block will be bootstrapped.
 	 */
 	void bootstrap_block (nano::block_hash const &);
+
 	nano::account get_node_id () const;
 	nano::telemetry_data local_telemetry () const;
 	std::string identifier () const;
+
 	nano::container_info container_info () const;
 
+	// Ledger management
+	void copy_with_compaction (std::filesystem::path const & destination);
+
 public:
-	const std::filesystem::path application_path;
+	const std::filesystem::path application_path; // aka: data_path
 	const nano::keypair node_id;
 	boost::latch node_initialized_latch;
 	nano::node_config config;
@@ -104,8 +108,8 @@ public:
 	nano::logger & logger;
 	std::unique_ptr<nano::stats> stats_impl;
 	nano::stats & stats;
-	std::unique_ptr<nano::store::component> store_impl;
-	nano::store::component & store;
+	std::unique_ptr<nano::store::ledger_store> store_impl;
+	nano::store::ledger_store & store;
 	std::unique_ptr<nano::wallets_store> wallets_store_impl;
 	nano::wallets_store & wallets_store;
 	std::unique_ptr<nano::wallets> wallets_impl;

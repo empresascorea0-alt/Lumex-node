@@ -7,6 +7,8 @@
 #include <nano/node/transport/tcp_listener.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
+#include <nano/store/ledger/account.hpp>
+#include <nano/test_common/common.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
 
@@ -38,6 +40,7 @@ std::string nano::error_system_messages::message (int ev) const
 nano::test::system::system () :
 	io_ctx{ std::make_shared<boost::asio::io_context> () },
 	io_guard{ boost::asio::make_work_guard (*io_ctx) },
+	logger{ "test" },
 	stats{ logger }
 {
 	auto scale_str = std::getenv ("DEADLINE_SCALE_FACTOR");

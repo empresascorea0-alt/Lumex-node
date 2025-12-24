@@ -23,6 +23,9 @@
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_confirmed.hpp>
 #include <nano/secure/vote.hpp>
+#include <nano/store/ledger/account.hpp>
+#include <nano/store/ledger/peer.hpp>
+#include <nano/store/ledger/pruned.hpp>
 #include <nano/test_common/chains.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
@@ -2568,13 +2571,21 @@ TEST (node, peer_history_restart)
 /** This checks that a node can be opened (without being blocked) when a write lock is held elsewhere */
 TEST (node, dont_write_lock_node)
 {
+	// RocksDB does not support opening the same database from multiple instances
+	// TODO: Implement a guard mechanism to prevent multiple node instances from opening the same RocksDB database
+	if (nano::default_database_backend () == nano::database_backend::rocksdb)
+	{
+		GTEST_SKIP ();
+	}
+
 	auto path = nano::unique_path ();
 
 	std::promise<void> write_lock_held_promise;
 	std::promise<void> finished_promise;
 	std::thread ([&path, &write_lock_held_promise, &finished_promise] () {
 		nano::logger logger;
-		auto store = nano::make_store (logger, path, nano::dev::constants, false, true);
+		nano::stats stats{ logger };
+		auto store = nano::make_store (logger, stats, path, nano::dev::constants, false, true);
 		{
 			auto transaction (store->tx_begin_write ());
 			store->initialize (transaction, nano::dev::constants);

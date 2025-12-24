@@ -21,6 +21,10 @@
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_confirmed.hpp>
 #include <nano/secure/transaction.hpp>
+#include <nano/store/ledger/account.hpp>
+#include <nano/store/ledger/confirmation_height.hpp>
+#include <nano/store/ledger/pending.hpp>
+#include <nano/store/ledger/pruned.hpp>
 
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -2237,7 +2241,7 @@ void nano::json_handler::database_txn_tracker ()
 
 		if (!ec)
 		{
-			node.store.serialize_mdb_tracker (json, std::chrono::milliseconds (min_read_time_milliseconds), std::chrono::milliseconds (min_write_time_milliseconds));
+			node.store.backend.collect_txn_tracker (json, std::chrono::milliseconds (min_read_time_milliseconds), std::chrono::milliseconds (min_write_time_milliseconds));
 			response_l.put_child ("txn_tracking", json);
 		}
 	}
@@ -3984,7 +3988,7 @@ void nano::json_handler::stats ()
 	}
 	else if (type == "database")
 	{
-		node.store.serialize_memory_stats (response_l);
+		node.store.backend.collect_memory_stats (response_l);
 	}
 	else
 	{

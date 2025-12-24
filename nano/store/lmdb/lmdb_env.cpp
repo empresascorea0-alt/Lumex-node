@@ -1,9 +1,10 @@
+#include <nano/lib/config.hpp>
+#include <nano/lib/errors.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/utility.hpp>
-#include <nano/store/lmdb/lmdb.hpp>
+#include <nano/store/backend.hpp>
+#include <nano/store/lmdb/common.hpp>
 #include <nano/store/lmdb/lmdb_env.hpp>
-
-#include <boost/system/error_code.hpp>
 
 nano::store::lmdb::env::env (std::filesystem::path const & path_a, nano::store::lmdb::env::options options_a) :
 	database_path{ path_a }
@@ -69,9 +70,17 @@ void nano::store::lmdb::env::init (std::filesystem::path const & path_a, nano::s
 			auto status4 (mdb_env_open (environment, path_a.string ().c_str (), environment_flags, 00600));
 			if (!success (status4))
 			{
-				std::string message = "Could not open lmdb environment: (" + std::to_string (status4) + ") " + mdb_strerror (status4);
-				nano::default_logger ().error (nano::log::type::lmdb, "{}", message);
-				throw std::runtime_error (message);
+				if (status4 == ENOENT)
+				{
+					// Expected errors are packaged as nano::error and handled at a higher level
+					throw nano::error (nano::error_backend::db_not_found);
+				}
+				else
+				{
+					std::string message = "Could not open lmdb environment: (" + std::to_string (status4) + ") " + mdb_strerror (status4);
+					nano::default_logger ().error (nano::log::type::lmdb, "{}", message);
+					throw std::runtime_error (message);
+				}
 			}
 			release_assert (success (status4), error_string (status4));
 		}
@@ -114,4 +123,30 @@ MDB_txn * nano::store::lmdb::env::tx (store::transaction const & transaction_a) 
 {
 	debug_assert (transaction_a.store_id () == store_id);
 	return static_cast<MDB_txn *> (transaction_a.get_handle ());
+}
+
+void nano::store::lmdb::env::create_backup_file (std::filesystem::path const & filepath, nano::logger & logger) const
+{
+	auto extension = filepath.extension ();
+	auto filename_without_extension = filepath.filename ().replace_extension ("");
+	auto orig_filepath = filepath;
+	auto & backup_path = orig_filepath.remove_filename ();
+	auto backup_filename = filename_without_extension;
+	backup_filename += "_backup_";
+	backup_filename += std::to_string (std::chrono::system_clock::now ().time_since_epoch ().count ());
+	backup_filename += extension;
+	auto backup_filepath = backup_path / backup_filename;
+
+	logger.info (nano::log::type::lmdb, "Performing {} backup before database upgrade...", filepath.filename ().string ());
+
+	auto error (mdb_env_copy (*this, backup_filepath.string ().c_str ()));
+	if (error)
+	{
+		logger.critical (nano::log::type::lmdb, "Database backup failed");
+		std::exit (1);
+	}
+	else
+	{
+		logger.info (nano::log::type::lmdb, "Database backup completed. Backup can be found at: {}", backup_filepath.string ());
+	}
 }
