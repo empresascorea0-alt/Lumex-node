@@ -3,9 +3,9 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/memory.hpp>
 #include <nano/lib/stream.hpp>
+#include <nano/lib/vote.hpp>
 #include <nano/secure/account_info.hpp>
 #include <nano/secure/pending_info.hpp>
-#include <nano/secure/vote.hpp>
 #include <nano/store/db_val.hpp>
 
 namespace nano::store

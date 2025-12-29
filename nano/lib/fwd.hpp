@@ -22,6 +22,7 @@ class stats;
 class thread_pool;
 class thread_runner;
 class tomlconfig;
+class vote;
 template <typename Key, typename Value>
 class uniquer;
 

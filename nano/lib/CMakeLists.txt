@@ -130,6 +130,8 @@ add_library(
   uniquer.hpp
   utility.hpp
   utility.cpp
+  vote.hpp
+  vote.cpp
   walletconfig.hpp
   walletconfig.cpp
   work.hpp

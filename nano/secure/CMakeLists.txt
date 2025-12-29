@@ -26,9 +26,7 @@ add_library(
   receivable_iterator_impl.hpp
   rep_weights.hpp
   rep_weights.cpp
-  transaction.hpp
-  vote.hpp
-  vote.cpp)
+  transaction.hpp)
 
 target_link_libraries(secure nano_lib ed25519 crypto_lib Boost::system)
 

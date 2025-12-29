@@ -1,12 +1,12 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
 #include <nano/lib/logging.hpp>
+#include <nano/lib/vote.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/repcrawler.hpp>
 #include <nano/node/transport/fake.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/secure/ledger.hpp>
-#include <nano/secure/vote.hpp>
 #include <nano/test_common/chains.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
