@@ -1,10 +1,10 @@
 #include <nano/lib/numbers_templ.hpp>
 #include <nano/lib/tomlconfig.hpp>
+#include <nano/lib/vote.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/vote_cache.hpp>
 #include <nano/node/vote_router.hpp>
-#include <nano/secure/vote.hpp>
 
 #include <ranges>
 

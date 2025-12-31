@@ -1,6 +1,7 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/lib/utility.hpp>
+#include <nano/lib/vote.hpp>
 #include <nano/node/local_vote_history.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
@@ -12,7 +13,6 @@
 #include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/vote.hpp>
 #include <nano/store/ledger/final_vote.hpp>
 
 #include <chrono>

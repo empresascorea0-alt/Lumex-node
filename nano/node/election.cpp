@@ -1,5 +1,6 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/enum_util.hpp>
+#include <nano/lib/vote.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/confirmation_solicitor.hpp>
 #include <nano/node/election.hpp>
@@ -10,7 +11,6 @@
 #include <nano/node/vote_generator.hpp>
 #include <nano/node/vote_router.hpp>
 #include <nano/secure/ledger.hpp>
-#include <nano/secure/vote.hpp>
 
 using namespace std::chrono;
 

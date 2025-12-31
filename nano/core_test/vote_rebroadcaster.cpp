@@ -1,7 +1,7 @@
 #include <nano/lib/numbers.hpp>
+#include <nano/lib/vote.hpp>
 #include <nano/node/rep_tiers.hpp>
 #include <nano/node/vote_rebroadcaster.hpp>
-#include <nano/secure/vote.hpp>
 #include <nano/test_common/testutil.hpp>
 
 #include <gtest/gtest.h>

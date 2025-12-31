@@ -3,10 +3,10 @@
 #include <nano/lib/interval.hpp>
 #include <nano/lib/locks.hpp>
 #include <nano/lib/numbers.hpp>
+#include <nano/lib/vote.hpp>
 #include <nano/node/fair_queue.hpp>
 #include <nano/node/fwd.hpp>
 #include <nano/node/wallet.hpp>
-#include <nano/secure/vote.hpp>
 
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/mem_fun.hpp>
