@@ -10,6 +10,14 @@ namespace nano::store
 {
 nano::store::column_schema const backend::schema_meta{ { nano::store::table::meta, "meta" } };
 
+backend::backend (nano::logger & logger, nano::store::txn_tracking_config const & txn_tracking_config)
+{
+	if (txn_tracking_config.enable)
+	{
+		tracker = std::make_unique<nano::store::txn_tracker> (logger, txn_tracking_config);
+	}
+}
+
 backend::~backend () = default;
 
 void backend::open (column_schema schema, nano::store::open_mode mode)
@@ -244,9 +252,27 @@ void backend::copy_to (backend & destination, copy_progress_callback callback, s
 	}
 }
 
-void backend::collect_txn_tracker (boost::property_tree::ptree &, std::chrono::milliseconds, std::chrono::milliseconds) const
+void backend::collect_txn_tracker (boost::property_tree::ptree & ptree, std::chrono::milliseconds min_read_time, std::chrono::milliseconds min_write_time) const
 {
-	// Default implementation does nothing - backend-specific
+	if (tracker)
+	{
+		tracker->serialize_json (ptree, min_read_time, min_write_time);
+	}
+}
+
+auto backend::txn_tracking_callbacks () const -> nano::store::txn_callbacks
+{
+	txn_callbacks callbacks{};
+	if (tracker)
+	{
+		callbacks.txn_start = [this] (nano::store::transaction_impl const * txn) {
+			tracker->add (txn);
+		};
+		callbacks.txn_end = [this] (nano::store::transaction_impl const * txn) {
+			tracker->erase (txn);
+		};
+	}
+	return callbacks;
 }
 
 void backend::collect_memory_stats (boost::property_tree::ptree &) const

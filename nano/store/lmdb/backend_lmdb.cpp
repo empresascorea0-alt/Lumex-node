@@ -10,13 +10,10 @@
 
 namespace nano::store::lmdb
 {
-backend_lmdb::backend_lmdb (std::filesystem::path const & path, nano::logger & logger_a, nano::lmdb_config const & config_a, nano::txn_tracking_config const & txn_tracking_config_a, std::chrono::milliseconds block_processor_batch_max_time_a) :
+backend_lmdb::backend_lmdb (std::filesystem::path const & path, nano::lmdb_config const & config_a, nano::logger & logger_a, nano::store::txn_tracking_config const & txn_tracking_config_a) :
+	backend{ logger_a, txn_tracking_config_a },
 	database_path{ path },
-	config{ config_a },
-	txn_tracking_config{ txn_tracking_config_a },
-	block_processor_batch_max_time{ block_processor_batch_max_time_a },
-	mdb_txn_tracker{ logger_a, txn_tracking_config_a, block_processor_batch_max_time_a },
-	txn_tracking_enabled{ txn_tracking_config_a.enable }
+	config{ config_a }
 {
 }
 
@@ -213,27 +210,12 @@ std::string backend_lmdb::error_string (int status) const
 
 nano::store::read_transaction backend_lmdb::tx_begin_read () const
 {
-	return env->tx_begin_read (create_txn_callbacks ());
+	return env->tx_begin_read (txn_tracking_callbacks ());
 }
 
 nano::store::write_transaction backend_lmdb::tx_begin_write ()
 {
-	return env->tx_begin_write (create_txn_callbacks ());
-}
-
-nano::store::lmdb::txn_callbacks backend_lmdb::create_txn_callbacks () const
-{
-	nano::store::lmdb::txn_callbacks callbacks;
-	if (txn_tracking_enabled)
-	{
-		callbacks.txn_start = [&tracker = mdb_txn_tracker] (nano::store::transaction_impl const * transaction_impl) {
-			tracker.add (transaction_impl);
-		};
-		callbacks.txn_end = [&tracker = mdb_txn_tracker] (nano::store::transaction_impl const * transaction_impl) {
-			tracker.erase (transaction_impl);
-		};
-	}
-	return callbacks;
+	return env->tx_begin_write (txn_tracking_callbacks ());
 }
 
 void backend_lmdb::backup ()
@@ -273,11 +255,6 @@ std::string backend_lmdb::vendor_get () const
 std::string backend_lmdb::get_database_path () const
 {
 	return database_path.string ();
-}
-
-void backend_lmdb::collect_txn_tracker (boost::property_tree::ptree & ptree, std::chrono::milliseconds min_read_time, std::chrono::milliseconds min_write_time) const
-{
-	mdb_txn_tracker.serialize_json (ptree, min_read_time, min_write_time);
 }
 
 void backend_lmdb::collect_memory_stats (boost::property_tree::ptree & ptree) const

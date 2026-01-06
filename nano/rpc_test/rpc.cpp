@@ -5922,13 +5922,6 @@ TEST (rpc, block_confirmed)
 
 TEST (rpc, database_txn_tracker)
 {
-	// TODO: Reenable when RocksDB supports transaction tracking
-	if (nano::default_database_backend () == nano::database_backend::rocksdb)
-	{
-		// Don't test this in rocksdb mode
-		return;
-	}
-
 	// First try when database tracking is disabled
 	{
 		nano::test::system system;
@@ -5947,7 +5940,7 @@ TEST (rpc, database_txn_tracker)
 	// Now try enabling it but with invalid amounts
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.diagnostics_config.txn_tracking.enable = true;
+	node_config.txn_tracking.enable = true;
 	auto node = add_ipc_enabled_node (system, node_config);
 	auto const rpc_ctx = add_rpc (system, node);
 
