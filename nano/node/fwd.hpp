@@ -11,6 +11,7 @@ class account_sets_config;
 class active_elections;
 class backlog_scan;
 class block_processor;
+class block_rebroadcaster;
 class bounded_backlog;
 class bucketing;
 class bootstrap_config;

@@ -212,6 +212,8 @@ public:
 	nano::pruning & pruning;
 	std::unique_ptr<nano::vote_rebroadcaster> vote_rebroadcaster_impl;
 	nano::vote_rebroadcaster & vote_rebroadcaster;
+	std::unique_ptr<nano::block_rebroadcaster> block_rebroadcaster_impl;
+	nano::block_rebroadcaster & block_rebroadcaster;
 
 public:
 	std::chrono::steady_clock::time_point const startup_time;

@@ -25,6 +25,8 @@ add_library(
   block_context.hpp
   block_processor.hpp
   block_processor.cpp
+  block_rebroadcaster.hpp
+  block_rebroadcaster.cpp
   block_source.hpp
   block_source.cpp
   bucketing.hpp

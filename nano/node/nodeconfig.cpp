@@ -290,6 +290,10 @@ nano::error nano::node_config::serialize_toml (nano::tomlconfig & toml) const
 	vote_rebroadcaster.serialize (vote_rebroadcaster_l);
 	toml.put_child ("vote_rebroadcaster", vote_rebroadcaster_l);
 
+	nano::tomlconfig block_rebroadcaster_l;
+	block_rebroadcaster.serialize (block_rebroadcaster_l);
+	toml.put_child ("block_rebroadcaster", block_rebroadcaster_l);
+
 	nano::tomlconfig cementing_set_l;
 	cementing_set.serialize (cementing_set_l);
 	toml.put_child ("cementing_set", cementing_set_l);
@@ -475,6 +479,12 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		{
 			auto config_l = toml.get_required_child ("vote_rebroadcaster");
 			vote_rebroadcaster.deserialize (config_l);
+		}
+
+		if (toml.has_key ("block_rebroadcaster"))
+		{
+			auto config_l = toml.get_required_child ("block_rebroadcaster");
+			block_rebroadcaster.deserialize (config_l);
 		}
 
 		if (toml.has_key ("cementing_set"))

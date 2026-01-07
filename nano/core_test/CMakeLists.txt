@@ -12,6 +12,7 @@ add_executable(
   block.cpp
   block_store.cpp
   block_processor.cpp
+  block_rebroadcaster.cpp
   bootstrap.cpp
   bootstrap_frontier_scan.cpp
   bootstrap_server.cpp

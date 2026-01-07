@@ -94,6 +94,7 @@ enum class type
 	bounded_backlog,
 	request_aggregator,
 	vote_rebroadcaster,
+	block_rebroadcaster,
 	migration,
 
 	// bootstrap

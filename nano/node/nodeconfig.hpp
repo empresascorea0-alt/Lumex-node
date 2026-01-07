@@ -10,6 +10,7 @@
 #include <nano/node/active_elections.hpp>
 #include <nano/node/backlog_scan.hpp>
 #include <nano/node/block_processor.hpp>
+#include <nano/node/block_rebroadcaster.hpp>
 #include <nano/node/bootstrap/bootstrap_config.hpp>
 #include <nano/node/bootstrap/bootstrap_server.hpp>
 #include <nano/node/bounded_backlog.hpp>
@@ -152,6 +153,7 @@ public:
 	nano::backlog_scan_config backlog_scan;
 	nano::bounded_backlog_config bounded_backlog;
 	nano::vote_rebroadcaster_config vote_rebroadcaster;
+	nano::block_rebroadcaster_config block_rebroadcaster;
 	nano::fork_cache_config fork_cache;
 
 public:

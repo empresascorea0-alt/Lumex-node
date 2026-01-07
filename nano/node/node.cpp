@@ -12,6 +12,7 @@
 #include <nano/node/active_elections.hpp>
 #include <nano/node/backlog_scan.hpp>
 #include <nano/node/bandwidth_limiter.hpp>
+#include <nano/node/block_rebroadcaster.hpp>
 #include <nano/node/bootstrap/bootstrap_server.hpp>
 #include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/bounded_backlog.hpp>
@@ -204,6 +205,8 @@ nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, std::filesy
 	pruning{ *pruning_impl },
 	vote_rebroadcaster_impl{ std::make_unique<nano::vote_rebroadcaster> (config.vote_rebroadcaster, ledger, vote_router, network, wallets, rep_tiers, stats, logger) },
 	vote_rebroadcaster{ *vote_rebroadcaster_impl },
+	block_rebroadcaster_impl{ std::make_unique<nano::block_rebroadcaster> (config.block_rebroadcaster, active, network, stats, logger) },
+	block_rebroadcaster{ *block_rebroadcaster_impl },
 	startup_time{ std::chrono::steady_clock::now () },
 	node_seq{ seq }
 {
@@ -574,6 +577,7 @@ void nano::node::start ()
 	http_callbacks.start ();
 	pruning.start ();
 	vote_rebroadcaster.start ();
+	block_rebroadcaster.start ();
 
 	add_initial_peers ();
 }
@@ -625,6 +629,7 @@ void nano::node::stop ()
 	http_callbacks.stop ();
 	pruning.stop ();
 	vote_rebroadcaster.stop ();
+	block_rebroadcaster.stop ();
 
 	bootstrap_workers.stop ();
 	wallet_workers.stop ();

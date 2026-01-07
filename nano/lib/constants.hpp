@@ -72,9 +72,7 @@ public:
 		syn_cookie_cutoff (std::chrono::seconds (5)),
 		bootstrap_interval (std::chrono::seconds (15 * 60)),
 		ipv6_subnetwork_prefix_for_limiting (64), // Equivalent to network prefix /64.
-		peer_dump_interval (std::chrono::seconds (5 * 60)),
-		vote_broadcast_interval (15 * 1000),
-		block_broadcast_interval (150 * 1000)
+		peer_dump_interval (std::chrono::seconds (5 * 60))
 	{
 		if (is_live_network ())
 		{
@@ -149,8 +147,8 @@ public:
 	std::chrono::seconds peer_dump_interval;
 
 	/** Time to wait before rebroadcasts for active elections */
-	std::chrono::milliseconds vote_broadcast_interval;
-	std::chrono::milliseconds block_broadcast_interval;
+	std::chrono::milliseconds vote_broadcast_interval{ 15s };
+	std::chrono::milliseconds block_broadcast_interval{ 150s };
 
 	/** We do not reply to telemetry requests made within cooldown period */
 	std::chrono::milliseconds telemetry_request_cooldown{ 1000 * 15 };
