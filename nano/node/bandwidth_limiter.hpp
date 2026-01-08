@@ -25,7 +25,7 @@ public:
 class bandwidth_limiter final
 {
 public:
-	explicit bandwidth_limiter (nano::node_config const &);
+	bandwidth_limiter (nano::node_config const &, nano::node_flags const &);
 
 	/**
 	 * Check whether packet falls withing bandwidth limits and should be allowed

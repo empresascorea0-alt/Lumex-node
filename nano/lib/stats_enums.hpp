@@ -626,6 +626,7 @@ enum class detail
 	// block broadcaster
 	broadcast_normal,
 	broadcast_aggressive,
+	broadcast_super,
 	erase_old,
 	erase_confirmed,
 

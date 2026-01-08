@@ -6,9 +6,10 @@
  * bandwidth_limiter
  */
 
-nano::bandwidth_limiter::bandwidth_limiter (nano::node_config const & node_config_a) :
-	config{ node_config_a },
-	limiter_generic{ config.generic_limit, config.generic_burst_ratio },
+nano::bandwidth_limiter::bandwidth_limiter (nano::node_config const & node_config, nano::node_flags const & flags) :
+	config{ node_config },
+	// In super_rebroadcaster mode, use unlimited bandwidth (0 = no limit)
+	limiter_generic{ flags.super_rebroadcaster ? 0 : config.generic_limit, config.generic_burst_ratio },
 	limiter_bootstrap{ config.bootstrap_limit, config.bootstrap_burst_ratio }
 {
 }

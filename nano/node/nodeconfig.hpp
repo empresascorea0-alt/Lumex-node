@@ -190,6 +190,7 @@ public:
 	bool disable_search_pending{ false }; // For testing only
 	bool enable_pruning{ false };
 	bool enable_voting{ false };
+	bool super_rebroadcaster{ false }; // Broadcast all blocks and votes to all peers
 	bool fast_bootstrap{ false };
 	bool read_only{ false };
 	bool disable_connection_cleanup{ false };

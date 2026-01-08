@@ -1114,7 +1114,8 @@ TEST (network, flood_vote)
 	ASSERT_TIMELY_EQ (5s, node.rep_crawler.representative_count (), 1);
 
 	auto vote = nano::test::make_vote (nano::dev::genesis_key, { nano::dev::genesis->hash () });
-	ASSERT_EQ (3, node.network.flood_vote_rebroadcasted (vote, 999.0f));
+	ASSERT_EQ (2, node.network.flood_vote (vote, nano::transport::traffic_type::test));
+	ASSERT_EQ (3, node.network.flood_vote_all (vote, nano::transport::traffic_type::test));
 	ASSERT_EQ (2, node.network.flood_vote_non_pr (vote, 999.0f));
 	ASSERT_EQ (1, node.network.flood_vote_pr (vote));
 }

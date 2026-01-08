@@ -5,13 +5,15 @@
 #include <nano/node/block_rebroadcaster.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
 
 /*
  * block_rebroadcaster
  */
 
-nano::block_rebroadcaster::block_rebroadcaster (nano::block_rebroadcaster_config const & config_a, nano::active_elections & active_a, nano::network & network_a, nano::stats & stats_a, nano::logger & logger_a) :
+nano::block_rebroadcaster::block_rebroadcaster (nano::block_rebroadcaster_config const & config_a, nano::node_flags const & flags_a, nano::active_elections & active_a, nano::network & network_a, nano::stats & stats_a, nano::logger & logger_a) :
 	config{ config_a },
+	flags{ flags_a },
 	active{ active_a },
 	network{ network_a },
 	stats{ stats_a },
@@ -140,12 +142,16 @@ void nano::block_rebroadcaster::run ()
 			lock.lock ();
 		}
 
-		float constexpr network_fanout_scale = 1.0f;
-
 		// Wait for spare capacity if our network traffic is too high
-		if (!network.check_capacity (nano::transport::traffic_type::block_rebroadcast, network_fanout_scale))
+		if (!check_capacity ())
 		{
 			stats.inc (nano::stat::type::block_rebroadcaster, nano::stat::detail::cooldown);
+
+			if (!queue.empty () && capacity_warning_interval.elapse (5s))
+			{
+				logger.warn (nano::log::type::block_rebroadcaster, "Network capacity for block rebroadcasting unavailable, {} blocks waiting in queue", queue.size ());
+			}
+
 			lock.unlock ();
 			std::this_thread::sleep_for (100ms);
 			lock.lock ();
@@ -171,7 +177,7 @@ void nano::block_rebroadcaster::run ()
 			{
 				stats.inc (nano::stat::type::block_rebroadcaster, nano::stat::detail::rebroadcast);
 
-				auto sent = network.flood_block (block, nano::transport::traffic_type::block_rebroadcast);
+				auto sent = broadcast (block);
 				stats.add (nano::stat::type::block_rebroadcaster, nano::stat::detail::sent, sent);
 			}
 			else
@@ -181,6 +187,32 @@ void nano::block_rebroadcaster::run ()
 
 			lock.lock ();
 		}
+	}
+}
+
+size_t nano::block_rebroadcaster::broadcast (std::shared_ptr<nano::block> const & block)
+{
+	if (flags.super_rebroadcaster)
+	{
+		stats.inc (nano::stat::type::block_rebroadcaster, nano::stat::detail::broadcast_super);
+		return network.flood_block_all (block, nano::transport::traffic_type::block_rebroadcast);
+	}
+	else
+	{
+		stats.inc (nano::stat::type::block_rebroadcaster, nano::stat::detail::broadcast);
+		return network.flood_block (block, nano::transport::traffic_type::block_rebroadcast);
+	}
+}
+
+bool nano::block_rebroadcaster::check_capacity () const
+{
+	if (flags.super_rebroadcaster)
+	{
+		return network.check_capacity_ratio (nano::transport::traffic_type::block_rebroadcast, 0.5f);
+	}
+	else
+	{
+		return network.check_capacity_fanout (nano::transport::traffic_type::block_rebroadcast);
 	}
 }
 

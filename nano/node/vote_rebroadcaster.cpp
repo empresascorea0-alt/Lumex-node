@@ -4,6 +4,7 @@
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/rep_tiers.hpp>
 #include <nano/node/vote_processor.hpp>
 #include <nano/node/vote_rebroadcaster.hpp>
@@ -11,8 +12,9 @@
 #include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 
-nano::vote_rebroadcaster::vote_rebroadcaster (nano::vote_rebroadcaster_config const & config_a, nano::ledger & ledger_a, nano::vote_router & vote_router_a, nano::network & network_a, nano::wallets & wallets_a, nano::rep_tiers & rep_tiers_a, nano::stats & stats_a, nano::logger & logger_a) :
+nano::vote_rebroadcaster::vote_rebroadcaster (nano::vote_rebroadcaster_config const & config_a, nano::node_flags const & flags_a, nano::ledger & ledger_a, nano::vote_router & vote_router_a, nano::network & network_a, nano::wallets & wallets_a, nano::rep_tiers & rep_tiers_a, nano::stats & stats_a, nano::logger & logger_a) :
 	config{ config_a },
+	flags{ flags_a },
 	ledger{ ledger_a },
 	vote_router{ vote_router_a },
 	network{ network_a },
@@ -72,9 +74,9 @@ nano::vote_rebroadcaster::vote_rebroadcaster (nano::vote_rebroadcaster_config co
 			return false;
 		});
 
-		// Enable vote rebroadcasting only if the node does not host a representative
+		// Enable vote rebroadcasting only if the node does not host a representative (or super_rebroadcaster mode)
 		// Do not rebroadcast votes from non-principal representatives
-		if (should_rebroadcast && non_principal)
+		if (should_rebroadcast && (!has_principal || flags.super_rebroadcaster))
 		{
 			auto tier = rep_tiers.tier (vote->account);
 			if (tier != nano::rep_tier::none)
@@ -180,8 +182,9 @@ void nano::vote_rebroadcaster::run ()
 		{
 			stats.inc (nano::stat::type::vote_rebroadcaster, nano::stat::detail::refresh);
 
+			// Check if node has a principal representative (rebroadcasting is disabled when true)
 			reps = wallets.reps ();
-			non_principal = !reps.have_half_rep (); // Disable vote rebroadcasting if the node has a principal representative (or close to)
+			has_principal = reps.have_half_rep ();
 		}
 
 		// Cleanup expired representatives from rebroadcasts
@@ -192,12 +195,16 @@ void nano::vote_rebroadcaster::run ()
 			lock.lock ();
 		}
 
-		float constexpr network_fanout_scale = 1.0f;
-
 		// Wait for spare capacity if our network traffic is too high
-		if (!network.check_capacity (nano::transport::traffic_type::vote_rebroadcast, network_fanout_scale))
+		if (!check_capacity ())
 		{
 			stats.inc (nano::stat::type::vote_rebroadcaster, nano::stat::detail::cooldown);
+
+			if (!queue.empty () && capacity_warning_interval.elapse (5s))
+			{
+				logger.warn (nano::log::type::vote_rebroadcaster, "Network capacity for vote rebroadcasting unavailable, {} votes waiting in queue", queue.size ());
+			}
+
 			lock.unlock ();
 			std::this_thread::sleep_for (100ms);
 			lock.lock ();
@@ -227,12 +234,38 @@ void nano::vote_rebroadcaster::run ()
 				stats.add (nano::stat::type::vote_rebroadcaster, nano::stat::detail::rebroadcast_hashes, vote->hashes.size ());
 				stats.inc (nano::stat::type::vote_rebroadcaster_tier, to_stat_detail (tier));
 
-				auto sent = network.flood_vote_rebroadcasted (vote, network_fanout_scale);
+				auto sent = broadcast (vote);
 				stats.add (nano::stat::type::vote_rebroadcaster, nano::stat::detail::sent, sent);
 			}
 
 			lock.lock ();
 		}
+	}
+}
+
+size_t nano::vote_rebroadcaster::broadcast (std::shared_ptr<nano::vote> const & vote)
+{
+	if (flags.super_rebroadcaster)
+	{
+		stats.inc (nano::stat::type::vote_rebroadcaster, nano::stat::detail::broadcast_super);
+		return network.flood_vote_all (vote, nano::transport::traffic_type::vote_rebroadcast, true /* rebroadcasted */);
+	}
+	else
+	{
+		stats.inc (nano::stat::type::vote_rebroadcaster, nano::stat::detail::broadcast);
+		return network.flood_vote (vote, nano::transport::traffic_type::vote_rebroadcast, true /* rebroadcasted */);
+	}
+}
+
+bool nano::vote_rebroadcaster::check_capacity () const
+{
+	if (flags.super_rebroadcaster)
+	{
+		return network.check_capacity_ratio (nano::transport::traffic_type::vote_rebroadcast, 0.5f);
+	}
+	else
+	{
+		return network.check_capacity_fanout (nano::transport::traffic_type::vote_rebroadcast);
 	}
 }
 
