@@ -182,7 +182,6 @@ public:
 	bool disable_tcp_realtime{ false };
 	bool disable_providing_telemetry_metrics{ false };
 	bool disable_block_processor_unchecked_deletion{ false };
-	bool disable_block_processor_republishing{ false };
 	bool allow_bootstrap_peers_duplicates{ false };
 	bool disable_max_peers_per_ip{ false }; // For testing only
 	bool disable_max_peers_per_subnetwork{ false }; // For testing only

@@ -39,6 +39,7 @@ public:
 	nano::error serialize (nano::tomlconfig &) const;
 
 public:
+	bool enable{ true };
 	std::size_t max_size{ 1024 * 8 };
 	std::chrono::seconds rebroadcast_interval{ 3 };
 	std::chrono::seconds max_rebroadcast_interval{ 60 };
@@ -54,7 +55,7 @@ public:
 class local_block_broadcaster final
 {
 public:
-	local_block_broadcaster (local_block_broadcaster_config const &, nano::node &, nano::ledger_notifications &, nano::network &, nano::cementing_set &, nano::stats &, nano::logger &, bool enabled = false);
+	local_block_broadcaster (local_block_broadcaster_config const &, nano::node &, nano::ledger_notifications &, nano::network &, nano::cementing_set &, nano::stats &, nano::logger &);
 	~local_block_broadcaster ();
 
 	void start ();
@@ -114,7 +115,6 @@ private:
 	ordered_locals local_blocks;
 
 private:
-	bool enabled{ false };
 	nano::rate_limiter limiter;
 	nano::interval cleanup_interval;
 

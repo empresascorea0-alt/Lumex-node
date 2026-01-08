@@ -11,7 +11,7 @@
 
 #include <boost/range/iterator_range.hpp>
 
-nano::local_block_broadcaster::local_block_broadcaster (local_block_broadcaster_config const & config_a, nano::node & node_a, nano::ledger_notifications & ledger_notifications_a, nano::network & network_a, nano::cementing_set & cementing_set_a, nano::stats & stats_a, nano::logger & logger_a, bool enabled_a) :
+nano::local_block_broadcaster::local_block_broadcaster (local_block_broadcaster_config const & config_a, nano::node & node_a, nano::ledger_notifications & ledger_notifications_a, nano::network & network_a, nano::cementing_set & cementing_set_a, nano::stats & stats_a, nano::logger & logger_a) :
 	config{ config_a },
 	node{ node_a },
 	ledger_notifications{ ledger_notifications_a },
@@ -19,10 +19,9 @@ nano::local_block_broadcaster::local_block_broadcaster (local_block_broadcaster_
 	cementing_set{ cementing_set_a },
 	stats{ stats_a },
 	logger{ logger_a },
-	enabled{ enabled_a },
 	limiter{ config.broadcast_rate_limit, config.broadcast_rate_burst_ratio }
 {
-	if (!enabled)
+	if (!config.enable)
 	{
 		return;
 	}
@@ -81,7 +80,7 @@ nano::local_block_broadcaster::~local_block_broadcaster ()
 
 void nano::local_block_broadcaster::start ()
 {
-	if (!enabled)
+	if (!config.enable)
 	{
 		return;
 	}
@@ -258,6 +257,7 @@ nano::container_info nano::local_block_broadcaster::container_info () const
 
 nano::error nano::local_block_broadcaster_config::serialize (nano::tomlconfig & toml) const
 {
+	toml.put ("enable", enable, "Enable or disable local block broadcasting.\ntype:bool");
 	toml.put ("max_size", max_size, "Maximum number of blocks to keep in the local block broadcaster set. \ntype:uint64");
 	toml.put ("rebroadcast_interval", rebroadcast_interval.count (), "Interval between rebroadcasts of the same block. Interval increases with each rebroadcast. \ntype:seconds");
 	toml.put ("max_rebroadcast_interval", max_rebroadcast_interval.count (), "Maximum interval between rebroadcasts of the same block. \ntype:seconds");
@@ -270,6 +270,7 @@ nano::error nano::local_block_broadcaster_config::serialize (nano::tomlconfig & 
 
 nano::error nano::local_block_broadcaster_config::deserialize (nano::tomlconfig & toml)
 {
+	toml.get ("enable", enable);
 	toml.get ("max_size", max_size);
 	toml.get_duration ("rebroadcast_interval", rebroadcast_interval);
 	toml.get_duration ("max_rebroadcast_interval", max_rebroadcast_interval);
