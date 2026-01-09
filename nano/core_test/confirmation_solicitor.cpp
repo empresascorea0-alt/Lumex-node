@@ -18,9 +18,12 @@ TEST (confirmation_solicitor, batches)
 	nano::node_flags node_flags;
 	node_flags.disable_request_loop = true;
 	node_flags.disable_rep_crawler = true;
-	auto & node1 = *system.add_node (node_flags);
-	node_flags.disable_request_loop = true;
-	auto & node2 = *system.add_node (node_flags);
+	nano::node_config config1 = system.default_config ();
+	config1.block_rebroadcaster.enable = false;
+	auto & node1 = *system.add_node (config1, node_flags);
+	nano::node_config config2 = system.default_config ();
+	config2.block_rebroadcaster.enable = false;
+	auto & node2 = *system.add_node (config2, node_flags);
 	auto channel1 = nano::test::establish_tcp (system, node2, node1.network.endpoint ());
 	// Solicitor will only solicit from this representative
 	nano::representative representative{ nano::dev::genesis_key.pub, channel1 };
@@ -55,8 +58,8 @@ TEST (confirmation_solicitor, batches)
 		ASSERT_EQ (0, node2.stats.count (nano::stat::type::message, nano::stat::detail::publish, nano::stat::dir::out));
 		ASSERT_FALSE (solicitor.broadcast (*election));
 	}
-	// One publish through directed broadcasting and another through random flooding
-	ASSERT_EQ (2, node2.stats.count (nano::stat::type::message, nano::stat::detail::publish, nano::stat::dir::out));
+	// One publish through directed broadcasting (random flooding moved to block_rebroadcaster)
+	ASSERT_EQ (1, node2.stats.count (nano::stat::type::message, nano::stat::detail::publish, nano::stat::dir::out));
 	solicitor.flush ();
 	ASSERT_EQ (1, node2.stats.count (nano::stat::type::message, nano::stat::detail::confirm_req, nano::stat::dir::out));
 }
@@ -69,8 +72,12 @@ TEST (confirmation_solicitor, different_hash)
 	nano::node_flags node_flags;
 	node_flags.disable_request_loop = true;
 	node_flags.disable_rep_crawler = true;
-	auto & node1 = *system.add_node (node_flags);
-	auto & node2 = *system.add_node (node_flags);
+	nano::node_config config1 = system.default_config ();
+	config1.block_rebroadcaster.enable = false;
+	auto & node1 = *system.add_node (config1, node_flags);
+	nano::node_config config2 = system.default_config ();
+	config2.block_rebroadcaster.enable = false;
+	auto & node2 = *system.add_node (config2, node_flags);
 	auto channel1 = nano::test::establish_tcp (system, node2, node1.network.endpoint ());
 	// Solicitor will only solicit from this representative
 	nano::representative representative{ nano::dev::genesis_key.pub, channel1 };
@@ -98,8 +105,8 @@ TEST (confirmation_solicitor, different_hash)
 	// Ensure the request and broadcast goes through
 	ASSERT_FALSE (solicitor.add (*election));
 	ASSERT_FALSE (solicitor.broadcast (*election));
-	// One publish through directed broadcasting and another through random flooding
-	ASSERT_EQ (2, node2.stats.count (nano::stat::type::message, nano::stat::detail::publish, nano::stat::dir::out));
+	// One publish through directed broadcasting (random flooding moved to block_rebroadcaster)
+	ASSERT_EQ (1, node2.stats.count (nano::stat::type::message, nano::stat::detail::publish, nano::stat::dir::out));
 	solicitor.flush ();
 	ASSERT_EQ (1, node2.stats.count (nano::stat::type::message, nano::stat::detail::confirm_req, nano::stat::dir::out));
 }

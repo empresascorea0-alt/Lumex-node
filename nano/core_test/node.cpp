@@ -2199,15 +2199,15 @@ TEST (node, epoch_conflict_confirm)
 TEST (node, DISABLED_fork_invalid_block_signature)
 {
 	nano::test::system system;
-	nano::node_flags node_flags;
+	nano::node_config config = system.default_config ();
 	// Disabling republishing + waiting for a rollback before sending the correct vote below fixes an intermittent failure in this test
 	// If these are taken out, one of two things may cause the test two fail often:
 	// - Block *send2* might get processed before the rollback happens, simply due to timings, with code "fork", and not be processed again. Waiting for the rollback fixes this issue.
 	// - Block *send1* might get processed again after the rollback happens, which causes *send2* to be processed with code "fork". Disabling block republishing ensures "send1" is not processed again.
 	// An alternative would be to repeatedly flood the correct vote
-	node_flags.disable_block_processor_republishing = true;
-	auto & node1 (*system.add_node (node_flags));
-	auto & node2 (*system.add_node (node_flags));
+	config.local_block_broadcaster.enable = false;
+	auto & node1 (*system.add_node (config));
+	auto & node2 (*system.add_node (config));
 	nano::keypair key2;
 	nano::send_block_builder builder;
 	auto send1 = builder.make_block ()

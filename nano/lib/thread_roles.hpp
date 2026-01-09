@@ -58,6 +58,7 @@ enum class name
 	scheduler_priority,
 	rep_crawler,
 	local_block_broadcasting,
+	block_rebroadcasting,
 	rep_tiers,
 	network_cleanup,
 	network_keepalive,

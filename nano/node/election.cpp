@@ -293,7 +293,8 @@ void nano::election::broadcast_block (nano::confirmation_solicitor & solicitor_a
 			last_block_hash = status.winner->hash ();
 
 			node.stats.inc (nano::stat::type::election, last_block_hash.is_zero () ? nano::stat::detail::broadcast_block_initial : nano::stat::detail::broadcast_block_repeat);
-			node.logger.debug (nano::log::type::election, "Broadcasting current winner: {} for root: {} (behavior: {}, state: {}, voters: {}, blocks: {}, duration: {}ms)",
+
+			node.logger.debug (nano::log::type::election, "Broadcasted current winner: {} for root: {} (behavior: {}, state: {}, voters: {}, blocks: {}, duration: {}ms)",
 			status.winner->hash (),
 			qualified_root,
 			to_string (behavior_m),
@@ -302,6 +303,9 @@ void nano::election::broadcast_block (nano::confirmation_solicitor & solicitor_a
 			status.block_count,
 			duration ().count ());
 		}
+
+		// Random flood for block propagation
+		node.block_rebroadcaster.push (status.winner);
 	}
 }
 

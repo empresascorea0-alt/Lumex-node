@@ -119,7 +119,6 @@ void nano::add_node_flag_options (boost::program_options::options_description & 
 		("disable_bootstrap_bulk_pull_server", "Disables the legacy bulk pull server for bootstrap operations")
 		("disable_bootstrap_bulk_push_client", "Disables the legacy bulk push client for bootstrap operations")
 		("disable_tcp_realtime", "Disables TCP realtime connections")
-		("disable_block_processor_republishing", "Disables block republishing by disabling the local_block_broadcaster component")
 		("disable_search_pending", "Disables the periodic search for pending transactions")
 		("enable_pruning", "Enable experimental ledger pruning")
 		("enable_voting", "Enable voting")
@@ -152,7 +151,6 @@ void nano::update_flags (nano::node_flags & flags_a, boost::program_options::var
 	flags_a.disable_bootstrap_bulk_pull_server = (vm.count ("disable_bootstrap_bulk_pull_server") > 0);
 	flags_a.disable_bootstrap_bulk_push_client = (vm.count ("disable_bootstrap_bulk_push_client") > 0);
 	flags_a.disable_tcp_realtime = (vm.count ("disable_tcp_realtime") > 0);
-	flags_a.disable_block_processor_republishing = (vm.count ("disable_block_processor_republishing") > 0);
 	flags_a.disable_search_pending = (vm.count ("disable_search_pending") > 0);
 	if (!flags_a.inactive_node)
 	{

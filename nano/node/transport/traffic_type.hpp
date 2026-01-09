@@ -15,6 +15,7 @@ enum class traffic_type
 	block_broadcast,
 	block_broadcast_initial,
 	block_broadcast_rpc,
+	block_rebroadcast,
 	confirmation_requests,
 	keepalive,
 	vote,

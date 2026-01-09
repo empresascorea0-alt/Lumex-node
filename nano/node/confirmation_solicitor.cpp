@@ -48,9 +48,6 @@ bool nano::confirmation_solicitor::broadcast (nano::election const & election_a)
 				count += different ? 0 : 1;
 			}
 		}
-		// Random flood for block propagation
-		// TODO: Avoid broadcasting to the same peers that were already broadcasted to
-		network.flood_message (winner, nano::transport::traffic_type::block_broadcast, 0.5f);
 		error = false;
 	}
 	return error;

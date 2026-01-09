@@ -163,6 +163,9 @@ std::string nano::thread_role::get_string (nano::thread_role::name role)
 		case nano::thread_role::name::local_block_broadcasting:
 			thread_role_name_string = "Local broadcast";
 			break;
+		case nano::thread_role::name::block_rebroadcasting:
+			thread_role_name_string = "Block rebroad";
+			break;
 		case nano::thread_role::name::rep_tiers:
 			thread_role_name_string = "Rep tiers";
 			break;
