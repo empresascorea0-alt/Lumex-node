@@ -116,6 +116,7 @@ bool nano::vote_processor::vote (std::shared_ptr<nano::vote> const & vote, std::
 	{
 		stats.inc (nano::stat::type::vote_processor, nano::stat::detail::process);
 		stats.inc (nano::stat::type::vote_processor_tier, to_stat_detail (tier));
+		stats.inc (nano::stat::type::vote_processor_source, to_stat_detail (source));
 
 		condition.notify_one ();
 	}
