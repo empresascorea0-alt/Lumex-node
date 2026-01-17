@@ -329,9 +329,12 @@ nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, std::filesy
 		logger.warn (nano::log::type::node, "Work generation is disabled");
 	}
 
-	logger.info (nano::log::type::node, "Outbound bandwidth limit: {} bytes/s, burst ratio: {}",
-	config.bandwidth_limit,
-	config.bandwidth_limit_burst_ratio);
+	{
+		auto [limit, burst_ratio] = outbound_limiter.get_limit ();
+		logger.info (nano::log::type::node, "Outbound bandwidth limit: {}, burst ratio: {}",
+		limit == 0 ? "unlimited" : std::to_string (limit) + " bytes/s",
+		burst_ratio);
+	}
 
 	if (!block_or_pruned_exists (config.network_params.ledger.genesis->hash ()))
 	{

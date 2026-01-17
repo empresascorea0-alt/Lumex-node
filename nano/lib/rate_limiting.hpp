@@ -73,9 +73,12 @@ public:
 	void reset (std::size_t limit, double burst_ratio = 1.0);
 
 	std::size_t size () const;
+	std::pair<std::size_t, double> get_limit () const;
 
 private:
 	nano::rate::token_bucket bucket;
+	std::size_t limit;
+	double burst_ratio;
 	mutable nano::mutex mutex;
 };
 }

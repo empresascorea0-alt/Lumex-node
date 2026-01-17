@@ -39,11 +39,14 @@ public:
 
 	nano::container_info container_info () const;
 
+	std::pair<std::size_t, double> get_limit (nano::transport::traffic_type type = nano::transport::traffic_type::generic) const;
+
 private:
 	/**
 	 * Returns reference to limiter corresponding to the limit type
 	 */
 	nano::rate_limiter & select_limiter (nano::transport::traffic_type type);
+	nano::rate_limiter const & select_limiter (nano::transport::traffic_type type) const;
 
 private:
 	bandwidth_limiter_config const config;
