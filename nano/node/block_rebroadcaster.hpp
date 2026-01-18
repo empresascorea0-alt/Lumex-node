@@ -80,7 +80,7 @@ private:
 class block_rebroadcaster final
 {
 public:
-	block_rebroadcaster (block_rebroadcaster_config const &, nano::active_elections &, nano::network &, nano::stats &, nano::logger &);
+	block_rebroadcaster (block_rebroadcaster_config const &, nano::node_flags const &, nano::active_elections &, nano::network &, nano::stats &, nano::logger &);
 	~block_rebroadcaster ();
 
 	void start ();
@@ -92,6 +92,7 @@ public:
 
 public: // Dependencies
 	block_rebroadcaster_config const & config;
+	nano::node_flags const & flags;
 	nano::active_elections & active;
 	nano::network & network;
 	nano::stats & stats;
@@ -101,6 +102,8 @@ private:
 	void run ();
 	std::shared_ptr<nano::block> next ();
 	void cleanup ();
+	size_t broadcast (std::shared_ptr<nano::block> const &);
+	bool check_capacity () const;
 
 private:
 	// Simple FIFO queue of blocks to rebroadcast
@@ -117,5 +120,6 @@ private:
 
 	nano::interval cleanup_interval;
 	nano::interval log_interval;
+	nano::interval capacity_warning_interval;
 };
 }

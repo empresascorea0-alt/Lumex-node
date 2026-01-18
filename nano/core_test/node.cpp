@@ -2232,11 +2232,11 @@ TEST (node, DISABLED_fork_invalid_block_signature)
 	node1.process_active (send1);
 	ASSERT_TIMELY (5s, node1.block (send1->hash ()));
 	// Send the vote with the corrupt block signature
-	ASSERT_TRUE (node2.network.flood_vote_rebroadcasted (vote_corrupt, 1.0f));
+	ASSERT_TRUE (node2.network.flood_vote_all (vote_corrupt, nano::transport::traffic_type::test));
 	// Wait for the rollback
 	ASSERT_TIMELY (5s, node1.stats.count (nano::stat::type::rollback));
 	// Send the vote with the correct block
-	ASSERT_TRUE (node2.network.flood_vote_rebroadcasted (vote, 1.0f));
+	ASSERT_TRUE (node2.network.flood_vote_all (vote, nano::transport::traffic_type::test));
 	ASSERT_TIMELY (10s, !node1.block (send1->hash ()));
 	ASSERT_TIMELY (10s, node1.block (send2->hash ()));
 	ASSERT_EQ (node1.block (send2->hash ())->block_signature (), send2->block_signature ());
@@ -3805,4 +3805,73 @@ TEST (node, bootstrap_poison)
 	ASSERT_FALSE (node.store.account.get (node.store.tx_begin_read (), key1.pub, account_info));
 	ASSERT_EQ (account_info.head, open_correct->hash ());
 	ASSERT_EQ (account_info.representative, key1.pub); // Correct representative
+}
+
+TEST (node, super_rebroadcaster)
+{
+	nano::test::system system;
+
+	// Node 1: Super rebroadcaster mode
+	nano::node_config config = system.default_config ();
+	config.bootstrap.enable = false;
+	config.local_block_broadcaster.enable = false;
+	nano::node_flags flags;
+	flags.super_rebroadcaster = true;
+	auto & node1 = *system.add_node (config, flags);
+
+	// Nodes 2, 3, 4: Normal peer nodes
+	nano::node_config peer_config = system.default_config ();
+	peer_config.block_rebroadcaster.enable = false;
+	peer_config.vote_rebroadcaster.enable = false;
+	peer_config.local_block_broadcaster.enable = false;
+	auto & node2 = *system.add_node (peer_config);
+	auto & node3 = *system.add_node (peer_config);
+	auto & node4 = *system.add_node (peer_config);
+
+	// Verify all nodes connected
+	ASSERT_TIMELY_EQ (5s, node1.network.size (), 3);
+
+	// Create a block
+	auto send = nano::state_block_builder ()
+				.account (nano::dev::genesis_key.pub)
+				.previous (nano::dev::genesis->hash ())
+				.representative (nano::dev::genesis_key.pub)
+				.balance (nano::dev::constants.genesis_amount - nano::Knano_ratio)
+				.link (nano::dev::genesis_key.pub)
+				.sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				.work (*system.work.generate (nano::dev::genesis->hash ()))
+				.build ();
+
+	// Process block as if received from the live network (triggers rebroadcasting)
+	node1.process_active (send);
+
+	// Verify block rebroadcasting uses super mode
+	ASSERT_TIMELY (5s, node1.stats.count (nano::stat::type::block_rebroadcaster, nano::stat::detail::broadcast_super) >= 1);
+	ASSERT_EQ (0, node1.stats.count (nano::stat::type::block_rebroadcaster, nano::stat::detail::broadcast));
+
+	// Verify ALL peers received the block (super mode floods to all)
+	ASSERT_TIMELY (5s, node2.block (send->hash ()));
+	ASSERT_TIMELY (5s, node3.block (send->hash ()));
+	ASSERT_TIMELY (5s, node4.block (send->hash ()));
+
+	// Verify vote rebroadcasting uses super mode
+	// Create a final vote for the block (final vote will confirm the block)
+	auto vote = nano::test::make_final_vote (nano::dev::genesis_key, { send });
+
+	// Process vote as if received from the live network (triggers rebroadcasting)
+	node1.process_active (vote);
+
+	// Verify super mode stat is used for vote rebroadcasting
+	ASSERT_TIMELY (5s, node1.stats.count (nano::stat::type::vote_rebroadcaster, nano::stat::detail::broadcast_super) >= 1);
+	ASSERT_EQ (0, node1.stats.count (nano::stat::type::vote_rebroadcaster, nano::stat::detail::broadcast));
+
+	// Verify peers received votes with rebroadcasted flag set
+	ASSERT_TIMELY (5s, node2.stats.count (nano::stat::type::vote_processor_source, nano::stat::detail::rebroadcast) >= 1);
+	ASSERT_TIMELY (5s, node3.stats.count (nano::stat::type::vote_processor_source, nano::stat::detail::rebroadcast) >= 1);
+	ASSERT_TIMELY (5s, node4.stats.count (nano::stat::type::vote_processor_source, nano::stat::detail::rebroadcast) >= 1);
+
+	// Verify all peers confirmed the block (final vote triggers confirmation)
+	ASSERT_TIMELY (5s, node2.block_confirmed (send->hash ()));
+	ASSERT_TIMELY (5s, node3.block_confirmed (send->hash ()));
+	ASSERT_TIMELY (5s, node4.block_confirmed (send->hash ()));
 }

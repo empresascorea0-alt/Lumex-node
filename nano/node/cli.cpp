@@ -122,6 +122,7 @@ void nano::add_node_flag_options (boost::program_options::options_description & 
 		("disable_search_pending", "Disables the periodic search for pending transactions")
 		("enable_pruning", "Enable experimental ledger pruning")
 		("enable_voting", "Enable voting")
+		("super_rebroadcaster", "Broadcast all blocks and votes to all peers (high bandwidth usage)")
 		("allow_bootstrap_peers_duplicates", "Allow multiple connections to same peer in bootstrap attempts")
 		("fast_bootstrap", "Increase bootstrap speed for high end nodes with higher limits")
 		("block_processor_batch_size", boost::program_options::value<std::size_t>(), "Increase block processor transaction batch write size, default 0 (limited by config block_processor_batch_max_time), 256k for fast_bootstrap")
@@ -160,6 +161,7 @@ void nano::update_flags (nano::node_flags & flags_a, boost::program_options::var
 	flags_a.disable_block_processor_unchecked_deletion = (vm.count ("disable_block_processor_unchecked_deletion") > 0);
 	flags_a.enable_pruning = (vm.count ("enable_pruning") > 0);
 	flags_a.enable_voting = (vm.count ("enable_voting") > 0);
+	flags_a.super_rebroadcaster = (vm.count ("super_rebroadcaster") > 0);
 	flags_a.allow_bootstrap_peers_duplicates = (vm.count ("allow_bootstrap_peers_duplicates") > 0);
 	flags_a.fast_bootstrap = (vm.count ("fast_bootstrap") > 0);
 	if (flags_a.fast_bootstrap)

@@ -6,14 +6,26 @@
  * bandwidth_limiter
  */
 
-nano::bandwidth_limiter::bandwidth_limiter (nano::node_config const & node_config_a) :
-	config{ node_config_a },
-	limiter_generic{ config.generic_limit, config.generic_burst_ratio },
+nano::bandwidth_limiter::bandwidth_limiter (nano::node_config const & node_config, nano::node_flags const & flags) :
+	config{ node_config },
+	// In super_rebroadcaster mode, use unlimited bandwidth (0 = no limit)
+	limiter_generic{ flags.super_rebroadcaster ? 0 : config.generic_limit, config.generic_burst_ratio },
 	limiter_bootstrap{ config.bootstrap_limit, config.bootstrap_burst_ratio }
 {
 }
 
 nano::rate_limiter & nano::bandwidth_limiter::select_limiter (nano::transport::traffic_type type)
+{
+	switch (type)
+	{
+		case nano::transport::traffic_type::bootstrap_server:
+			return limiter_bootstrap;
+		default:
+			return limiter_generic;
+	}
+}
+
+nano::rate_limiter const & nano::bandwidth_limiter::select_limiter (nano::transport::traffic_type type) const
 {
 	switch (type)
 	{
@@ -42,6 +54,11 @@ nano::container_info nano::bandwidth_limiter::container_info () const
 	info.put ("generic", limiter_generic.size ());
 	info.put ("bootstrap", limiter_bootstrap.size ());
 	return info;
+}
+
+std::pair<std::size_t, double> nano::bandwidth_limiter::get_limit (nano::transport::traffic_type type) const
+{
+	return select_limiter (type).get_limit ();
 }
 
 /*

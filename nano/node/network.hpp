@@ -96,18 +96,29 @@ public:
 	nano::endpoint endpoint () const;
 
 	// Checks if we have enough channel capacity for the given traffic type
-	bool check_capacity (nano::transport::traffic_type, float scale = 1.0f) const;
+	// Returns true if at least half of target peers have spare capacity
+	bool check_capacity (nano::transport::traffic_type, size_t target_count) const;
+	// Computes target from fanout(scale)
+	bool check_capacity_fanout (nano::transport::traffic_type, float scale = 1.0f) const;
+	// Computes target as ratio of all peers (e.g., 0.5 = 50%)
+	bool check_capacity_ratio (nano::transport::traffic_type, float ratio) const;
 
 	size_t flood_message (nano::messages::message const &, nano::transport::traffic_type, float scale = 1.0f) const;
+	size_t flood_message_all (nano::messages::message const &, nano::transport::traffic_type) const;
+
 	size_t flood_keepalive (float scale = 1.0f) const;
 	size_t flood_keepalive_self (float scale = 0.5f) const;
+
+	size_t flood_vote (std::shared_ptr<nano::vote> const &, nano::transport::traffic_type, bool rebroadcasted = false) const;
+	size_t flood_vote_all (std::shared_ptr<nano::vote> const &, nano::transport::traffic_type, bool rebroadcasted = false) const;
 	size_t flood_vote_pr (std::shared_ptr<nano::vote> const &) const;
 	size_t flood_vote_non_pr (std::shared_ptr<nano::vote> const &, float scale) const;
-	size_t flood_vote_rebroadcasted (std::shared_ptr<nano::vote> const &, float scale) const;
-	// Flood block to all PRs and a random selection of non-PRs
-	size_t flood_block_initial (std::shared_ptr<nano::block> const &) const;
+
 	// Flood block to a random selection of peers
 	size_t flood_block (std::shared_ptr<nano::block> const &, nano::transport::traffic_type) const;
+	size_t flood_block_all (std::shared_ptr<nano::block> const &, nano::transport::traffic_type) const;
+	// Flood block to all PRs and a random selection of non-PRs
+	size_t flood_block_initial (std::shared_ptr<nano::block> const &) const;
 	void flood_block_many (std::deque<std::shared_ptr<nano::block>>, nano::transport::traffic_type, std::chrono::milliseconds delay = 10ms, std::function<void ()> callback = nullptr) const;
 
 	void send_keepalive (std::shared_ptr<nano::transport::channel> const &) const;

@@ -128,7 +128,7 @@ private:
 class vote_rebroadcaster final
 {
 public:
-	vote_rebroadcaster (vote_rebroadcaster_config const &, nano::ledger &, nano::vote_router &, nano::network &, nano::wallets &, nano::rep_tiers &, nano::stats &, nano::logger &);
+	vote_rebroadcaster (vote_rebroadcaster_config const &, nano::node_flags const &, nano::ledger &, nano::vote_router &, nano::network &, nano::wallets &, nano::rep_tiers &, nano::stats &, nano::logger &);
 	~vote_rebroadcaster ();
 
 	void start ();
@@ -140,6 +140,7 @@ public:
 
 public: // Dependencies
 	vote_rebroadcaster_config const & config;
+	nano::node_flags const & flags;
 	nano::ledger & ledger;
 	nano::vote_router & vote_router;
 	nano::network & network;
@@ -153,6 +154,8 @@ private:
 	void cleanup ();
 	bool process (std::shared_ptr<nano::vote> const &);
 	std::pair<std::shared_ptr<nano::vote>, nano::rep_tier> next ();
+	size_t broadcast (std::shared_ptr<nano::vote> const &);
+	bool check_capacity () const;
 
 private:
 	// Queue of recently processed votes to potentially rebroadcast
@@ -162,7 +165,7 @@ private:
 	nano::locked<vote_rebroadcaster_index> rebroadcasts;
 
 private:
-	std::atomic<bool> non_principal{ true };
+	std::atomic<bool> has_principal{ false };
 	nano::wallet_representatives reps;
 	nano::interval refresh_interval;
 	nano::interval cleanup_interval;
@@ -173,5 +176,6 @@ private:
 	std::thread thread;
 
 	nano::interval log_interval;
+	nano::interval capacity_warning_interval;
 };
 }

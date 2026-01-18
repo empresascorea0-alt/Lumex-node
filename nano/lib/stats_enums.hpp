@@ -25,6 +25,7 @@ enum class type
 	vote_processor,
 	vote_processor_tier,
 	vote_processor_overfill,
+	vote_processor_source,
 	vote_rebroadcaster,
 	vote_rebroadcaster_tier,
 	election,
@@ -625,6 +626,7 @@ enum class detail
 	// block broadcaster
 	broadcast_normal,
 	broadcast_aggressive,
+	broadcast_super,
 	erase_old,
 	erase_confirmed,
 

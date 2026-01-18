@@ -120,7 +120,7 @@ nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, std::filesy
 	unchecked{ *unchecked_impl },
 	ledger_notifications_impl{ std::make_unique<nano::ledger_notifications> (config, stats, logger) },
 	ledger_notifications{ *ledger_notifications_impl },
-	outbound_limiter_impl{ std::make_unique<nano::bandwidth_limiter> (config) },
+	outbound_limiter_impl{ std::make_unique<nano::bandwidth_limiter> (config, flags) },
 	outbound_limiter{ *outbound_limiter_impl },
 	message_processor_impl{ std::make_unique<nano::message_processor> (config.message_processor, *this) },
 	message_processor{ *message_processor_impl },
@@ -203,9 +203,9 @@ nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, std::filesy
 	http_callbacks{ *http_callbacks_impl },
 	pruning_impl{ std::make_unique<nano::pruning> (config, flags, ledger, stats, logger) },
 	pruning{ *pruning_impl },
-	vote_rebroadcaster_impl{ std::make_unique<nano::vote_rebroadcaster> (config.vote_rebroadcaster, ledger, vote_router, network, wallets, rep_tiers, stats, logger) },
+	vote_rebroadcaster_impl{ std::make_unique<nano::vote_rebroadcaster> (config.vote_rebroadcaster, flags, ledger, vote_router, network, wallets, rep_tiers, stats, logger) },
 	vote_rebroadcaster{ *vote_rebroadcaster_impl },
-	block_rebroadcaster_impl{ std::make_unique<nano::block_rebroadcaster> (config.block_rebroadcaster, active, network, stats, logger) },
+	block_rebroadcaster_impl{ std::make_unique<nano::block_rebroadcaster> (config.block_rebroadcaster, flags, active, network, stats, logger) },
 	block_rebroadcaster{ *block_rebroadcaster_impl },
 	startup_time{ std::chrono::steady_clock::now () },
 	node_seq{ seq }
@@ -329,9 +329,12 @@ nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, std::filesy
 		logger.warn (nano::log::type::node, "Work generation is disabled");
 	}
 
-	logger.info (nano::log::type::node, "Outbound bandwidth limit: {} bytes/s, burst ratio: {}",
-	config.bandwidth_limit,
-	config.bandwidth_limit_burst_ratio);
+	{
+		auto [limit, burst_ratio] = outbound_limiter.get_limit ();
+		logger.info (nano::log::type::node, "Outbound bandwidth limit: {}, burst ratio: {}",
+		limit == 0 ? "unlimited" : std::to_string (limit) + " bytes/s",
+		burst_ratio);
+	}
 
 	if (!block_or_pruned_exists (config.network_params.ledger.genesis->hash ()))
 	{
@@ -372,6 +375,11 @@ nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, std::filesy
 	else if (reps.half_principal)
 	{
 		logger.warn (nano::log::type::node, "Found local representatives in wallets, but voting is disabled. To enable voting, set `[node] enable_voting=true` in the `config-node.toml` file or use `--enable_voting` command line argument");
+	}
+
+	if (flags.super_rebroadcaster)
+	{
+		logger.warn (nano::log::type::node, "Super rebroadcaster mode enabled - broadcasting to all peers (expect high bandwidth usage)");
 	}
 
 	if ((network_params.network.is_live_network () || network_params.network.is_beta_network ()) && !flags.inactive_node)
@@ -483,6 +491,11 @@ void nano::node::inbound (const nano::messages::message & message, const std::sh
 void nano::node::process_active (std::shared_ptr<nano::block> const & incoming)
 {
 	block_processor.add (incoming);
+}
+
+void nano::node::process_active (std::shared_ptr<nano::vote> const & vote)
+{
+	vote_processor.vote (vote, loopback_channel, nano::vote_source::live);
 }
 
 [[nodiscard]] nano::block_status nano::node::process (secure::write_transaction const & transaction, std::shared_ptr<nano::block> block)
