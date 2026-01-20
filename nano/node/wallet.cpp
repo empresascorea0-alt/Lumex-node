@@ -12,6 +12,7 @@
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_confirmed.hpp>
 #include <nano/store/ledger/pending.hpp>
+#include <nano/store/lmdb/common.hpp>
 #include <nano/store/lmdb/db_val.hpp>
 #include <nano/store/lmdb/iterator.hpp>
 #include <nano/store/lmdb/utility.hpp>
@@ -458,8 +459,7 @@ void nano::wallet_store::erase (nano::store::write_transaction const & transacti
 	nano::store::lmdb::db_val pub_key (pub);
 	MDB_val mdb_pub_key{ pub_key.size (), pub_key.data () };
 	auto status (mdb_del (env.tx (transaction_a), handle, &mdb_pub_key, nullptr));
-	(void)status;
-	debug_assert (status == 0);
+	release_assert (nano::store::lmdb::success (status), nano::store::lmdb::error_string (status));
 }
 
 nano::wallet_value nano::wallet_store::entry_get_raw (nano::store::transaction const & transaction_a, nano::account const & pub_a)
@@ -490,8 +490,7 @@ void nano::wallet_store::entry_put_raw (nano::store::write_transaction const & t
 	auto mdb_pub_key = nano::store::lmdb::to_mdb_val (pub_key);
 	auto mdb_entry_val = nano::store::lmdb::to_mdb_val (entry_val);
 	auto status (mdb_put (env.tx (transaction_a), handle, &mdb_pub_key, &mdb_entry_val, 0));
-	(void)status;
-	debug_assert (status == 0);
+	release_assert (nano::store::lmdb::success (status), nano::store::lmdb::error_string (status));
 }
 
 nano::key_type nano::wallet_store::key_type (nano::wallet_value const & value_a)
@@ -881,8 +880,7 @@ void nano::wallet::serialize (std::string & json_a)
 void nano::wallet_store::destroy (nano::store::write_transaction const & transaction_a)
 {
 	auto status (mdb_drop (env.tx (transaction_a), handle, 1));
-	(void)status;
-	debug_assert (status == 0);
+	release_assert (nano::store::lmdb::success (status), nano::store::lmdb::error_string (status));
 	handle = 0;
 }
 
@@ -1764,8 +1762,7 @@ void nano::wallets::clear_send_ids ()
 {
 	auto transaction (tx_begin_write ());
 	auto status (mdb_drop (env.tx (transaction), send_action_ids, 0));
-	(void)status;
-	debug_assert (status == 0);
+	release_assert (nano::store::lmdb::success (status), nano::store::lmdb::error_string (status));
 }
 
 nano::wallet_representatives nano::wallets::reps () const
