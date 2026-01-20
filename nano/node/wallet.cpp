@@ -694,7 +694,7 @@ void nano::kdf::phs (nano::raw_key & result_a, std::string const & password_a, n
 {
 	nano::lock_guard<nano::mutex> lock{ mutex };
 	auto success (argon2_hash (1, kdf_work, 1, password_a.data (), password_a.size (), salt_a.bytes.data (), salt_a.bytes.size (), result_a.bytes.data (), result_a.bytes.size (), NULL, 0, Argon2_d, 0x10));
-	debug_assert (success == 0);
+	release_assert (success == 0);
 	(void)success;
 }
 
@@ -974,11 +974,10 @@ std::shared_ptr<nano::block> nano::wallet::change_action (nano::account const & 
 				representative_a.to_account ());
 
 				auto info = wallets.ledger.any.account_get (ledger_txn, source_a);
-				debug_assert (info);
+				release_assert (info, "could not find account info for account in wallet change_action", source_a.to_account ());
 				nano::raw_key prv;
 				auto error2 (store.fetch (transaction, source_a, prv));
-				(void)error2;
-				debug_assert (!error2);
+				release_assert (!error2, "failed to fetch private key for account in wallet change_action", source_a.to_account ());
 				if (work_a == 0)
 				{
 					store.work_get (transaction, source_a, work_a);
@@ -1072,11 +1071,10 @@ std::shared_ptr<nano::block> nano::wallet::send_action (nano::account const & so
 						amount_a.convert_to<std::string> ());
 
 						auto info = wallets.ledger.any.account_get (ledger_txn, source_a);
-						debug_assert (info);
+						release_assert (info, "could not find account info for account in wallet send_action", source_a.to_account ());
 						nano::raw_key prv;
 						auto error2 (store.fetch (transaction, source_a, prv));
-						(void)error2;
-						debug_assert (!error2);
+						release_assert (!error2, "failed to fetch private key for account in wallet send_action", source_a.to_account ());
 						if (work_a == 0)
 						{
 							store.work_get (transaction, source_a, work_a);
@@ -1460,7 +1458,7 @@ nano::logger & logger_a) :
 		auto transaction (tx_begin_write ());
 		auto status (mdb_dbi_open (env.tx (transaction), nullptr, MDB_CREATE, &handle));
 		status |= mdb_dbi_open (env.tx (transaction), "send_action_ids", MDB_CREATE, &send_action_ids);
-		release_assert (status == 0);
+		release_assert (nano::store::lmdb::success (status), nano::store::lmdb::error_string (status));
 		std::string beginning (nano::uint256_union (0).to_string ());
 		nano::store::lmdb::db_val beginning_val{ beginning.size (), const_cast<char *> (beginning.c_str ()) };
 		std::string end ((nano::uint256_union (nano::uint256_t (0) - nano::uint256_t (1))).to_string ());
@@ -1474,7 +1472,7 @@ nano::logger & logger_a) :
 			nano::wallet_id id;
 			std::string text (reinterpret_cast<char const *> (i->first.data ()), i->first.size ());
 			auto error (id.decode_hex (text));
-			release_assert (!error);
+			release_assert (!error, "failed to decode wallet id from text: {}", text);
 			release_assert (items.find (id) == items.end ());
 			auto wallet (std::make_shared<nano::wallet> (error, transaction, *this, text));
 			if (!error)
@@ -1614,7 +1612,7 @@ void nano::wallets::destroy (nano::wallet_id const & id_a)
 	// action_mutex should be after transactions to prevent deadlocks in deterministic_insert () & insert_adhoc ()
 	nano::lock_guard<nano::mutex> action_lock{ action_mutex };
 	auto existing (items.find (id_a));
-	debug_assert (existing != items.end ());
+	release_assert (existing != items.end ());
 	auto wallet (existing->second);
 	items.erase (existing);
 	wallet->store.destroy (transaction);
@@ -1638,7 +1636,7 @@ void nano::wallets::reload ()
 		nano::wallet_id id;
 		std::string text (reinterpret_cast<char const *> (i->first.data ()), i->first.size ());
 		auto error (id.decode_hex (text));
-		debug_assert (!error);
+		release_assert (!error, "error decoding wallet id from text", text);
 		// New wallet
 		if (items.find (id) == items.end ())
 		{
@@ -1704,8 +1702,7 @@ void nano::wallets::foreach_representative (std::function<void (nano::public_key
 							{
 								nano::raw_key prv;
 								auto error (wallet.store.fetch (transaction_l, account, prv));
-								(void)error;
-								debug_assert (!error);
+								release_assert (!error, "failed to fetch private key for representative account", account.to_account ());
 								action_accounts_l.emplace_back (account, prv);
 							}
 							else
