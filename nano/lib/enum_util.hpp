@@ -12,12 +12,34 @@ namespace nano
  */
 template <typename Index, typename Value>
 using enum_array = magic_enum::containers::array<Index, Value>;
-}
 
-// Needs nested namespace to avoid ADL collisions with magic_enum
-namespace nano::enum_util
-{
-std::string_view name (auto value)
+/**
+ * Bitset indexed by enum values
+ */
+template <typename E>
+using enum_bitset = magic_enum::containers::bitset<E>;
+
+/**
+ * Concept that checks if all values of source enum S can be converted to target enum T by name.
+ * Used to provide clear compile-time errors when enum conversion is not possible.
+ */
+template <typename S, typename T>
+concept enum_convertible_to = std::is_enum_v<S> && std::is_enum_v<T> && ([] {
+	for (auto value : magic_enum::enum_values<S> ())
+	{
+		if (!magic_enum::enum_cast<T> (magic_enum::enum_name (value)))
+		{
+			return false;
+		}
+	}
+	return true;
+}());
+
+/**
+ * Returns the string name of an enum value.
+ * Wraps magic_enum::enum_name with safety checks.
+ */
+std::string_view enum_to_string (auto value)
 {
 	auto name = magic_enum::enum_name (value);
 	debug_assert (!name.empty ());
@@ -26,10 +48,11 @@ std::string_view name (auto value)
 }
 
 /**
- * Same as `magic_enum::enum_values (...)` but ignores reserved values (starting with underscore).
+ * Returns all valid enum values, ignoring reserved values (starting with underscore) by default.
+ * Same as magic_enum::enum_values but filters reserved values.
  */
 template <class E, bool ignore_reserved = true>
-std::vector<E> const & values ()
+std::vector<E> const & enum_values ()
 {
 	static std::vector<E> all = [] () {
 		std::vector<E> result;
@@ -46,11 +69,12 @@ std::vector<E> const & values ()
 }
 
 /**
- * Same as `magic_enum::enum_cast (...)` but ignores reserved values (starting with underscore) by default.
- * Case insensitive.
+ * Parses a string to an enum value. Case insensitive.
+ * Ignores reserved values (starting with underscore) by default.
+ * Returns std::nullopt if the name is not found.
  */
 template <class E>
-std::optional<E> try_parse (std::string_view name, bool ignore_reserved = true)
+std::optional<E> enum_try_parse (std::string_view name, bool ignore_reserved = true)
 {
 	if (ignore_reserved && name.starts_with ('_'))
 	{
@@ -63,14 +87,14 @@ std::optional<E> try_parse (std::string_view name, bool ignore_reserved = true)
 }
 
 /**
- * Same as `magic_enum::enum_cast (...)` but ignores reserved values (starting with underscore) by default.
- * Case insensitive.
+ * Parses a string to an enum value. Case insensitive.
+ * Ignores reserved values (starting with underscore) by default.
  * @throws std::invalid_argument if the name is not found
  */
 template <class E>
-E parse (std::string_view name, bool ignore_reserved = true)
+E enum_parse (std::string_view name, bool ignore_reserved = true)
 {
-	auto value = try_parse<E> (name, ignore_reserved);
+	auto value = enum_try_parse<E> (name, ignore_reserved);
 	if (value)
 	{
 		return *value;
@@ -78,25 +102,15 @@ E parse (std::string_view name, bool ignore_reserved = true)
 	throw std::invalid_argument ("Invalid value of " + std::string{ magic_enum::enum_type_name<E> () } + ": \"" + std::string{ name } + "\"");
 }
 
-template <typename T, typename S>
-consteval void ensure_all_castable ()
-{
-	for (auto value : magic_enum::enum_values<S> ())
-	{
-		if (!magic_enum::enum_cast<T> (magic_enum::enum_name (value)))
-		{
-			// If this fails, it means that the target enum is missing a value present in the source enum
-			throw std::logic_error ("Value of " + std::string{ magic_enum::enum_type_name<S> () } + " (" + std::string{ magic_enum::enum_name (value) } + ") cannot be cast to " + std::string{ magic_enum::enum_type_name<T> () });
-		}
-	}
-}
-
+/**
+ * Converts an enum value to another enum type by matching names.
+ * Validates at compile-time that all source enum values exist in target enum.
+ */
 template <class T, class S>
-T cast (S value)
+	requires enum_convertible_to<S, T>
+T enum_convert (S value)
 {
-	ensure_all_castable<T, S> ();
-
-	auto conv = magic_enum::enum_cast<T> (nano::enum_util::name (value));
+	auto conv = magic_enum::enum_cast<T> (nano::enum_to_string (value));
 	debug_assert (conv);
 	return conv.value_or (T{});
 }
