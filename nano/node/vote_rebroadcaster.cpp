@@ -166,7 +166,8 @@ void nano::vote_rebroadcaster::run ()
 	std::unique_lock lock{ mutex };
 	while (!stopped)
 	{
-		condition.wait (lock, [&] {
+		// Should be woken up periodically to perform maintenance tasks even if no votes are queued
+		condition.wait_for (lock, 1s, [&] {
 			return stopped || !queue.empty ();
 		});
 
@@ -180,11 +181,11 @@ void nano::vote_rebroadcaster::run ()
 		// Update local reps cache
 		if (refresh_interval.elapse (nano::is_dev_run () ? 1s : 15s))
 		{
-			stats.inc (nano::stat::type::vote_rebroadcaster, nano::stat::detail::refresh);
-
 			// Check if node has a principal representative (rebroadcasting is disabled when true)
 			reps = wallets.reps ();
 			has_principal = reps.have_half_rep ();
+
+			stats.inc (nano::stat::type::vote_rebroadcaster, nano::stat::detail::refresh);
 		}
 
 		// Cleanup expired representatives from rebroadcasts
@@ -193,6 +194,11 @@ void nano::vote_rebroadcaster::run ()
 			lock.unlock ();
 			cleanup ();
 			lock.lock ();
+		}
+
+		if (queue.empty ())
+		{
+			continue; // Nothing to process
 		}
 
 		// Wait for spare capacity if our network traffic is too high
