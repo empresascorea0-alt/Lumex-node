@@ -273,16 +273,15 @@ bool nano::vote_rebroadcaster::process (std::shared_ptr<nano::vote> const & vote
 {
 	stats.inc (nano::stat::type::vote_rebroadcaster, nano::stat::detail::process);
 
-	auto rebroadcasts_l = rebroadcasts.lock ();
+	auto result = rebroadcasts->check_and_record (vote, ledger.weight (vote->account), std::chrono::steady_clock::now ());
 
-	auto result = rebroadcasts_l->check_and_record (vote, ledger.weight (vote->account), std::chrono::steady_clock::now ());
+	stats.inc (nano::stat::type::vote_rebroadcaster_process, to_stat_detail (result));
 	if (result == nano::vote_rebroadcaster_index::result::ok)
 	{
 		return true; // Vote qualifies for rebroadcast
 	}
 	else
 	{
-		stats.inc (nano::stat::type::vote_rebroadcaster, nano::enum_convert<nano::stat::detail> (result));
 		return false; // Vote does not qualify for rebroadcast
 	}
 }
@@ -291,9 +290,7 @@ void nano::vote_rebroadcaster::cleanup ()
 {
 	stats.inc (nano::stat::type::vote_rebroadcaster, nano::stat::detail::cleanup);
 
-	auto rebroadcasts_l = rebroadcasts.lock ();
-
-	auto erased_reps = rebroadcasts_l->cleanup ([this] (auto const & rep) {
+	auto erased_reps = rebroadcasts->cleanup ([this] (auto const & rep) {
 		auto tier = rep_tiers.tier (rep);
 		auto weight = ledger.weight (rep);
 		return std::make_pair (tier != nano::rep_tier::none /* keep entry only if principal rep */, weight);
@@ -527,4 +524,13 @@ nano::error nano::vote_rebroadcaster_config::serialize (nano::tomlconfig & toml)
 	toml.put ("priority_coefficient", priority_coefficient, "Priority coefficient for prioritizing votes from representative tiers.\ntype:uint64");
 
 	return toml.get_error ();
+}
+
+/*
+ *
+ */
+
+nano::stat::detail nano::to_stat_detail (nano::vote_rebroadcaster_index::result result)
+{
+	return nano::enum_convert<nano::stat::detail> (result);
 }
