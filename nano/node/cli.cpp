@@ -249,7 +249,7 @@ void copy_database (std::filesystem::path const & data_path, boost::program_opti
 	}
 	if (vm.count ("clear_send_ids"))
 	{
-		node.node->wallets.clear_send_ids (node.node->wallets.tx_begin_write ());
+		node.node->wallets.clear_send_ids ();
 	}
 	if (vm.count ("online_weight_clear"))
 	{
@@ -594,8 +594,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 		try
 		{
 			nano::inactive_node node (data_path, node_flags);
-			auto transaction (node.node->wallets.tx_begin_write ());
-			node.node->wallets.clear_send_ids (transaction);
+			node.node->wallets.clear_send_ids ();
 			std::cout << "Send IDs deleted" << std::endl;
 		}
 		catch (std::exception const &)

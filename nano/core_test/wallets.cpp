@@ -170,23 +170,14 @@ TEST (wallets, exists)
 	auto & node (*system.nodes[0]);
 	nano::keypair key1;
 	nano::keypair key2;
-	{
-		auto transaction (node.wallets.tx_begin_read ());
-		ASSERT_FALSE (node.wallets.exists (transaction, key1.pub));
-		ASSERT_FALSE (node.wallets.exists (transaction, key2.pub));
-	}
+	ASSERT_FALSE (node.wallets.exists (key1.pub));
+	ASSERT_FALSE (node.wallets.exists (key2.pub));
 	system.wallet (0)->insert_adhoc (key1.prv);
-	{
-		auto transaction (node.wallets.tx_begin_read ());
-		ASSERT_TRUE (node.wallets.exists (transaction, key1.pub));
-		ASSERT_FALSE (node.wallets.exists (transaction, key2.pub));
-	}
+	ASSERT_TRUE (node.wallets.exists (key1.pub));
+	ASSERT_FALSE (node.wallets.exists (key2.pub));
 	system.wallet (0)->insert_adhoc (key2.prv);
-	{
-		auto transaction (node.wallets.tx_begin_read ());
-		ASSERT_TRUE (node.wallets.exists (transaction, key1.pub));
-		ASSERT_TRUE (node.wallets.exists (transaction, key2.pub));
-	}
+	ASSERT_TRUE (node.wallets.exists (key1.pub));
+	ASSERT_TRUE (node.wallets.exists (key2.pub));
 }
 
 TEST (wallets, search_receivable)
