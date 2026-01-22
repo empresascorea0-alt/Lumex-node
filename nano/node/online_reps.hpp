@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nano/lib/interval.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/numbers_templ.hpp>
 #include <nano/lib/utility.hpp>
@@ -23,7 +24,7 @@ namespace nano
 class online_reps final
 {
 public:
-	online_reps (nano::node_config const &, nano::ledger &, nano::stats &, nano::logger &);
+	online_reps (nano::node_config const &, nano::node &, nano::ledger &, nano::stats &, nano::logger &);
 	~online_reps ();
 
 	void start ();
@@ -51,6 +52,7 @@ public:
 
 private: // Dependencies
 	nano::node_config const & config;
+	nano::node & node;
 	nano::ledger & ledger;
 	nano::stats & stats;
 	nano::logger & logger;
@@ -101,6 +103,8 @@ private:
 	nano::uint128_t cached_online{0};
 
 	std::chrono::steady_clock::time_point last_sample;
+
+	nano::interval_mt low_weight_warning_interval;
 
 	bool stopped{ false };
 	nano::condition_variable condition;
