@@ -15,6 +15,7 @@
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/node/json_handler.hpp>
 #include <nano/node/node_rpc_config.hpp>
+#include <nano/node/node_scope_guard.hpp>
 #include <nano/qt/qt.hpp>
 #include <nano/rpc/rpc.hpp>
 
@@ -117,7 +118,6 @@ public:
 
 			try
 			{
-				std::shared_ptr<nano::node> node;
 				std::shared_ptr<nano_qt::wallet> gui;
 				nano::set_application_icon (application);
 				auto opencl = nano::opencl_work::create (config.opencl_enable, config.opencl, logger, config.node.network_params.work);
@@ -129,7 +129,7 @@ public:
 					};
 				}
 				nano::work_pool work{ config.node.network_params.network, config.node.work_threads, config.node.pow_sleep_interval, opencl_work_func };
-				node = std::make_shared<nano::node> (io_ctx, data_path, config.node, work, flags);
+				nano::node_scope_guard node{ std::make_shared<nano::node> (io_ctx, data_path, config.node, work, flags) };
 				auto wallet (node->wallets.open (wallet_config.wallet));
 				if (wallet == nullptr)
 				{
