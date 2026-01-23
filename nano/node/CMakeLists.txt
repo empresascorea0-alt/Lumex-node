@@ -116,6 +116,7 @@ add_library(
   node_rpc_config.cpp
   node_wrapper.hpp
   node_wrapper.cpp
+  node_scope_guard.hpp
   inactive_node.hpp
   inactive_node.cpp
   node.hpp

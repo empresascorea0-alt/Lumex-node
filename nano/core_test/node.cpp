@@ -4012,3 +4012,25 @@ TEST (node, super_rebroadcaster)
 	ASSERT_TIMELY (5s, node3.block_confirmed (send->hash ()));
 	ASSERT_TIMELY (5s, node4.block_confirmed (send->hash ()));
 }
+
+// Tests that when two nodes try to bind to the same port, the second node fails gracefully
+TEST (node, port_already_in_use)
+{
+	nano::test::system system;
+
+	// Start first node on the port
+	auto node1 = system.add_node ();
+	ASSERT_NE (0, node1->network.port);
+
+	// Try to start second node on the same port
+	nano::node_config config2{ node1->network.port };
+
+	// Create node in a scope so it gets destroyed if start() throws
+	auto node2 = std::make_shared<nano::node> (system.io_ctx, nano::unique_path (), config2, system.work);
+
+	// This should throw boost::system::system_error indicating port is already in use
+	ASSERT_THROW (node2->start (), boost::system::system_error);
+
+	// Exit gracefully
+	node2->stop ();
+}

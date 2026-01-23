@@ -12,6 +12,7 @@
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/node/json_handler.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/node_scope_guard.hpp>
 #include <nano/node/openclwork.hpp>
 #include <nano/rpc/rpc.hpp>
 
@@ -120,7 +121,9 @@ void nano::daemon::run (std::filesystem::path const & data_path, nano::node_flag
 			config.node.peering_port = network_params.network.default_node_port;
 		}
 
-		auto node = std::make_shared<nano::node> (io_ctx, data_path, config.node, opencl_work, flags);
+		// Use a scope guard to ensure node->stop() is called while we still hold a shared_ptr (even in case of exceptions)
+		nano::node_scope_guard node{ std::make_shared<nano::node> (io_ctx, data_path, config.node, opencl_work, flags) };
+
 		// IO context runner should be started first and stopped last to allow asio handlers to execute during node start/stop
 		runner = std::make_unique<nano::thread_runner> (io_ctx, logger, node->config.io_threads, nano::thread_role::name::io_daemon);
 
@@ -206,6 +209,7 @@ void nano::daemon::run (std::filesystem::path const & data_path, nano::node_flag
 	catch (std::exception const & ex)
 	{
 		logger.critical (nano::log::type::daemon, "Error: {}", ex.what ());
+		std::exit (1);
 	}
 
 	logger.info (nano::log::type::daemon, "Stopped");

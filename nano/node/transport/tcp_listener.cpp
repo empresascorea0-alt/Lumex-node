@@ -49,7 +49,15 @@ void nano::transport::tcp_listener::start ()
 		asio::ip::tcp::endpoint target{ asio::ip::address_v6::any (), port };
 
 		acceptor.open (target.protocol ());
+
+#ifndef _WIN32
+		// On Unix, SO_REUSEADDR allows binding to a port in TIME_WAIT state,
+		// but still fails if the port is actively bound by another socket.
+		// On Windows, SO_REUSEADDR has different semantics - it allows multiple
+		// sockets to bind to the same port (port stealing), so we skip it there.
 		acceptor.set_option (asio::ip::tcp::acceptor::reuse_address (true));
+#endif
+
 		acceptor.bind (target);
 		acceptor.listen (asio::socket_base::max_listen_connections);
 
