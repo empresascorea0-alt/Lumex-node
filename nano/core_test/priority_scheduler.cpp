@@ -1,4 +1,5 @@
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/thread_pool.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/scheduler/component.hpp>
@@ -535,4 +536,60 @@ TEST (priority_scheduler, activate_successors)
 	// Assert on stable, observable end-state: both successors become active elections
 	ASSERT_TIMELY (5s, node.active.election (open_destination->qualified_root ()) != nullptr);
 	ASSERT_TIMELY (5s, node.active.election (next_genesis_block->qualified_root ()) != nullptr);
+}
+
+/**
+ * Stress test to verify notifications are not missed in priority scheduler.
+ * If notifications are missed, blocks get stuck and test times out.
+ */
+TEST (priority_scheduler, stress_test)
+{
+	nano::test::system system;
+
+	nano::node_config config = system.default_config ();
+	config.backlog_scan.enable = false; // Disable fallback mechanisms to avoid interference
+
+	nano::node_flags flags;
+	flags.disable_activate_successors = true; // Full control over activations
+
+	auto & node = *system.add_node (config, flags);
+
+	// Create N unconfirmed open blocks
+	// All have balance = 1 raw, so they land in the same bucket
+	constexpr size_t num_blocks = 20;
+	auto blocks = nano::test::setup_independent_blocks (system, node, num_blocks);
+
+	// Worker pool for async activation - decouples notification from activation
+	nano::thread_pool workers{ 1, nano::thread_role::name::unknown };
+	nano::test::start_stop_guard guard{ workers };
+
+	// Track activations via batch_activated callback
+	std::atomic<size_t> activated_count{ 0 };
+	std::atomic<size_t> next_to_activate{ 1 }; // Start from 1 since we activate 0 manually
+
+	node.scheduler.priority.batch_activated.add ([&] (auto const & batch) {
+		activated_count += batch.size ();
+
+		workers.post ([&] () {
+			std::this_thread::yield (); // Increase timing variability
+
+			// Activate the next account
+			auto idx = next_to_activate.fetch_add (1);
+			if (idx < blocks.size ())
+			{
+				auto txn = node.ledger.tx_begin_read ();
+				EXPECT_TRUE (node.scheduler.priority.activate (txn, blocks[idx]->account ()));
+			}
+		});
+	});
+
+	// Kick off the chain by activating the first block
+	ASSERT_TRUE (node.scheduler.priority.activate (node.ledger.tx_begin_read (), blocks[0]->account ()));
+
+	// All blocks should eventually be activated
+	// If race occurs, some activations sit in pool and never get processed → timeout
+	ASSERT_TIMELY (15s, activated_count >= num_blocks);
+
+	// Verify pool is empty (all blocks were activated)
+	ASSERT_TRUE (node.scheduler.priority.empty ());
 }
