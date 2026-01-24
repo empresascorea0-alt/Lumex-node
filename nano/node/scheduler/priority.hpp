@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nano/lib/numbers.hpp>
+#include <nano/lib/observer_set.hpp>
 #include <nano/node/fwd.hpp>
 #include <nano/node/scheduler/bucket.hpp>
 
@@ -63,6 +64,10 @@ public:
 
 public: // Testing
 	bool push (std::shared_ptr<nano::block> const & block, nano::bucket_index, nano::priority_timestamp);
+
+public: // Events
+	// Triggered when blocks are activated (elections started) in the scheduler run loop
+	nano::observer_set<std::deque<nano::block_hash>> batch_activated;
 
 private: // Dependencies
 	priority_config const & config;

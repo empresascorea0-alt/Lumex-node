@@ -266,6 +266,7 @@ void nano::scheduler::priority::run ()
 		if (!activated.empty ())
 		{
 			pool.lock ()->erase_all (activated);
+			batch_activated.notify (activated); // Notify without the lock held
 		}
 
 		lock.lock ();
