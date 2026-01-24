@@ -1,8 +1,10 @@
 #pragma once
 
 #include <nano/lib/numbers.hpp>
+#include <nano/lib/observer_set.hpp>
 #include <nano/node/fwd.hpp>
 #include <nano/node/scheduler/bucket.hpp>
+#include <nano/node/scheduler/priority_pool.hpp>
 
 #include <condition_variable>
 #include <deque>
@@ -43,7 +45,7 @@ public:
 	void stop ();
 
 	/**
-	 * Activates the first unconfirmed block of \p account_a
+	 * Activates the first unconfirmed block of \p account
 	 * @return true if account was activated
 	 */
 	bool activate (nano::secure::transaction const &, nano::account const &);
@@ -64,6 +66,10 @@ public:
 public: // Testing
 	bool push (std::shared_ptr<nano::block> const & block, nano::bucket_index, nano::priority_timestamp);
 
+public: // Events
+	// Triggered when blocks are activated (elections started) in the scheduler run loop
+	nano::observer_set<std::deque<nano::block_hash>> batch_activated;
+
 private: // Dependencies
 	priority_config const & config;
 	nano::node & node;
@@ -82,7 +88,7 @@ private:
 
 private:
 	std::map<nano::bucket_index, std::unique_ptr<scheduler::bucket>> buckets;
-	nano::locked<priority_pool> pool;
+	priority_pool pool;
 
 	bool stopped{ false };
 	nano::condition_variable condition;
