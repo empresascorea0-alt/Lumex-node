@@ -125,6 +125,8 @@ private:
 	ordered_representatives index;
 };
 
+nano::stat::detail to_stat_detail (nano::vote_rebroadcaster_index::result);
+
 class vote_rebroadcaster final
 {
 public:
