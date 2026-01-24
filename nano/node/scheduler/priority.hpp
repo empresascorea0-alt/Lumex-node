@@ -4,6 +4,7 @@
 #include <nano/lib/observer_set.hpp>
 #include <nano/node/fwd.hpp>
 #include <nano/node/scheduler/bucket.hpp>
+#include <nano/node/scheduler/priority_pool.hpp>
 
 #include <condition_variable>
 #include <deque>
@@ -44,7 +45,7 @@ public:
 	void stop ();
 
 	/**
-	 * Activates the first unconfirmed block of \p account_a
+	 * Activates the first unconfirmed block of \p account
 	 * @return true if account was activated
 	 */
 	bool activate (nano::secure::transaction const &, nano::account const &);
@@ -87,7 +88,7 @@ private:
 
 private:
 	std::map<nano::bucket_index, std::unique_ptr<scheduler::bucket>> buckets;
-	nano::locked<priority_pool> pool;
+	priority_pool pool;
 
 	bool stopped{ false };
 	nano::condition_variable condition;

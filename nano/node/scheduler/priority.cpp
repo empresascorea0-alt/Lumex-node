@@ -139,7 +139,8 @@ bool nano::scheduler::priority::activate (secure::transaction const & transactio
 
 		bool added = false;
 		{
-			added = pool.lock ()->push (block, bucket_index, priority_timestamp);
+			nano::lock_guard<nano::mutex> guard{ mutex };
+			added = pool.push (block, bucket_index, priority_timestamp);
 		}
 		if (added)
 		{
@@ -171,45 +172,58 @@ bool nano::scheduler::priority::activate (secure::transaction const & transactio
 
 bool nano::scheduler::priority::push (std::shared_ptr<nano::block> const & block, nano::bucket_index bucket, nano::priority_timestamp priority)
 {
-	bool result = pool.lock ()->push (block, bucket, priority);
+	{
+		nano::lock_guard<nano::mutex> guard{ mutex };
+		if (!pool.push (block, bucket, priority))
+		{
+			return false;
+		}
+	}
 	condition.notify_all ();
-	return result;
+	return true;
 }
 
 bool nano::scheduler::priority::activate_successors (secure::transaction const & transaction, nano::block const & block)
 {
 	bool result = activate (transaction, block.account ());
+
 	// Start or vote for the next unconfirmed block in the destination account
 	if (block.is_send () && !block.destination ().is_zero () && block.destination () != block.account ())
 	{
 		result |= activate (transaction, block.destination ());
 	}
+
 	return result;
 }
 
 bool nano::scheduler::priority::contains (nano::block_hash const & hash) const
 {
-	return pool.lock ()->contains (hash);
+	nano::lock_guard<nano::mutex> guard{ mutex };
+	return pool.contains (hash);
 }
 
 std::size_t nano::scheduler::priority::size () const
 {
-	return pool.lock ()->size ();
+	nano::lock_guard<nano::mutex> guard{ mutex };
+	return pool.size ();
 }
 
 bool nano::scheduler::priority::empty () const
 {
-	return pool.lock ()->empty ();
+	nano::lock_guard<nano::mutex> guard{ mutex };
+	return pool.empty ();
 }
 
 size_t nano::scheduler::priority::pool_size () const
 {
-	return pool.lock ()->size ();
+	nano::lock_guard<nano::mutex> guard{ mutex };
+	return pool.size ();
 }
 
 size_t nano::scheduler::priority::pool_size (nano::bucket_index bucket) const
 {
-	return pool.lock ()->size (bucket);
+	nano::lock_guard<nano::mutex> guard{ mutex };
+	return pool.size (bucket);
 }
 
 size_t nano::scheduler::priority::election_count (nano::bucket_index bucket) const
@@ -220,7 +234,8 @@ size_t nano::scheduler::priority::election_count (nano::bucket_index bucket) con
 
 bool nano::scheduler::priority::predicate () const
 {
-	auto tops = pool.lock ()->top_all ();
+	debug_assert (!mutex.try_lock ());
+	auto tops = pool.top_all ();
 	return std::any_of (buckets.begin (), buckets.end (), [&tops] (auto const & bucket) {
 		return bucket.second->available (find_or_default (tops, bucket.first));
 	});
@@ -244,10 +259,10 @@ void nano::scheduler::priority::run ()
 
 		stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::loop);
 
-		lock.unlock ();
-
 		// Get the top blocks for each bucket
-		auto tops = pool.lock ()->top_all ();
+		auto tops = pool.top_all ();
+
+		lock.unlock ();
 
 		std::deque<nano::block_hash> activated;
 
@@ -262,14 +277,15 @@ void nano::scheduler::priority::run ()
 			}
 		}
 
+		batch_activated.notify (activated); // Notify without the lock held
+
+		lock.lock ();
+
 		// Erase activated blocks from the pool
 		if (!activated.empty ())
 		{
-			pool.lock ()->erase_all (activated);
-			batch_activated.notify (activated); // Notify without the lock held
+			pool.erase_all (activated);
 		}
-
-		lock.lock ();
 	}
 }
 
@@ -316,9 +332,11 @@ nano::container_info nano::scheduler::priority::container_info () const
 		return info;
 	};
 
+	nano::lock_guard<nano::mutex> guard{ mutex };
+
 	nano::container_info info;
 	info.add ("elections", collect_elections ());
-	info.add ("pool", pool.lock ()->container_info ());
+	info.add ("pool", pool.container_info ());
 	return info;
 }
 
