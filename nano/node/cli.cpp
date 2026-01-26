@@ -131,8 +131,7 @@ void nano::add_node_flag_options (boost::program_options::options_description & 
 		("inactive_votes_cache_size", boost::program_options::value<std::size_t>(), "Increase cached votes without active elections size, default 16384")
 		("vote_processor_capacity", boost::program_options::value<std::size_t>(), "Vote processor queue size before dropping votes, default 144k")
 		("disable_large_votes", boost::program_options::value<bool>(), "Disable large votes")
-		("skip_consistency_check", "Skip ledger consistency check on startup, this is not recommended and should only be used for testing or recovery purposes")
-		;
+		("skip_consistency_check", "Skip ledger consistency check on startup, this is not recommended and should only be used for testing or recovery purposes");
 	// clang-format on
 }
 
@@ -211,6 +210,10 @@ void nano::update_flags (nano::node_flags & flags_a, boost::program_options::var
 	if (rpcconfig != vm.end ())
 	{
 		flags_a.rpc_config_overrides = nano::config_overrides (rpcconfig->second.as<std::vector<nano::config_key_value_pair>> ());
+	}
+	if (auto it = vm.find ("runtime_info_file"); it != vm.end ())
+	{
+		flags_a.runtime_info_file = it->second.as<std::string> ();
 	}
 }
 

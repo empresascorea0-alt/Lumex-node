@@ -1,11 +1,15 @@
 #include <nano/boost/process/process.hpp>
 #include <nano/lib/runtime_files.hpp>
 
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
+
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <mutex>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 
 namespace
@@ -79,4 +83,22 @@ void nano::runtime_files::create_pid_file (std::filesystem::path const & path)
 {
 	auto pid = boost::this_process::get_id ();
 	nano::runtime_files::create (path, std::to_string (pid));
+}
+
+void nano::runtime_files::create_runtime_info (std::filesystem::path const & path, runtime_info const & info)
+{
+	boost::property_tree::ptree tree;
+	tree.put ("peering_port", info.peering_port);
+	if (info.rpc_port != 0)
+	{
+		tree.put ("rpc_port", info.rpc_port);
+	}
+	if (!info.node_id.empty ())
+	{
+		tree.put ("node_id", info.node_id);
+	}
+
+	std::ostringstream oss;
+	boost::property_tree::write_json (oss, tree);
+	nano::runtime_files::create (path, oss.str ());
 }

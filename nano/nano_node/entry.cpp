@@ -133,7 +133,8 @@ int main (int argc, char * const * argv)
 		("pow_sleep_interval", boost::program_options::value<std::string> (), "Defines the amount to sleep inbetween each pow calculation attempt")
 		("address_column", boost::program_options::value<std::string> (), "Defines which column the addresses are located, 0 indexed (check --debug_output_last_backtrace_dump output)")
 		("silent", "Silent command execution")
-		("pid_file", boost::program_options::value<std::string> ()->implicit_value ("nano_node.pid"), "Write process ID to file. Optional path argument, defaults to nano_node.pid in current directory");
+		("pid_file", boost::program_options::value<std::string> ()->implicit_value ("nano_node.pid"), "Write process ID to file. Optional path argument, defaults to nano_node.pid in current directory")
+		("runtime_info_file", boost::program_options::value<std::string> ()->implicit_value ("runtime_info.json"), "Write runtime info JSON with ports to file. Optional path argument, defaults to runtime_info.json in current directory");
 	// clang-format on
 	nano::add_node_options (description);
 	nano::add_node_flag_options (description);

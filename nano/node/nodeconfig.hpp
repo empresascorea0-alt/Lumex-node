@@ -40,6 +40,7 @@
 #include <nano/store/txn_tracking.hpp>
 
 #include <chrono>
+#include <filesystem>
 #include <optional>
 #include <vector>
 
@@ -193,6 +194,7 @@ public:
 	bool enable_voting{ false };
 	bool super_rebroadcaster{ false }; // Broadcast all blocks and votes to all peers
 	bool fast_bootstrap{ false };
+	std::optional<std::filesystem::path> runtime_info_file; // Write runtime_info.json with ports
 	bool read_only{ false };
 	bool disable_connection_cleanup{ false };
 	nano::generate_cache_flags generate_cache;

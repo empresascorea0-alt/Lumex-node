@@ -9,6 +9,6 @@ class daemon
 	nano::logger logger{ "daemon" };
 
 public:
-	void run (std::filesystem::path const &, nano::node_flags const & flags);
+	void run (std::filesystem::path const & data_path, nano::node_flags const &);
 };
 }

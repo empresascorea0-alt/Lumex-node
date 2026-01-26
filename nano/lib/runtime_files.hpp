@@ -27,4 +27,16 @@ void cleanup ();
  * @throws std::runtime_error if file creation fails
  */
 void create_pid_file (std::filesystem::path const & path);
+
+/**
+ * Creates a runtime info JSON file and registers it for cleanup on exit.
+ * @throws std::runtime_error if file creation fails
+ */
+struct runtime_info
+{
+	uint16_t peering_port{ 0 };
+	uint16_t rpc_port{ 0 }; // 0 if RPC is disabled
+	std::string node_id;
+};
+void create_runtime_info (std::filesystem::path const & path, runtime_info const & info);
 }
