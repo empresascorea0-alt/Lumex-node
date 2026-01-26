@@ -9,7 +9,7 @@ set -eu
 
 DATADIR1=$(mktemp -d)
 DATADIR2=$(mktemp -d)
-PORT=44999
+RUNTIME_INFO="$DATADIR1/runtime_info.json"
 
 cleanup() {
     kill $NODE1_PID 2>/dev/null || true
@@ -17,10 +17,25 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Start first node
-$NANO_NODE_EXE --daemon --network dev --data_path "$DATADIR1" --config node.peering_port=$PORT &
+# Start first node with ephemeral port
+$NANO_NODE_EXE --daemon --network dev --data_path "$DATADIR1" \
+    --runtime_info_file "$RUNTIME_INFO" \
+    --config node.peering_port=0 &
 NODE1_PID=$!
-sleep 3
+
+# Wait for runtime_info.json to appear (indicates node is ready)
+for i in {1..30}; do
+    if [ -f "$RUNTIME_INFO" ]; then
+        break
+    fi
+    sleep 1
+done
+
+[ -f "$RUNTIME_INFO" ] || { echo "FAIL: runtime_info.json not created"; exit 1; }
+
+# Get the peering port from runtime info
+PORT=$(jq -r '.peering_port' "$RUNTIME_INFO")
+[ "$PORT" != "0" ] && [ -n "$PORT" ] && [ "$PORT" != "null" ] || { echo "FAIL: invalid peering_port"; exit 1; }
 
 # Start second node on same port - should fail gracefully
 set +e
