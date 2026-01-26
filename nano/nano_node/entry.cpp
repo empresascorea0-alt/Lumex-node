@@ -5,6 +5,7 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/cli.hpp>
 #include <nano/lib/files.hpp>
+#include <nano/lib/runtime_files.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/lib/version.hpp>
@@ -66,38 +67,6 @@ public:
 	bool operator< (const address_library_pair & other) const;
 	bool operator== (const address_library_pair & other) const;
 };
-std::filesystem::path pid_file;
-void remove_pid_file ()
-{
-	std::error_code ec;
-	std::filesystem::remove (pid_file, ec);
-	if (ec)
-	{
-		std::cerr << "Unable to remove pid file: " << ec.message ();
-	}
-}
-void register_pid_file ()
-{
-	std::error_code ec;
-	auto pid = boost::this_process::get_id ();
-	std::filesystem::create_directories (pid_file.parent_path (), ec);
-	if (ec)
-	{
-		std::cerr << "Unable to access PID file path" << std::endl;
-		return;
-	}
-	std::ofstream pid_file_stream (pid_file, std::ios::out | std::ios::trunc);
-	if (pid_file_stream.is_open ())
-	{
-		pid_file_stream << std::to_string (pid) << std::endl;
-		pid_file_stream.close ();
-		std::atexit (remove_pid_file);
-	}
-	else
-	{
-		std::cerr << "Unable to open PID file for writing." << std::endl;
-	}
-}
 }
 
 int main (int argc, char * const * argv)
@@ -164,7 +133,7 @@ int main (int argc, char * const * argv)
 		("pow_sleep_interval", boost::program_options::value<std::string> (), "Defines the amount to sleep inbetween each pow calculation attempt")
 		("address_column", boost::program_options::value<std::string> (), "Defines which column the addresses are located, 0 indexed (check --debug_output_last_backtrace_dump output)")
 		("silent", "Silent command execution")
-		("pid_file", boost::program_options::value<std::string> (), "If present, node will write its process id to the specified file and delete the file upon exit");
+		("pid_file", boost::program_options::value<std::string> ()->implicit_value ("nano_node.pid"), "Write process ID to file. Optional path argument, defaults to nano_node.pid in current directory");
 	// clang-format on
 	nano::add_node_options (description);
 	nano::add_node_flag_options (description);
@@ -195,8 +164,9 @@ int main (int argc, char * const * argv)
 
 	if (auto existing = vm.find ("pid_file"); existing != vm.end ())
 	{
-		pid_file = existing->second.as<std::string> ();
-		register_pid_file ();
+		auto pid_filepath = std::filesystem::path (existing->second.as<std::string> ());
+		nano::runtime_files::create_pid_file (pid_filepath);
+		std::cerr << "PID file created: " << pid_filepath << std::endl;
 	}
 
 	nano::network_params network_params{ nano::get_active_network () };
