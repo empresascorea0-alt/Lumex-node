@@ -106,6 +106,8 @@ add_library(
   rpc_handler_interface.hpp
   rpcconfig.hpp
   rpcconfig.cpp
+  runtime_files.hpp
+  runtime_files.cpp
   signal_manager.hpp
   signal_manager.cpp
   stacktrace.hpp

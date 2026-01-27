@@ -587,7 +587,7 @@ std::shared_ptr<nano::transport::channel> nano::network::find_node_id (nano::acc
 
 nano::endpoint nano::network::endpoint () const
 {
-	return nano::endpoint (boost::asio::ip::address_v6::loopback (), port);
+	return nano::endpoint{ boost::asio::ip::address_v6::loopback (), port };
 }
 
 void nano::network::cleanup (std::chrono::steady_clock::time_point const & cutoff)

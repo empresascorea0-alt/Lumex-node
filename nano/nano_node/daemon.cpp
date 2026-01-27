@@ -1,5 +1,6 @@
 #include <nano/boost/process/child.hpp>
 #include <nano/lib/files.hpp>
+#include <nano/lib/runtime_files.hpp>
 #include <nano/lib/signal_manager.hpp>
 #include <nano/lib/stacktrace.hpp>
 #include <nano/lib/thread_runner.hpp>
@@ -173,6 +174,21 @@ void nano::daemon::run (std::filesystem::path const & data_path, nano::node_flag
 				rpc_process = std::make_unique<boost::process::child> (config.rpc.child_process.rpc_path, "--daemon", "--data_path", data_path.string (), "--network", network);
 			}
 			debug_assert (rpc || rpc_process);
+		}
+
+		// Write runtime info file with actual bound ports (if requested)
+		if (flags.runtime_info_file)
+		{
+			nano::runtime_files::runtime_info info;
+			info.peering_port = node->network.endpoint ().port ();
+			info.node_id = node->get_node_id ().to_node_id ();
+			// Only set if rpc is enabled
+			if (rpc)
+			{
+				info.rpc_port = rpc->listening_port ();
+			}
+			nano::runtime_files::create_runtime_info (*flags.runtime_info_file, info);
+			std::cerr << "Runtime info file created: " << *flags.runtime_info_file << std::endl;
 		}
 
 		auto signal_handler = [this, &stopped] (int signum) {
