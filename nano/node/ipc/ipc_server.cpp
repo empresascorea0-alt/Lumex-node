@@ -20,6 +20,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <list>
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -32,15 +33,19 @@ template <typename SOCKET_TYPE>
 class session final : public nano::ipc::socket_base, public std::enable_shared_from_this<session<SOCKET_TYPE>>
 {
 public:
-	session (nano::ipc::ipc_server & server_a, boost::asio::io_context & io_ctx_a, nano::ipc::ipc_config_transport & config_transport_a) :
-		socket_base (io_ctx_a),
-		server (server_a), node (server_a.node), session_id (server_a.id_dispenser.fetch_add (1)),
-		io_ctx (io_ctx_a), strand (io_ctx_a.get_executor ()), socket (io_ctx_a), config_transport (config_transport_a)
+	session (nano::ipc::ipc_server & server_a, std::shared_ptr<boost::asio::io_context> io_ctx_a, nano::ipc::ipc_config_transport & config_transport_a) :
+		socket_base{ io_ctx_a },
+		server{ server_a },
+		node{ server_a.node },
+		session_id{ server_a.id_dispenser.fetch_add (1) },
+		strand{ io_ctx.get_executor () },
+		socket{ io_ctx },
+		config_transport{ config_transport_a }
 	{
 		node.logger.debug (nano::log::type::ipc, "Creating session with id: {}", session_id.load ());
 	}
 
-	~session ()
+	~session () override
 	{
 		close ();
 	}
@@ -434,12 +439,6 @@ private:
 	/** Timer for measuring the duration of ipc calls */
 	nano::timer<std::chrono::microseconds> session_timer;
 
-	/**
-	 * IO context from node, or per-transport, depending on configuration.
-	 * Certain transports may scale better if they use a separate context.
-	 */
-	boost::asio::io_context & io_ctx;
-
 	/** IO strand for synchronizing */
 	boost::asio::strand<boost::asio::io_context::executor_type> strand;
 
@@ -495,7 +494,14 @@ public:
 	void accept ()
 	{
 		// Prepare the next session
-		auto new_session (std::make_shared<session<SOCKET_TYPE>> (server, context (), config_transport));
+		auto new_session (std::make_shared<session<SOCKET_TYPE>> (server, io_ctx, config_transport));
+
+		// Track session immediately so it can be closed on shutdown
+		{
+			auto sessions_locked = sessions.lock ();
+			sessions_locked->remove_if ([] (auto const & ws) { return ws.expired (); });
+			sessions_locked->push_back (new_session);
+		}
 
 		std::weak_ptr<nano::node> nano_weak = server.node.shared ();
 		acceptor->async_accept (new_session->get_socket (), [this, new_session, nano_weak] (boost::system::error_code const & ec) {
@@ -531,7 +537,22 @@ public:
 		release_assert (runner);
 
 		acceptor->close ();
-		io_ctx->stop ();
+
+		// Close all active sessions to cancel pending async operations
+		{
+			auto sessions_locked = sessions.lock ();
+			for (auto & session_weak : sessions_locked.get ())
+			{
+				if (auto session = session_weak.lock ())
+				{
+					session->close ();
+				}
+			}
+			sessions_locked->clear ();
+		}
+
+		// Let io_context drain naturally - don't call io_ctx->stop()
+		// The cancelled handlers need to run to release their captured shared_ptrs
 		runner->join ();
 	}
 
@@ -543,6 +564,7 @@ private:
 	std::unique_ptr<nano::thread_runner> runner;
 	std::shared_ptr<boost::asio::io_context> io_ctx;
 	std::unique_ptr<ACCEPTOR_TYPE> acceptor;
+	nano::locked<std::list<std::weak_ptr<session<SOCKET_TYPE>>>> sessions;
 };
 
 using tcp_socket_transport = socket_transport<boost::asio::ip::tcp::acceptor, boost::asio::ip::tcp::socket, boost::asio::ip::tcp::endpoint>;
