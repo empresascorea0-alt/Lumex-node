@@ -775,13 +775,11 @@ nano::public_key nano::wallet::deterministic_insert (nano::store::write_transact
 		{
 			work_ensure (key, key);
 		}
-		auto half_principal_weight (wallets.node.minimum_principal_weight () / 2);
-		if (wallets.check_rep (key, half_principal_weight))
+
+		if (wallets.check_rep (key))
 		{
 			logger.info (nano::log::type::wallet, "New account qualified as a representative: {}", key.to_account ());
-
-			nano::lock_guard<nano::mutex> lock{ representatives_mutex };
-			representatives.insert (key);
+			representatives.lock ()->insert (key);
 		}
 	}
 	return key;
@@ -819,19 +817,23 @@ nano::public_key nano::wallet::insert_adhoc (nano::raw_key const & key_a, bool g
 	if (store.valid_password (transaction))
 	{
 		key = store.insert_adhoc (transaction, key_a);
+
+		logger.info (nano::log::type::wallet, "Ad-hoc inserted new account: {}", key.to_account ());
+
 		auto ledger_txn = wallets.ledger.tx_begin_read ();
 		if (generate_work_a)
 		{
 			work_ensure (key, wallets.ledger.latest_root (ledger_txn, key));
 		}
-		auto half_principal_weight (wallets.node.minimum_principal_weight () / 2);
+
 		// Makes sure that the representatives container will
 		// be in sync with any added keys.
 		transaction.commit ();
-		if (wallets.check_rep (key, half_principal_weight))
+
+		if (wallets.check_rep (key))
 		{
-			nano::lock_guard<nano::mutex> lock{ representatives_mutex };
-			representatives.insert (key);
+			logger.info (nano::log::type::wallet, "New account qualified as a representative: {}", key.to_account ());
+			representatives.lock ()->insert (key);
 		}
 	}
 	return key;
@@ -1409,6 +1411,11 @@ bool nano::wallet::live ()
 	return store.handle != 0;
 }
 
+std::unordered_set<nano::account> nano::wallet::reps () const
+{
+	return *representatives.lock ();
+}
+
 void nano::wallet::work_cache_blocking (nano::account const & account_a, nano::root const & root_a)
 {
 	if (wallets.node.work_generation_enabled ())
@@ -1716,12 +1723,8 @@ void nano::wallets::foreach_representative (std::function<void (nano::public_key
 			{
 				auto & wallet (*i->second);
 				nano::lock_guard<std::recursive_mutex> store_lock{ wallet.store.mutex };
-				decltype (wallet.representatives) representatives_l;
-				{
-					nano::lock_guard<nano::mutex> representatives_lock{ wallet.representatives_mutex };
-					representatives_l = wallet.representatives;
-				}
-				for (auto const & account : representatives_l)
+				auto representatives_locked = *wallet.representatives.lock ();
+				for (auto const & account : representatives_locked)
 				{
 					if (wallet.store.exists (transaction_l, account))
 					{
@@ -1793,36 +1796,36 @@ void nano::wallets::clear_send_ids ()
 
 nano::wallet_representatives nano::wallets::reps () const
 {
-	nano::lock_guard<nano::mutex> counts_guard{ reps_cache_mutex };
-	return representatives;
+	return *representatives.lock ();
 }
 
-bool nano::wallets::check_rep (nano::account const & account_a, nano::uint128_t const & half_principal_weight_a, bool const acquire_lock_a)
+bool nano::wallets::check_rep (nano::account const & account)
 {
-	auto weight = ledger.weight (account_a);
+	auto half_principal_weight = node.minimum_principal_weight () / 2;
+	auto representatives_locked = representatives.lock ();
+	return check_rep_impl (*representatives_locked, account, half_principal_weight);
+}
+
+bool nano::wallets::check_rep_impl (wallet_representatives & reps, nano::account const & account, nano::uint128_t const & half_principal_weight)
+{
+	auto weight = ledger.weight (account);
 	if (weight < config.vote_minimum.number ())
 	{
 		return false; // account not a representative
 	}
 
-	nano::unique_lock<nano::mutex> lock;
-	if (acquire_lock_a)
+	if (weight >= half_principal_weight)
 	{
-		lock = nano::unique_lock<nano::mutex>{ reps_cache_mutex };
+		reps.half_principal = true;
 	}
 
-	if (weight >= half_principal_weight_a)
-	{
-		representatives.half_principal = true;
-	}
-
-	auto insert_result = representatives.accounts.insert (account_a);
+	auto insert_result = reps.accounts.insert (account);
 	if (!insert_result.second)
 	{
 		return false; // account already exists
 	}
 
-	++representatives.voting;
+	++reps.voting;
 
 	return true;
 }
@@ -1830,24 +1833,23 @@ bool nano::wallets::check_rep (nano::account const & account_a, nano::uint128_t 
 void nano::wallets::compute_reps ()
 {
 	nano::lock_guard<nano::mutex> guard{ mutex };
-	nano::lock_guard<nano::mutex> counts_guard{ reps_cache_mutex };
-	representatives.clear ();
+	auto representatives_locked = representatives.lock ();
+	representatives_locked->clear ();
 	auto half_principal_weight (node.minimum_principal_weight () / 2);
 	auto transaction (tx_begin_read ());
 	for (auto i (items.begin ()), n (items.end ()); i != n; ++i)
 	{
 		auto & wallet (*i->second);
-		decltype (wallet.representatives) representatives_l;
+		std::unordered_set<nano::account> representatives_l;
 		for (auto ii (wallet.store.begin (transaction)), nn (wallet.store.end (transaction)); ii != nn; ++ii)
 		{
 			auto account (ii->first);
-			if (check_rep (account, half_principal_weight, false))
+			if (check_rep_impl (*representatives_locked, account, half_principal_weight))
 			{
 				representatives_l.insert (account);
 			}
 		}
-		nano::lock_guard<nano::mutex> representatives_guard{ wallet.representatives_mutex };
-		wallet.representatives.swap (representatives_l);
+		wallet.representatives.lock ()->swap (representatives_l);
 	}
 }
 
@@ -1868,6 +1870,8 @@ void nano::wallets::run_reps_scan ()
 		lock.unlock ();
 
 		stats.inc (nano::stat::type::wallet, nano::stat::detail::loop_reps);
+
+		// Recompute local wallet representatives
 		compute_reps ();
 
 		lock.lock ();
