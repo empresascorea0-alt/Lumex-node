@@ -20,6 +20,8 @@ add_library(
   ledger/pending.cpp
   ledger/pruned.hpp
   ledger/pruned.cpp
+  ledger/successor.hpp
+  ledger/successor.cpp
   ledger/rep_weight.hpp
   ledger/rep_weight.cpp
   ledger/version.hpp

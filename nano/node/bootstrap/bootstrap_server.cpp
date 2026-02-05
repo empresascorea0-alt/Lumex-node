@@ -344,8 +344,8 @@ std::deque<std::shared_ptr<nano::block>> nano::bootstrap_server::prepare_blocks 
 		{
 			result.push_back (current);
 
-			auto successor = current->sideband ().successor;
-			current = ledger.any.block_get (transaction, successor);
+			auto successor_hash = ledger.store.block.successor (transaction, current->hash ());
+			current = successor_hash ? ledger.any.block_get (transaction, *successor_hash) : nullptr;
 		}
 	}
 	return result;

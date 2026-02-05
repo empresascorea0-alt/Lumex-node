@@ -20,7 +20,9 @@
 #include <nano/store/ledger/peer.hpp>
 #include <nano/store/ledger/pending.hpp>
 #include <nano/store/ledger/pruned.hpp>
+#include <nano/store/ledger/successor.hpp>
 #include <nano/store/ledger/version.hpp>
+#include <nano/store/ledger_store.hpp>
 #include <nano/store/lmdb/backend_lmdb.hpp>
 #include <nano/store/rocksdb/backend_rocksdb.hpp>
 #include <nano/store/versioning.hpp>
@@ -94,7 +96,6 @@ TEST (block_store, sideband_serialization)
 	sideband1.account = 1;
 	sideband1.balance = 2;
 	sideband1.height = 3;
-	sideband1.successor = 4;
 	sideband1.timestamp = 5;
 	std::vector<uint8_t> vector;
 	{
@@ -107,7 +108,6 @@ TEST (block_store, sideband_serialization)
 	ASSERT_EQ (sideband1.account, sideband2.account);
 	ASSERT_EQ (sideband1.balance, sideband2.balance);
 	ASSERT_EQ (sideband1.height, sideband2.height);
-	ASSERT_EQ (sideband1.successor, sideband2.successor);
 	ASSERT_EQ (sideband1.timestamp, sideband2.timestamp);
 }
 
@@ -161,33 +161,21 @@ TEST (block_store, clear_successor)
 	block1->sideband_set ({});
 	auto transaction (store->tx_begin_write ());
 	store->block.put (transaction, block1->hash (), *block1);
-	auto block2 = builder
-				  .open ()
-				  .source (0)
-				  .representative (2)
-				  .account (0)
-				  .sign (nano::keypair ().prv, 0)
-				  .work (0)
-				  .build ();
-	block2->sideband_set ({});
-	store->block.put (transaction, block2->hash (), *block2);
-	auto block2_store (store->block.get (transaction, block1->hash ()));
-	ASSERT_NE (nullptr, block2_store);
-	ASSERT_EQ (0, block2_store->sideband ().successor.number ());
-	auto modified_sideband = block2_store->sideband ();
-	modified_sideband.successor = block2->hash ();
-	block1->sideband_set (modified_sideband);
-	store->block.put (transaction, block1->hash (), *block1);
+	// Open block has no predecessor, so no successor entry
+	ASSERT_FALSE (store->block.successor (transaction, block1->hash ()).has_value ());
+	// Manually set a successor via the successor table
+	auto block1_hash = block1->hash ();
+	nano::block_hash fake_successor{ 42 };
+	store->successor.put (transaction, block1_hash, fake_successor);
 	{
-		auto block1_store (store->block.get (transaction, block1->hash ()));
-		ASSERT_NE (nullptr, block1_store);
-		ASSERT_EQ (block2->hash (), block1_store->sideband ().successor);
+		auto result = store->block.successor (transaction, block1_hash);
+		ASSERT_TRUE (result.has_value ());
+		ASSERT_EQ (fake_successor, *result);
 	}
-	store->block.successor_clear (transaction, block1->hash ());
+	store->block.successor_clear (transaction, block1_hash);
 	{
-		auto block1_store (store->block.get (transaction, block1->hash ()));
-		ASSERT_NE (nullptr, block1_store);
-		ASSERT_EQ (0, block1_store->sideband ().successor.number ());
+		auto result = store->block.successor (transaction, block1_hash);
+		ASSERT_FALSE (result.has_value ());
 	}
 }
 

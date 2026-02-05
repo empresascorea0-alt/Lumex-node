@@ -1,3 +1,6 @@
+#include <nano/lib/block_sideband.hpp>
+#include <nano/lib/block_type.hpp>
+#include <nano/lib/blocks.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/stats.hpp>
@@ -5,9 +8,12 @@
 #include <nano/secure/account_info.hpp>
 #include <nano/secure/common.hpp>
 #include <nano/store/backend.hpp>
+#include <nano/store/db_val_templ.hpp>
 #include <nano/store/ledger/account.hpp>
+#include <nano/store/ledger/block.hpp>
 #include <nano/store/ledger/pending.hpp>
 #include <nano/store/ledger/rep_weight.hpp>
+#include <nano/store/ledger/successor.hpp>
 #include <nano/store/ledger/version.hpp>
 #include <nano/store/ledger_store.hpp>
 #include <nano/store/tables.hpp>
@@ -65,6 +71,19 @@ nano::store::column_schema const schema_v23{
 	{ nano::store::table::confirmation_height, "confirmation_height" },
 	{ nano::store::table::final_votes, "final_votes" },
 	{ nano::store::table::frontiers, "frontiers" },
+	{ nano::store::table::meta, "meta" }
+};
+
+nano::store::column_schema const schema_v24{
+	{ nano::store::table::blocks, "blocks" },
+	{ nano::store::table::accounts, "accounts" },
+	{ nano::store::table::pending, "pending" },
+	{ nano::store::table::rep_weights, "rep_weights" },
+	{ nano::store::table::online_weight, "online_weight" },
+	{ nano::store::table::pruned, "pruned" },
+	{ nano::store::table::peers, "peers" },
+	{ nano::store::table::confirmation_height, "confirmation_height" },
+	{ nano::store::table::final_votes, "final_votes" },
 	{ nano::store::table::meta, "meta" }
 };
 }
@@ -574,11 +593,134 @@ TEST (ledger_upgrades, upgrade_v23_to_v24)
 	// Verify version is now 24 and frontiers table no longer exists
 	{
 		auto backend = nano::test::make_backend (path);
-		backend->open (nano::store::ledger_store::schema_current, nano::store::open_mode::read_only);
+		backend->open (schema_v24, nano::store::open_mode::read_only);
 		auto tx = backend->tx_begin_read ();
 		ASSERT_EQ (backend->get_version (tx), 24);
 		ASSERT_FALSE (backend->table_exists ("frontiers"));
 	}
+}
+
+namespace
+{
+class legacy_database_v24
+{
+public:
+	legacy_database_v24 (std::filesystem::path const & path_a) :
+		path{ path_a },
+		backend{ nano::test::make_backend (path_a) }
+	{
+		backend->create (schema_v24, 24);
+		backend->open (schema_v24, nano::store::open_mode::read_write);
+	}
+
+	// Write a block with the OLD v24 sideband format (successor as first field in sideband)
+	void add_block_v24 (nano::block const & block, nano::block_hash const & successor_hash)
+	{
+		auto tx = backend->tx_begin_write ();
+
+		// Serialize block
+		std::vector<uint8_t> data;
+		{
+			nano::vectorstream stream{ data };
+			nano::serialize_block (stream, block);
+			// Write old-format sideband: successor first (32 bytes), then remaining sideband fields
+			nano::write (stream, successor_hash.bytes);
+			block.sideband ().serialize (stream, block.type ());
+		}
+
+		nano::store::db_val value{ data.size (), data.data () };
+		auto status = backend->put (tx, nano::store::table::blocks, block.hash (), value);
+		backend->release_assert_success (status);
+	}
+
+	std::filesystem::path path;
+	std::unique_ptr<nano::store::backend> backend;
+};
+}
+
+/*
+ * Test v24 to v25 upgrade: moves successor from block sideband to dedicated table
+ */
+TEST (ledger_upgrades, upgrade_v24_to_v25)
+{
+	nano::keypair key1;
+	nano::keypair key2;
+
+	nano::block_builder builder;
+
+	// Create an open block (genesis-like, no predecessor)
+	auto block1 = builder
+				  .open ()
+				  .source (nano::block_hash{ key1.pub.number () })
+				  .representative (key1.pub)
+				  .account (key1.pub)
+				  .sign (key1.prv, key1.pub)
+				  .work (0)
+				  .build ();
+	block1->sideband_set (nano::block_sideband{
+	key1.pub,
+	nano::amount{ 1000 },
+	1, 0, nano::epoch::epoch_0,
+	false, false, false, nano::epoch::epoch_0 });
+
+	// Create a state block with a previous (block1)
+	auto block2 = builder
+				  .state ()
+				  .account (key1.pub)
+				  .previous (block1->hash ())
+				  .representative (key1.pub)
+				  .balance (500)
+				  .link (key2.pub)
+				  .sign (key1.prv, key1.pub)
+				  .work (0)
+				  .build ();
+	block2->sideband_set (nano::block_sideband{
+	key1.pub,
+	nano::amount{ 500 },
+	2, 0, nano::epoch::epoch_0,
+	true, false, false, nano::epoch::epoch_0 });
+
+	auto const path = nano::unique_path ();
+	{
+		legacy_database_v24 legacy_db{ path };
+
+		// block1 has block2 as successor
+		legacy_db.add_block_v24 (*block1, block2->hash ());
+
+		// block2 has no successor (zero hash)
+		legacy_db.add_block_v24 (*block2, nano::block_hash{ 0 });
+	}
+
+	// Open through ledger_store which should trigger upgrade
+	nano::store::ledger_store store (
+	nano::test::make_backend (path),
+	nano::store::open_mode::read_write,
+	nano::test::default_stats (),
+	nano::test::default_logger ());
+
+	auto tx = store.tx_begin_read ();
+
+	// Verify version
+	ASSERT_EQ (store.version.get (tx), nano::store::ledger_store::version_current);
+
+	// Verify successor table has the correct entry for block1 -> block2
+	auto successor_result = store.block.successor (tx, block1->hash ());
+	ASSERT_TRUE (successor_result.has_value ());
+	ASSERT_EQ (*successor_result, block2->hash ());
+
+	// Verify block2 has no successor
+	auto no_successor = store.block.successor (tx, block2->hash ());
+	ASSERT_FALSE (no_successor.has_value ());
+
+	// Verify blocks can be read with new sideband format
+	auto stored_block1 = store.block.get (tx, block1->hash ());
+	ASSERT_NE (nullptr, stored_block1);
+	// Open block account is in the block itself, not the sideband
+	ASSERT_EQ (stored_block1->sideband ().height, 1);
+
+	auto stored_block2 = store.block.get (tx, block2->hash ());
+	ASSERT_NE (nullptr, stored_block2);
+	ASSERT_EQ (stored_block2->sideband ().height, 2);
 }
 
 /*

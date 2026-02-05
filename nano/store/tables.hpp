@@ -17,6 +17,7 @@ enum class table
 	peers,
 	pending,
 	pruned,
+	successor,
 	vote,
 	rep_weights,
 	unchecked, // dropped in v22
