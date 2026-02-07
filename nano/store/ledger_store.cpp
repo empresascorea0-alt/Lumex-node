@@ -1,5 +1,6 @@
 #include <nano/lib/block_sideband.hpp>
 #include <nano/lib/block_type.hpp>
+#include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/stats.hpp>
@@ -384,13 +385,14 @@ void ledger_store::upgrade_v24_to_v25 ()
 	{
 		release_assert (backend.get_version (backend.tx_begin_read ()) == 24, "unexpected version during upgrade", std::to_string (backend.get_version (backend.tx_begin_read ())));
 
-		// Clear successor table for crash recovery (if previous attempt partially populated it)
-		backend.clear (nano::store::table::successor);
+		// Already-migrated blocks (new format) are skipped during iteration
+		// Succesor puts re-inserting the same (block_hash → successor_hash) pair is harmless.
 
 		auto transaction = backend.tx_begin_write ();
 
 		const size_t batch_size = nano::is_dev_run () ? 2 : 250000;
 		size_t processed = 0;
+		auto const total_blocks = backend.count (backend.tx_begin_read (), nano::store::table::blocks);
 
 		// Iterate all blocks using a separate read transaction
 		auto iterate_blocks = [this] (auto && func) {
@@ -403,7 +405,7 @@ void ledger_store::upgrade_v24_to_v25 ()
 			}
 		};
 
-		iterate_blocks ([this, &transaction, &processed, batch_size] (nano::store::db_val const & key, nano::store::db_val const & value) {
+		iterate_blocks ([this, &transaction, &processed, batch_size, total_blocks] (nano::store::db_val const & key, nano::store::db_val const & value) {
 			auto const raw_data = static_cast<uint8_t const *> (value.data ());
 			auto const raw_size = value.size ();
 			release_assert (raw_size > 0);
@@ -411,10 +413,22 @@ void ledger_store::upgrade_v24_to_v25 ()
 			// Byte 0 is the block type
 			auto const type = static_cast<nano::block_type> (raw_data[0]);
 
-			// Calculate sizes: old sideband had successor (32 bytes) as first field
+			// Calculate sizes for both old and new formats
+			auto const block_size = nano::block::size (type);
 			auto const new_sideband_size = nano::block_sideband::size (type);
 			auto const old_sideband_size = new_sideband_size + 32;
-			release_assert (raw_size >= old_sideband_size);
+
+			// block type (1 byte) + block data + sideband
+			auto const expected_old_size = 1 + block_size + old_sideband_size;
+			auto const expected_new_size = 1 + block_size + new_sideband_size;
+
+			// Skip blocks that have already been migrated (idempotency)
+			if (raw_size == expected_new_size)
+			{
+				return;
+			}
+
+			release_assert (raw_size == expected_old_size, "unexpected block size during v24 to v25 migration");
 			auto const block_data_size = raw_size - old_sideband_size;
 
 			// Extract 32-byte successor hash from the old sideband (first field after block data)
@@ -448,7 +462,8 @@ void ledger_store::upgrade_v24_to_v25 ()
 			processed++;
 			if (processed % batch_size == 0)
 			{
-				logger.info (nano::log::type::ledger_upgrade, "Processed {} blocks", processed);
+				double const percentage = total_blocks > 0 ? (static_cast<double> (processed) / total_blocks * 100.0) : 0.0;
+				logger.info (nano::log::type::ledger_upgrade, "Processed {} blocks ({:.1f}%)", processed, percentage);
 				transaction.refresh ();
 			}
 		});
