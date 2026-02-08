@@ -613,18 +613,20 @@ public:
 		backend->open (schema_v24, nano::store::open_mode::read_write);
 	}
 
-	// Write a block with the OLD v24 sideband format (successor as first field in sideband)
-	void add_block_v24 (nano::block const & block, nano::block_hash const & successor_hash)
+	// Write a block with v24 sideband format (successor is part of sideband)
+	void add_block (nano::block & block, nano::block_hash const & successor_hash)
 	{
 		auto tx = backend->tx_begin_write ();
 
-		// Serialize block
+		// Set successor in sideband before serializing
+		auto sideband = block.sideband ();
+		sideband.successor = successor_hash;
+		block.sideband_set (sideband);
+
 		std::vector<uint8_t> data;
 		{
 			nano::vectorstream stream{ data };
 			nano::serialize_block (stream, block);
-			// Write old-format sideband: successor first (32 bytes), then remaining sideband fields
-			nano::write (stream, successor_hash.bytes);
 			block.sideband ().serialize (stream, block.type ());
 		}
 
@@ -639,7 +641,7 @@ public:
 }
 
 /*
- * Test v24 to v25 upgrade: moves successor from block sideband to dedicated table
+ * Test v24 to v25 upgrade: copies successor from block sideband to dedicated table
  */
 TEST (ledger_upgrades, upgrade_v24_to_v25)
 {
@@ -659,6 +661,7 @@ TEST (ledger_upgrades, upgrade_v24_to_v25)
 				  .build ();
 	block1->sideband_set (nano::block_sideband{
 	key1.pub,
+	nano::block_hash{ 0 },
 	nano::amount{ 1000 },
 	1, 0, nano::epoch::epoch_0,
 	false, false, false, nano::epoch::epoch_0 });
@@ -676,6 +679,7 @@ TEST (ledger_upgrades, upgrade_v24_to_v25)
 				  .build ();
 	block2->sideband_set (nano::block_sideband{
 	key1.pub,
+	nano::block_hash{ 0 },
 	nano::amount{ 500 },
 	2, 0, nano::epoch::epoch_0,
 	true, false, false, nano::epoch::epoch_0 });
@@ -685,10 +689,10 @@ TEST (ledger_upgrades, upgrade_v24_to_v25)
 		legacy_database_v24 legacy_db{ path };
 
 		// block1 has block2 as successor
-		legacy_db.add_block_v24 (*block1, block2->hash ());
+		legacy_db.add_block (*block1, block2->hash ());
 
 		// block2 has no successor (zero hash)
-		legacy_db.add_block_v24 (*block2, nano::block_hash{ 0 });
+		legacy_db.add_block (*block2, nano::block_hash{ 0 });
 	}
 
 	// Open through ledger_store which should trigger upgrade
@@ -708,19 +712,14 @@ TEST (ledger_upgrades, upgrade_v24_to_v25)
 	ASSERT_TRUE (successor_result.has_value ());
 	ASSERT_EQ (*successor_result, block2->hash ());
 
-	// Verify block2 has no successor
+	// Verify block2 has no successor in the table
 	auto no_successor = store.block.successor (tx, block2->hash ());
 	ASSERT_FALSE (no_successor.has_value ());
-
-	// Verify blocks can be read with new sideband format
-	auto stored_block1 = store.block.get (tx, block1->hash ());
-	ASSERT_NE (nullptr, stored_block1);
-	// Open block account is in the block itself, not the sideband
-	ASSERT_EQ (stored_block1->sideband ().height, 1);
 
 	auto stored_block2 = store.block.get (tx, block2->hash ());
 	ASSERT_NE (nullptr, stored_block2);
 	ASSERT_EQ (stored_block2->sideband ().height, 2);
+	ASSERT_EQ (stored_block2->sideband ().successor, nano::block_hash{ 0 });
 }
 
 /*

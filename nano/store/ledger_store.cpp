@@ -375,7 +375,7 @@ void ledger_store::upgrade_v23_to_v24 ()
 	logger.info (nano::log::type::ledger_upgrade, "Upgrading database from v23 to v24 completed");
 }
 
-// Move successor from block sideband to dedicated successor table, rewrite all blocks
+// Populate dedicated successor table from block sideband data
 void ledger_store::upgrade_v24_to_v25 ()
 {
 	logger.info (nano::log::type::ledger_upgrade, "Upgrading database from v24 to v25...");
@@ -385,8 +385,8 @@ void ledger_store::upgrade_v24_to_v25 ()
 	{
 		release_assert (backend.get_version (backend.tx_begin_read ()) == 24, "unexpected version during upgrade", std::to_string (backend.get_version (backend.tx_begin_read ())));
 
-		// Already-migrated blocks (new format) are skipped during iteration
-		// Succesor puts re-inserting the same (block_hash → successor_hash) pair is harmless.
+		// Always clear successor table to ensure clean state before populating
+		backend.clear (nano::store::table::successor);
 
 		auto transaction = backend.tx_begin_write ();
 
@@ -413,32 +413,17 @@ void ledger_store::upgrade_v24_to_v25 ()
 			// Byte 0 is the block type
 			auto const type = static_cast<nano::block_type> (raw_data[0]);
 
-			// Calculate sizes for both old and new formats
-			auto const block_size = nano::block::size (type);
-			auto const new_sideband_size = nano::block_sideband::size (type);
-			auto const old_sideband_size = new_sideband_size + 32;
+			// block type (1 byte) + block data + sideband (which includes 32-byte successor as first field)
+			auto const block_data_size = 1 + nano::block::size (type);
 
-			// block type (1 byte) + block data + sideband
-			auto const expected_old_size = 1 + block_size + old_sideband_size;
-			auto const expected_new_size = 1 + block_size + new_sideband_size;
-
-			// Skip blocks that have already been migrated (idempotency)
-			if (raw_size == expected_new_size)
-			{
-				return;
-			}
-
-			release_assert (raw_size == expected_old_size, "unexpected block size during v24 to v25 migration");
-			auto const block_data_size = raw_size - old_sideband_size;
-
-			// Extract 32-byte successor hash from the old sideband (first field after block data)
+			// Extract 32-byte successor hash from the sideband (first field after block data)
 			nano::block_hash successor_hash;
+			release_assert (raw_size >= block_data_size + 32, "block record too small during v24 to v25 migration");
 			std::memcpy (successor_hash.bytes.data (), raw_data + block_data_size, 32);
 
 			// If successor is non-zero, write to successor table
 			if (!successor_hash.is_zero ())
 			{
-				// Read key as block_hash
 				nano::block_hash block_hash;
 				release_assert (key.size () == sizeof (block_hash));
 				std::memcpy (block_hash.bytes.data (), key.data (), sizeof (block_hash));
@@ -446,18 +431,6 @@ void ledger_store::upgrade_v24_to_v25 ()
 				auto status = backend.put (transaction, nano::store::table::successor, block_hash, successor_hash);
 				backend.release_assert_success (status);
 			}
-
-			// Construct new block data: block_data + old_sideband_without_successor
-			// Skip the 32 successor bytes at position block_data_size
-			std::vector<uint8_t> new_data;
-			new_data.reserve (raw_size - 32);
-			new_data.insert (new_data.end (), raw_data, raw_data + block_data_size);
-			new_data.insert (new_data.end (), raw_data + block_data_size + 32, raw_data + raw_size);
-
-			// Write new block data back
-			nano::store::db_val new_value{ new_data.size (), new_data.data () };
-			auto status = backend.put (transaction, nano::store::table::blocks, key, new_value);
-			backend.release_assert_success (status);
 
 			processed++;
 			if (processed % batch_size == 0)
