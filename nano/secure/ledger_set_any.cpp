@@ -5,6 +5,7 @@
 #include <nano/store/ledger/block.hpp>
 #include <nano/store/ledger/pending.hpp>
 #include <nano/store/ledger/pruned.hpp>
+#include <nano/store/ledger/successor.hpp>
 #include <nano/store/ledger_store.hpp>
 
 nano::ledger_set_any::ledger_set_any (nano::ledger const & ledger) :
@@ -214,7 +215,7 @@ std::optional<nano::block_hash> nano::ledger_set_any::block_successor (secure::t
 {
 	if (!root.previous ().is_zero ())
 	{
-		return ledger.store.block.successor (transaction, root.previous ());
+		return ledger.store.successor.get (transaction, root.previous ());
 	}
 	else
 	{

@@ -164,19 +164,19 @@ TEST (block_store, clear_successor)
 	auto transaction (store->tx_begin_write ());
 	store->block.put (transaction, block1->hash (), *block1);
 	// Open block has no predecessor, so no successor entry
-	ASSERT_FALSE (store->block.successor (transaction, block1->hash ()).has_value ());
+	ASSERT_FALSE (store->successor.get (transaction, block1->hash ()).has_value ());
 	// Manually set a successor via the successor table
 	auto block1_hash = block1->hash ();
 	nano::block_hash fake_successor{ 42 };
 	store->successor.put (transaction, block1_hash, fake_successor);
 	{
-		auto result = store->block.successor (transaction, block1_hash);
+		auto result = store->successor.get (transaction, block1_hash);
 		ASSERT_TRUE (result.has_value ());
 		ASSERT_EQ (fake_successor, *result);
 	}
-	store->block.successor_clear (transaction, block1_hash);
+	store->successor.del (transaction, block1_hash);
 	{
-		auto result = store->block.successor (transaction, block1_hash);
+		auto result = store->successor.get (transaction, block1_hash);
 		ASSERT_FALSE (result.has_value ());
 	}
 }

@@ -23,8 +23,6 @@ public:
 
 	void put (nano::store::write_transaction const &, nano::block_hash const &, nano::block const &);
 	void raw_put (nano::store::write_transaction const &, std::vector<uint8_t> const & data, nano::block_hash const &);
-	std::optional<nano::block_hash> successor (nano::store::transaction const &, nano::block_hash const &) const;
-	void successor_clear (nano::store::write_transaction const &, nano::block_hash const &);
 	std::shared_ptr<nano::block> get (nano::store::transaction const &, nano::block_hash const &) const;
 	void del (nano::store::write_transaction const &, nano::block_hash const &);
 	bool exists (nano::store::transaction const &, nano::block_hash const &) const;

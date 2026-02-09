@@ -24,7 +24,7 @@ void block_view::put (nano::store::write_transaction const & txn, nano::block_ha
 	{
 		successor_store.put (txn, block.previous (), hash);
 	}
-	debug_assert (block.previous ().is_zero () || successor (txn, block.previous ()) == hash);
+	debug_assert (block.previous ().is_zero () || successor_store.get (txn, block.previous ()) == hash);
 }
 
 void block_view::raw_put (nano::store::write_transaction const & txn, std::vector<uint8_t> const & data, nano::block_hash const & hash)
@@ -32,16 +32,6 @@ void block_view::raw_put (nano::store::write_transaction const & txn, std::vecto
 	nano::store::db_val value{ data.size (), (void *)data.data () };
 	auto status = backend.put (txn, nano::store::table::blocks, hash, value);
 	backend.release_assert_success (status);
-}
-
-std::optional<nano::block_hash> block_view::successor (nano::store::transaction const & txn, nano::block_hash const & hash) const
-{
-	return successor_store.get (txn, hash);
-}
-
-void block_view::successor_clear (nano::store::write_transaction const & txn, nano::block_hash const & hash)
-{
-	successor_store.del (txn, hash);
 }
 
 std::shared_ptr<nano::block> block_view::get (nano::store::transaction const & txn, nano::block_hash const & hash) const

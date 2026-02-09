@@ -708,12 +708,12 @@ TEST (ledger_upgrades, upgrade_v24_to_v25)
 	ASSERT_EQ (store.version.get (tx), nano::store::ledger_store::version_current);
 
 	// Verify successor table has the correct entry for block1 -> block2
-	auto successor_result = store.block.successor (tx, block1->hash ());
+	auto successor_result = store.successor.get (tx, block1->hash ());
 	ASSERT_TRUE (successor_result.has_value ());
 	ASSERT_EQ (*successor_result, block2->hash ());
 
 	// Verify block2 has no successor in the table
-	auto no_successor = store.block.successor (tx, block2->hash ());
+	auto no_successor = store.successor.get (tx, block2->hash ());
 	ASSERT_FALSE (no_successor.has_value ());
 
 	auto stored_block2 = store.block.get (tx, block2->hash ());
