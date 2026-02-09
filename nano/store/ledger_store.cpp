@@ -4,7 +4,9 @@
 #include <nano/lib/config.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/stats.hpp>
+#include <nano/lib/stream.hpp>
 #include <nano/store/backend.hpp>
+#include <nano/store/db_val_templ.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
 #include <nano/store/ledger/confirmation_height.hpp>
@@ -390,6 +392,7 @@ void ledger_store::upgrade_v24_to_v25 ()
 
 		auto transaction = backend.tx_begin_write ();
 
+		// Smaller batch size for dev runs to potentially trigger edge cases
 		const size_t batch_size = nano::is_dev_run () ? 2 : 250000;
 		size_t processed = 0;
 		auto const total_blocks = backend.count (backend.tx_begin_read (), nano::store::table::blocks);
@@ -397,38 +400,20 @@ void ledger_store::upgrade_v24_to_v25 ()
 		// Iterate all blocks using a separate read transaction
 		auto iterate_blocks = [this] (auto && func) {
 			auto read_txn = backend.tx_begin_read ();
-			auto it = backend.begin (read_txn, nano::store::table::blocks);
-			auto const end = backend.end (read_txn, nano::store::table::blocks);
+			auto it = nano::store::typed_iterator<nano::block_hash, nano::store::block_w_sideband>{ backend.begin (read_txn, nano::store::table::blocks) };
+			auto const end = nano::store::typed_iterator<nano::block_hash, nano::store::block_w_sideband>{ backend.end (read_txn, nano::store::table::blocks) };
 			for (; it != end; ++it)
 			{
-				func (it->first, it->second);
+				auto const & [hash, block_w_sideband] = *it;
+				func (hash, block_w_sideband);
 			}
 		};
 
-		iterate_blocks ([this, &transaction, &processed, batch_size, total_blocks] (nano::store::db_val const & key, nano::store::db_val const & value) {
-			auto const raw_data = static_cast<uint8_t const *> (value.data ());
-			auto const raw_size = value.size ();
-			release_assert (raw_size > 0);
-
-			// Byte 0 is the block type
-			auto const type = static_cast<nano::block_type> (raw_data[0]);
-
-			// block type (1 byte) + block data + sideband (which includes 32-byte successor as first field)
-			auto const block_data_size = 1 + nano::block::size (type);
-
-			// Extract 32-byte successor hash from the sideband (first field after block data)
-			nano::block_hash successor_hash;
-			release_assert (raw_size >= block_data_size + 32, "block record too small during v24 to v25 migration");
-			std::memcpy (successor_hash.bytes.data (), raw_data + block_data_size, 32);
-
+		iterate_blocks ([this, &transaction, &processed, batch_size, total_blocks] (nano::block_hash const & hash, nano::store::block_w_sideband const & block_w_sideband) {
 			// If successor is non-zero, write to successor table
-			if (!successor_hash.is_zero ())
+			if (!block_w_sideband.sideband.successor.is_zero ())
 			{
-				nano::block_hash block_hash;
-				release_assert (key.size () == sizeof (block_hash));
-				std::memcpy (block_hash.bytes.data (), key.data (), sizeof (block_hash));
-
-				auto status = backend.put (transaction, nano::store::table::successor, block_hash, successor_hash);
+				auto status = backend.put (transaction, nano::store::table::successor, hash, block_w_sideband.sideband.successor);
 				backend.release_assert_success (status);
 			}
 

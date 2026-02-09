@@ -26,13 +26,7 @@ std::optional<nano::block_hash> successor_view::get (nano::store::transaction co
 	auto status = backend.get (txn, nano::store::table::successor, hash, value);
 	if (backend.success (status))
 	{
-		nano::block_hash result;
-		debug_assert (value.size () == sizeof (result));
-		std::memcpy (result.bytes.data (), value.data (), sizeof (result));
-		if (!result.is_zero ())
-		{
-			return result;
-		}
+		return nano::block_hash{ value };
 	}
 	return std::nullopt;
 }
