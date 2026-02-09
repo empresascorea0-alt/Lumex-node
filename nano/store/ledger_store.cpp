@@ -301,7 +301,8 @@ void ledger_store::upgrade_v22_to_v23 ()
 
 		// Always drop rep_weights table to ensure it's empty before populating
 		// This can happen if an upgrade was attempted but failed halfway through
-		backend.clear (nano::store::table::rep_weights);
+		auto clear_status = backend.clear (nano::store::table::rep_weights);
+		release_assert (backend.success (clear_status), "failed to clear rep_weights table during upgrade", backend.error_string (clear_status));
 
 		auto transaction = backend.tx_begin_write ();
 
@@ -388,7 +389,8 @@ void ledger_store::upgrade_v24_to_v25 ()
 		release_assert (backend.get_version (backend.tx_begin_read ()) == 24, "unexpected version during upgrade", std::to_string (backend.get_version (backend.tx_begin_read ())));
 
 		// Always clear successor table to ensure clean state before populating
-		backend.clear (nano::store::table::successor);
+		auto clear_result = backend.clear (nano::store::table::successor);
+		release_assert (backend.success (clear_result), "failed to clear successor table during upgrade", backend.error_string (clear_result));
 
 		auto transaction = backend.tx_begin_write ();
 
