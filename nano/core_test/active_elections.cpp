@@ -1858,7 +1858,7 @@ TEST (active_elections, cancel_already_cemented)
 	// First, cement the block through direct ledger confirmation process, skips callbacks
 	{
 		auto transaction = node.ledger.tx_begin_write ();
-		node.ledger.confirm (transaction, last_block->hash ());
+		node.ledger.cement (transaction, last_block->hash ());
 	}
 
 	// Verify the block is actually cemented

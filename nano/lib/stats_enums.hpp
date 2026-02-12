@@ -447,9 +447,9 @@ enum class detail
 	invocations,
 
 	// confirmation height
-	blocks_confirmed,
-	blocks_confirmed_unbounded,
-	blocks_confirmed_bounded,
+	blocks_cemented,
+	blocks_cemented_unbounded,
+	blocks_cemented_bounded,
 
 	// request aggregator
 	aggregator_accepted,

@@ -5057,7 +5057,7 @@ TEST (ledger, dependencies_confirmed)
 					.build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, receive1));
 	ASSERT_FALSE (ledger.dependencies_confirmed (transaction, *receive1));
-	ledger.confirm (transaction, send1->hash ());
+	ledger.cement (transaction, send1->hash ());
 	ASSERT_TRUE (ledger.dependencies_confirmed (transaction, *receive1));
 	auto receive2 = builder.state ()
 					.account (key1.pub)
@@ -5070,9 +5070,9 @@ TEST (ledger, dependencies_confirmed)
 					.build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, receive2));
 	ASSERT_FALSE (ledger.dependencies_confirmed (transaction, *receive2));
-	ledger.confirm (transaction, receive1->hash ());
+	ledger.cement (transaction, receive1->hash ());
 	ASSERT_FALSE (ledger.dependencies_confirmed (transaction, *receive2));
-	ledger.confirm (transaction, send2->hash ());
+	ledger.cement (transaction, send2->hash ());
 	ASSERT_TRUE (ledger.dependencies_confirmed (transaction, *receive2));
 }
 
@@ -5107,7 +5107,7 @@ TEST (ledger, dependencies_confirmed_pruning)
 				 .work (*pool.generate (send1->hash ()))
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
-	ledger.confirm (transaction, send2->hash ());
+	ledger.cement (transaction, send2->hash ());
 	ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
 	ASSERT_EQ (2, ledger.pruning_action (transaction, send2->hash (), 1));
 	auto receive1 = builder.state ()
@@ -5146,7 +5146,7 @@ TEST (ledger, block_confirmed)
 	ASSERT_FALSE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send1));
 	ASSERT_FALSE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
-	ledger.confirm (transaction, send1->hash ());
+	ledger.cement (transaction, send1->hash ());
 	ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
 }
 
@@ -5224,7 +5224,7 @@ TEST (ledger, cache)
 
 		{
 			auto transaction = ledger.tx_begin_write ();
-			ledger.confirm (transaction, send->hash ());
+			ledger.cement (transaction, send->hash ());
 			ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, send->hash ()));
 		}
 
@@ -5234,7 +5234,7 @@ TEST (ledger, cache)
 
 		{
 			auto transaction = ledger.tx_begin_write ();
-			ledger.confirm (transaction, open->hash ());
+			ledger.cement (transaction, open->hash ());
 			ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, open->hash ()));
 		}
 
@@ -5291,7 +5291,7 @@ TEST (ledger, pruning_action)
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send2->hash ()));
 	// Pruning action
-	ledger.confirm (transaction, send1->hash ());
+	ledger.cement (transaction, send1->hash ());
 	ASSERT_EQ (1, ledger.pruning_action (transaction, send1->hash (), 1));
 	ASSERT_EQ (0, ledger.pruning_action (transaction, nano::dev::genesis->hash (), 1));
 	ASSERT_TRUE (ledger.any.pending_get (transaction, nano::pending_key{ nano::dev::genesis_key.pub, send1->hash () }));
@@ -5327,7 +5327,7 @@ TEST (ledger, pruning_action)
 	ASSERT_FALSE (receive1_stored->sideband ().details.is_epoch);
 	// Middle block pruning
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send2->hash ()));
-	ledger.confirm (transaction, send2->hash ());
+	ledger.cement (transaction, send2->hash ());
 	ASSERT_EQ (1, ledger.pruning_action (transaction, send2->hash (), 1));
 	ASSERT_TRUE (store->pruned.exists (transaction, send2->hash ()));
 	ASSERT_FALSE (ledger.any.block_exists (transaction, send2->hash ()));
@@ -5378,7 +5378,7 @@ TEST (ledger, pruning_large_chain)
 	}
 	ASSERT_EQ (0, store->pruned.count (transaction));
 	ASSERT_EQ (send_receive_pairs * 2 + 1, store->block.count (transaction));
-	ledger.confirm (transaction, last_hash);
+	ledger.cement (transaction, last_hash);
 	// Pruning action
 	ASSERT_EQ (send_receive_pairs * 2, ledger.pruning_action (transaction, last_hash, 5));
 	ASSERT_TRUE (store->pruned.exists (transaction, last_hash));
@@ -5435,7 +5435,7 @@ TEST (ledger, pruning_source_rollback)
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send2->hash ()));
-	ledger.confirm (transaction, send1->hash ());
+	ledger.cement (transaction, send1->hash ());
 	// Pruning action
 	ASSERT_EQ (2, ledger.pruning_action (transaction, send1->hash (), 1));
 	ASSERT_FALSE (ledger.any.block_exists (transaction, send1->hash ()));
@@ -5520,7 +5520,7 @@ TEST (ledger, pruning_source_rollback_legacy)
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send3));
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send3->hash ()));
 	ASSERT_TRUE (ledger.any.pending_get (transaction, nano::pending_key{ nano::dev::genesis_key.pub, send3->hash () }));
-	ledger.confirm (transaction, send2->hash ());
+	ledger.cement (transaction, send2->hash ());
 	// Pruning action
 	ASSERT_EQ (2, ledger.pruning_action (transaction, send2->hash (), 1));
 	ASSERT_FALSE (ledger.any.block_exists (transaction, send2->hash ()));
@@ -5653,7 +5653,7 @@ TEST (ledger, pruning_legacy_blocks)
 				 .work (*pool.generate (open1->hash ()))
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send3));
-	ledger.confirm (transaction, open1->hash ());
+	ledger.cement (transaction, open1->hash ());
 	// Pruning action
 	ASSERT_EQ (3, ledger.pruning_action (transaction, change1->hash (), 2));
 	ASSERT_EQ (1, ledger.pruning_action (transaction, open1->hash (), 1));
@@ -5708,7 +5708,7 @@ TEST (ledger, pruning_safe_functions)
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send2->hash ()));
-	ledger.confirm (transaction, send1->hash ());
+	ledger.cement (transaction, send1->hash ());
 	// Pruning action
 	ASSERT_EQ (1, ledger.pruning_action (transaction, send1->hash (), 1));
 	ASSERT_FALSE (ledger.any.block_exists (transaction, send1->hash ()));
@@ -5758,7 +5758,7 @@ TEST (ledger, random_blocks)
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send2->hash ()));
-	ledger.confirm (transaction, send1->hash ());
+	ledger.cement (transaction, send1->hash ());
 	// Pruning action
 	ASSERT_EQ (1, ledger.pruning_action (transaction, send1->hash (), 1));
 	ASSERT_FALSE (ledger.any.block_exists (transaction, send1->hash ()));
@@ -5939,7 +5939,7 @@ TEST (ledger, cement_unbounded)
 	std::deque<std::shared_ptr<nano::block>> confirmed;
 	{
 		auto tx = ledger.tx_begin_write ();
-		confirmed = ledger.confirm (tx, bottom->hash ());
+		confirmed = ledger.cement (tx, bottom->hash ());
 	}
 	ASSERT_TRUE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	// Check that all blocks got confirmed in a single call
@@ -5963,7 +5963,7 @@ TEST (ledger, cement_bounded)
 	{
 		// This should only cement some of the dependencies
 		auto tx = ledger.tx_begin_write ();
-		confirmed1 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 3);
+		confirmed1 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 3);
 	}
 	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed1.size (), 3);
@@ -5975,7 +5975,7 @@ TEST (ledger, cement_bounded)
 	{
 		// This should cement a few more dependencies
 		auto tx = ledger.tx_begin_write ();
-		confirmed2 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 16);
+		confirmed2 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 16);
 	}
 	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed2.size (), 16);
@@ -5987,7 +5987,7 @@ TEST (ledger, cement_bounded)
 	{
 		// This should cement the remaining dependencies
 		auto tx = ledger.tx_begin_write ();
-		confirmed3 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 64);
+		confirmed3 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 64);
 	}
 	ASSERT_TRUE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_LE (confirmed3.size (), 64);
@@ -6009,7 +6009,7 @@ TEST (ledger, cement_bounded_diamond)
 	{
 		// This should only cement some of the dependencies
 		auto tx = ledger.tx_begin_write ();
-		confirmed1 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 3);
+		confirmed1 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 3);
 	}
 	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed1.size (), 3);
@@ -6021,7 +6021,7 @@ TEST (ledger, cement_bounded_diamond)
 	{
 		// This should cement a few more dependencies
 		auto tx = ledger.tx_begin_write ();
-		confirmed2 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 16);
+		confirmed2 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 16);
 	}
 	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed2.size (), 16);
@@ -6033,7 +6033,7 @@ TEST (ledger, cement_bounded_diamond)
 	{
 		// A few more bounded calls should confirm the whole tree
 		auto tx = ledger.tx_begin_write ();
-		confirmed3 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 64);
+		confirmed3 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 64);
 	}
 	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed3.size (), 64);
@@ -6044,7 +6044,7 @@ TEST (ledger, cement_bounded_diamond)
 
 	{
 		auto tx = ledger.tx_begin_write ();
-		confirmed4 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 64);
+		confirmed4 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 64);
 	}
 	ASSERT_TRUE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_LT (confirmed4.size (), 64);

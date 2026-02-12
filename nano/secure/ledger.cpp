@@ -285,8 +285,8 @@ nano::uint128_t nano::ledger::account_receivable (secure::transaction const & tr
 }
 
 // Both stack and result set are bounded to limit maximum memory usage
-// Callers must ensure that the target block was confirmed, and if not, call this function multiple times
-std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_transaction & transaction, nano::block_hash const & target_hash, size_t max_blocks)
+// Due to the max_blocks limit, the target block may not be cemented in a single call. Callers should call this function multiple times until the target is cemented.
+std::deque<std::shared_ptr<nano::block>> nano::ledger::cement (secure::write_transaction & transaction, nano::block_hash const & target_hash, size_t max_blocks)
 {
 	std::deque<std::shared_ptr<nano::block>> result;
 
@@ -326,9 +326,9 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 	};
 
 	auto resolve = [&] (std::shared_ptr<nano::block> const & block) -> bool {
-		// We must only confirm blocks that have their dependencies confirmed
+		// We must only cement blocks that have their dependencies cemented
 		debug_assert (dependencies_confirmed (transaction, *block));
-		confirm_one (transaction, *block);
+		cement_one (transaction, *block);
 
 		result.push_back (block);
 
@@ -343,7 +343,7 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 			}
 		}
 
-		// Early return might leave parts of the dependency tree unconfirmed
+		// Early return might leave parts of the dependency tree uncemented
 		return result.size () < max_blocks;
 	};
 
@@ -357,14 +357,14 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 	return result;
 }
 
-void nano::ledger::confirm_one (secure::write_transaction & transaction, nano::block const & block)
+void nano::ledger::cement_one (secure::write_transaction & transaction, nano::block const & block)
 {
 	debug_assert ((!store.confirmation_height.get (transaction, block.account ()) && block.sideband ().height == 1) || store.confirmation_height.get (transaction, block.account ()).value ().height + 1 == block.sideband ().height);
 	confirmation_height_info info{ block.sideband ().height, block.hash () };
 	store.confirmation_height.put (transaction, block.account (), info);
 	++cache.cemented_count;
 
-	stats.inc (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed);
+	stats.inc (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented);
 }
 
 nano::block_status nano::ledger::process (secure::write_transaction const & transaction, std::shared_ptr<nano::block> block)

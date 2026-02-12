@@ -308,7 +308,7 @@ TEST (request_aggregator, split)
 	{
 		// Confirm all blocks
 		auto tx = node.ledger.tx_begin_write ();
-		node.ledger.confirm (tx, blocks.back ()->hash ());
+		node.ledger.cement (tx, blocks.back ()->hash ());
 	}
 	ASSERT_TIMELY_EQ (5s, max_vbh + 2, node.ledger.cemented_count ());
 	ASSERT_EQ (max_vbh + 1, request.size ());

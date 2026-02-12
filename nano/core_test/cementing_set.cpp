@@ -70,7 +70,7 @@ TEST (cementing_set, process_one)
 	nano::test::start_stop_guard guard{ cementing_set };
 	std::unique_lock lock{ mutex };
 	ASSERT_TRUE (condition.wait_for (lock, 5s, [&] () { return count == 1; }));
-	ASSERT_EQ (1, ctx.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
+	ASSERT_EQ (1, ctx.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented, nano::stat::dir::in));
 	ASSERT_EQ (2, ctx.ledger.cemented_count ());
 }
 
@@ -89,7 +89,7 @@ TEST (cementing_set, process_multiple)
 	nano::test::start_stop_guard guard{ cementing_set };
 	std::unique_lock lock{ mutex };
 	ASSERT_TRUE (condition.wait_for (lock, 5s, [&] () { return count == 2; }));
-	ASSERT_EQ (2, ctx.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
+	ASSERT_EQ (2, ctx.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented, nano::stat::dir::in));
 	ASSERT_EQ (3, ctx.ledger.cemented_count ());
 }
 
@@ -134,7 +134,7 @@ TEST (confirmation_callback, observer_callbacks)
 	// Callback is performed for all blocks that are confirmed
 	ASSERT_TIMELY_EQ (5s, 2, node->ledger.stats.count (nano::stat::type::confirmation_observer, nano::stat::dir::out));
 
-	ASSERT_EQ (2, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
+	ASSERT_EQ (2, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented, nano::stat::dir::in));
 	ASSERT_EQ (3, node->ledger.cemented_count ());
 }
 
@@ -206,7 +206,7 @@ TEST (confirmation_callback, confirmed_history)
 	// Confirm the callback is not called under this circumstance
 	ASSERT_TIMELY_EQ (5s, 1, node->stats.count (nano::stat::type::confirmation_observer, nano::stat::detail::active_quorum, nano::stat::dir::out));
 	ASSERT_TIMELY_EQ (5s, 1, node->stats.count (nano::stat::type::confirmation_observer, nano::stat::detail::inactive_conf_height, nano::stat::dir::out));
-	ASSERT_TIMELY_EQ (5s, 2, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
+	ASSERT_TIMELY_EQ (5s, 2, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented, nano::stat::dir::in));
 	ASSERT_EQ (3, node->ledger.cemented_count ());
 }
 
@@ -261,7 +261,7 @@ TEST (confirmation_callback, dependent_election)
 	election->force_confirm ();
 
 	// Wait for blocks to be confirmed in ledger, callbacks will happen after
-	ASSERT_TIMELY_EQ (5s, 3, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
+	ASSERT_TIMELY_EQ (5s, 3, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented, nano::stat::dir::in));
 	// Once the item added to the confirming set no longer exists, callbacks have completed
 	ASSERT_TIMELY (5s, !node->cementing_set.contains (send2->hash ()));
 

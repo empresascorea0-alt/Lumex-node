@@ -253,7 +253,7 @@ void nano::cementing_set::run_batch (std::unique_lock<std::mutex> & lock)
 					break;
 				}
 
-				auto added = ledger.confirm (transaction, hash, config.max_blocks);
+				auto added = ledger.cement (transaction, hash, config.max_blocks);
 				if (!added.empty ())
 				{
 					// Confirming this block may implicitly confirm more

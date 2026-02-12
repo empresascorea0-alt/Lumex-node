@@ -34,7 +34,7 @@ add_executable(
   fork_cache.cpp
   ipc.cpp
   ledger.cpp
-  ledger_confirm.cpp
+  ledger_cement.cpp
   ledger_priority.cpp
   ledger_upgrades.cpp
   locks.cpp
