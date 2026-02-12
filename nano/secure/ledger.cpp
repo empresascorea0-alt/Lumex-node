@@ -1,6 +1,7 @@
 #include <nano/crypto_lib/random_pool.hpp>
 #include <nano/lib/block_type.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/bounded_dfs.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/numbers.hpp>
@@ -289,47 +290,25 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 {
 	std::deque<std::shared_ptr<nano::block>> result;
 
-	std::deque<nano::block_hash> stack;
-	stack.push_back (target_hash);
-	while (!stack.empty ())
-	{
-		auto hash = stack.back ();
+	auto is_resolved = [&] (nano::block_hash const & hash) {
+		return hash.is_zero () || confirmed.block_exists_or_pruned (transaction, hash);
+	};
+
+	auto get_dependencies = [&] (nano::block_hash const & hash) {
+		auto block = any.block_get (transaction, hash);
+		release_assert (block);
+		return block->dependencies ();
+	};
+
+	auto resolve = [&] (nano::block_hash const & hash) -> bool {
 		auto block = any.block_get (transaction, hash);
 		release_assert (block);
 
-		auto dependencies = block->dependencies ();
-		for (auto const & dependency : dependencies)
-		{
-			if (!dependency.is_zero () && !confirmed.block_exists_or_pruned (transaction, dependency))
-			{
-				stats.inc (nano::stat::type::confirmation_height, nano::stat::detail::dependency_unconfirmed);
+		// We must only confirm blocks that have their dependencies confirmed
+		debug_assert (dependencies_confirmed (transaction, *block));
+		confirm_one (transaction, *block);
 
-				stack.push_back (dependency);
-
-				// Limit the stack size to avoid excessive memory usage
-				// This will forget the bottom of the dependency tree
-				if (stack.size () > max_blocks)
-				{
-					stack.pop_front ();
-				}
-			}
-		}
-
-		if (stack.back () == hash)
-		{
-			stack.pop_back ();
-			if (!confirmed.block_exists_or_pruned (transaction, hash))
-			{
-				// We must only confirm blocks that have their dependencies confirmed
-				debug_assert (dependencies_confirmed (transaction, *block));
-				confirm_one (transaction, *block);
-				result.push_back (block);
-			}
-		}
-		else
-		{
-			// Unconfirmed dependencies were added
-		}
+		result.push_back (block);
 
 		// Refresh the transaction to avoid long-running transactions
 		// Ensure that the block wasn't rolled back during the refresh
@@ -338,16 +317,15 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 		{
 			if (!any.block_exists (transaction, target_hash))
 			{
-				break; // Block was rolled back during cementing
+				return false; // Block was rolled back during cementing
 			}
 		}
 
 		// Early return might leave parts of the dependency tree unconfirmed
-		if (result.size () >= max_blocks)
-		{
-			break;
-		}
-	}
+		return result.size () < max_blocks;
+	};
+
+	nano::bounded_dfs (target_hash, max_blocks, is_resolved, get_dependencies, resolve);
 
 	return result;
 }
