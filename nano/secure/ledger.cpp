@@ -290,20 +290,42 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 {
 	std::deque<std::shared_ptr<nano::block>> result;
 
-	auto is_resolved = [&] (nano::block_hash const & hash) {
-		return hash.is_zero () || confirmed.block_exists_or_pruned (transaction, hash);
+	auto start_block = any.block_get (transaction, target_hash);
+	release_assert (start_block, "attempting to cement a non-existent block", target_hash.to_string ());
+
+	auto is_resolved = [&] (std::shared_ptr<nano::block> const & block) {
+		if (block)
+		{
+			return confirmed.block_exists (transaction, *block);
+		}
+		return true; // Pruned, must have been cemented
 	};
 
-	auto get_dependencies = [&] (nano::block_hash const & hash) {
-		auto block = any.block_get (transaction, hash);
-		release_assert (block);
-		return block->dependencies ();
+	auto get_dependencies = [&] (std::shared_ptr<nano::block> const & block) {
+		auto dep_hashes = block->dependencies ();
+		std::array<std::shared_ptr<nano::block>, dep_hashes.size ()> deps{};
+		for (size_t i = 0; i < dep_hashes.size (); ++i)
+		{
+			auto const & dep_hash = dep_hashes[i];
+			if (!dep_hash.is_zero ())
+			{
+				auto dep_block = any.block_get (transaction, dep_hash);
+				if (dep_block)
+				{
+					deps[i] = dep_block;
+				}
+				else
+				{
+					// If the block doesn't exist, it must be pruned
+					debug_assert (any.block_pruned (transaction, dep_hash), "missing dependency block", dep_hash.to_string ());
+				}
+				// nullptr will be filtered by is_resolved
+			}
+		}
+		return deps;
 	};
 
-	auto resolve = [&] (nano::block_hash const & hash) -> bool {
-		auto block = any.block_get (transaction, hash);
-		release_assert (block);
-
+	auto resolve = [&] (std::shared_ptr<nano::block> const & block) -> bool {
 		// We must only confirm blocks that have their dependencies confirmed
 		debug_assert (dependencies_confirmed (transaction, *block));
 		confirm_one (transaction, *block);
@@ -325,7 +347,12 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 		return result.size () < max_blocks;
 	};
 
-	nano::bounded_dfs (target_hash, max_blocks, is_resolved, get_dependencies, resolve);
+	// Walk the dependency tree depth-first, cementing blocks bottom-up, newly cemented blocks are collected in result
+	auto dfs_result = nano::bounded_dfs (start_block, max_blocks, is_resolved, get_dependencies, resolve);
+	debug_assert (dfs_result.resolved == result.size ());
+
+	stats.inc (nano::stat::type::ledger, dfs_result.overflow ? nano::stat::detail::cementing_overflow : nano::stat::detail::cementing);
+	stats.inc (nano::stat::type::ledger, nano::stat::detail::cemented, dfs_result.resolved);
 
 	return result;
 }

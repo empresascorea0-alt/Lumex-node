@@ -654,6 +654,7 @@ enum class detail
 	notify_intermediate,
 	already_cemented,
 	cementing,
+	cementing_overflow,
 	cemented_hash,
 	cementing_failed,
 	deferred_failed,

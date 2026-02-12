@@ -60,6 +60,16 @@ bool nano::ledger_set_confirmed::block_exists (secure::transaction const & trans
 	return block_get (transaction, hash) != nullptr;
 }
 
+bool nano::ledger_set_confirmed::block_exists (secure::transaction const & transaction, nano::block const & block) const
+{
+	auto info = ledger.store.confirmation_height.get (transaction, block.account ());
+	if (!info)
+	{
+		return false;
+	}
+	return block.sideband ().height <= info.value ().height;
+}
+
 bool nano::ledger_set_confirmed::block_exists_or_pruned (secure::transaction const & transaction, nano::block_hash const & hash) const
 {
 	if (hash.is_zero ())
