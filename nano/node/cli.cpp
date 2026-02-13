@@ -523,7 +523,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 					auto block = node.node->ledger.any.block_get (transaction, block_hash);
 					if (block != nullptr)
 					{
-						if (!node.node->ledger.confirmed.block_exists (transaction, block_hash))
+						if (!node.node->ledger.cemented.block_exists (transaction, block_hash))
 						{
 							std::cout << "Rolling back " << block_hash.to_string () << " ..." << std::endl;
 

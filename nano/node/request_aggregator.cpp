@@ -265,7 +265,7 @@ auto nano::request_aggregator::aggregate (nano::secure::transaction const & tran
 			// If the final vote is not set, generate vote if the block is confirmed
 			else
 			{
-				return ledger.confirmed.block_exists (transaction, block->hash ());
+				return ledger.cemented.block_exists (transaction, block->hash ());
 			}
 		};
 

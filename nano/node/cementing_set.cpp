@@ -264,13 +264,13 @@ void nano::cementing_set::run_batch (std::unique_lock<std::mutex> & lock)
 					}
 					cemented_count += added.size ();
 				}
-				else if (ledger.confirmed.block_exists (transaction, hash))
+				else if (ledger.cemented.block_exists (transaction, hash))
 				{
 					stats.inc (nano::stat::type::cementing_set, nano::stat::detail::already_cemented);
 					already.push_back (hash);
 				}
 
-				success = ledger.confirmed.block_exists (transaction, hash);
+				success = ledger.cemented.block_exists (transaction, hash);
 			} while (!success);
 
 			if (success)

@@ -41,9 +41,9 @@ nano::ledger::ledger (nano::store::ledger_store & store_a, nano::network_params 
 	rep_weights{ store_a.rep_weight, min_rep_weight_a },
 	max_backlog_size{ max_backlog_a },
 	any_impl{ std::make_unique<ledger_set_any> (*this) },
-	confirmed_impl{ std::make_unique<ledger_set_cemented> (*this) },
+	cemented_impl{ std::make_unique<ledger_set_cemented> (*this) },
 	any{ *any_impl },
-	confirmed{ *confirmed_impl }
+	cemented{ *cemented_impl }
 {
 	initialize (generate_cache_flags_a);
 }
@@ -262,7 +262,7 @@ bool nano::ledger::block_uncemented (secure::transaction const & transaction, na
 	auto block = any.block_get (transaction, hash);
 	if (block)
 	{
-		return !confirmed.block_exists (transaction, *block);
+		return !cemented.block_exists (transaction, *block);
 	}
 	return false; // Block doesn't exist
 }
@@ -276,7 +276,7 @@ nano::uint128_t nano::ledger::account_receivable (secure::transaction const & tr
 		nano::pending_info const & info (i->second);
 		if (only_confirmed_a)
 		{
-			if (confirmed.block_exists_or_pruned (transaction_a, i->first.hash))
+			if (cemented.block_exists_or_pruned (transaction_a, i->first.hash))
 			{
 				result += info.amount.number ();
 			}
@@ -301,7 +301,7 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::cement (secure::write_tra
 	auto is_resolved = [&] (std::shared_ptr<nano::block> const & block) {
 		if (block)
 		{
-			return confirmed.block_exists (transaction, *block);
+			return cemented.block_exists (transaction, *block);
 		}
 		return true; // Pruned, must have been cemented
 	};
@@ -588,7 +588,7 @@ bool nano::ledger::dependencies_confirmed (secure::transaction const & transacti
 	release_assert (block.has_sideband ());
 	auto dependencies = block.dependencies ();
 	return std::all_of (dependencies.begin (), dependencies.end (), [this, &transaction] (nano::block_hash const & hash) {
-		return hash.is_zero () || confirmed.block_exists_or_pruned (transaction, hash);
+		return hash.is_zero () || cemented.block_exists_or_pruned (transaction, hash);
 	});
 }
 
@@ -707,7 +707,7 @@ uint64_t nano::ledger::pruning_action (secure::write_transaction & transaction_a
 		auto block_l = any.block_get (transaction_a, hash);
 		if (block_l != nullptr)
 		{
-			release_assert (confirmed.block_exists (transaction_a, hash));
+			release_assert (cemented.block_exists (transaction_a, hash));
 			store.block.del (transaction_a, hash);
 			store.pruned.put (transaction_a, hash);
 			hash = block_l->previous ();

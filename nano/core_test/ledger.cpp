@@ -61,7 +61,7 @@ TEST (ledger, confirmed_unconfirmed_view)
 	auto ctx = nano::test::ledger_empty ();
 	auto & ledger = ctx.ledger ();
 	auto & unconfirmed = ledger;
-	auto & confirmed = ledger.confirmed;
+	auto & cemented = ledger.cemented;
 }
 
 // Genesis account should have the max balance on empty initialization
@@ -5108,7 +5108,7 @@ TEST (ledger, dependencies_confirmed_pruning)
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
 	ledger.cement (transaction, send2->hash ());
-	ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
+	ASSERT_TRUE (ledger.cemented.block_exists_or_pruned (transaction, send1->hash ()));
 	ASSERT_EQ (2, ledger.pruning_action (transaction, send2->hash (), 1));
 	auto receive1 = builder.state ()
 					.account (key1.pub)
@@ -5130,7 +5130,7 @@ TEST (ledger, block_confirmed)
 	auto & store = ctx.store ();
 	auto transaction = ledger.tx_begin_write ();
 	nano::block_builder builder;
-	ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, nano::dev::genesis->hash ()));
+	ASSERT_TRUE (ledger.cemented.block_exists_or_pruned (transaction, nano::dev::genesis->hash ()));
 	auto & pool = ctx.pool ();
 	nano::keypair key1;
 	auto send1 = builder.state ()
@@ -5143,11 +5143,11 @@ TEST (ledger, block_confirmed)
 				 .work (*pool.generate (nano::dev::genesis->hash ()))
 				 .build ();
 	// Must be safe against non-existing blocks
-	ASSERT_FALSE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists_or_pruned (transaction, send1->hash ()));
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send1));
-	ASSERT_FALSE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists_or_pruned (transaction, send1->hash ()));
 	ledger.cement (transaction, send1->hash ());
-	ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
+	ASSERT_TRUE (ledger.cemented.block_exists_or_pruned (transaction, send1->hash ()));
 }
 
 TEST (ledger, cache)
@@ -5225,7 +5225,7 @@ TEST (ledger, cache)
 		{
 			auto transaction = ledger.tx_begin_write ();
 			ledger.cement (transaction, send->hash ());
-			ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, send->hash ()));
+			ASSERT_TRUE (ledger.cemented.block_exists_or_pruned (transaction, send->hash ()));
 		}
 
 		++cemented_count;
@@ -5235,7 +5235,7 @@ TEST (ledger, cache)
 		{
 			auto transaction = ledger.tx_begin_write ();
 			ledger.cement (transaction, open->hash ());
-			ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, open->hash ()));
+			ASSERT_TRUE (ledger.cemented.block_exists_or_pruned (transaction, open->hash ()));
 		}
 
 		++cemented_count;
@@ -5941,7 +5941,7 @@ TEST (ledger, cement_unbounded)
 		auto tx = ledger.tx_begin_write ();
 		confirmed = ledger.cement (tx, bottom->hash ());
 	}
-	ASSERT_TRUE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_TRUE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	// Check that all blocks got confirmed in a single call
 	ASSERT_TRUE (std::all_of (ctx.blocks ().begin (), ctx.blocks ().end (), [&] (auto const & block) {
 		return std::find_if (confirmed.begin (), confirmed.end (), [&] (auto const & block2) {
@@ -5965,7 +5965,7 @@ TEST (ledger, cement_bounded)
 		auto tx = ledger.tx_begin_write ();
 		confirmed1 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 3);
 	}
-	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed1.size (), 3);
 	// Only topmost dependencies should get cemented during this call
 	ASSERT_TRUE (std::all_of (confirmed1.begin (), confirmed1.end (), [&] (auto const & block) {
@@ -5977,7 +5977,7 @@ TEST (ledger, cement_bounded)
 		auto tx = ledger.tx_begin_write ();
 		confirmed2 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 16);
 	}
-	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed2.size (), 16);
 	// Only topmost dependencies should get cemented during this call
 	ASSERT_TRUE (std::all_of (confirmed2.begin (), confirmed2.end (), [&] (auto const & block) {
@@ -5989,11 +5989,11 @@ TEST (ledger, cement_bounded)
 		auto tx = ledger.tx_begin_write ();
 		confirmed3 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 64);
 	}
-	ASSERT_TRUE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_TRUE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_LE (confirmed3.size (), 64);
 	// Every block in the ledger should be cemented
 	ASSERT_TRUE (std::all_of (ctx.blocks ().begin (), ctx.blocks ().end (), [&] (auto const & block) {
-		return ledger.confirmed.block_exists (ledger.tx_begin_read (), block->hash ());
+		return ledger.cemented.block_exists (ledger.tx_begin_read (), block->hash ());
 	}));
 }
 
@@ -6011,7 +6011,7 @@ TEST (ledger, cement_bounded_diamond)
 		auto tx = ledger.tx_begin_write ();
 		confirmed1 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 3);
 	}
-	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed1.size (), 3);
 	// Only topmost dependencies should get cemented during this call
 	ASSERT_TRUE (std::all_of (confirmed1.begin (), confirmed1.end (), [&] (auto const & block) {
@@ -6023,7 +6023,7 @@ TEST (ledger, cement_bounded_diamond)
 		auto tx = ledger.tx_begin_write ();
 		confirmed2 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 16);
 	}
-	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed2.size (), 16);
 	// Only topmost dependencies should get cemented during this call
 	ASSERT_TRUE (std::all_of (confirmed2.begin (), confirmed2.end (), [&] (auto const & block) {
@@ -6035,7 +6035,7 @@ TEST (ledger, cement_bounded_diamond)
 		auto tx = ledger.tx_begin_write ();
 		confirmed3 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 64);
 	}
-	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed3.size (), 64);
 	// Only topmost dependencies should get cemented during this call
 	ASSERT_TRUE (std::all_of (confirmed2.begin (), confirmed2.end (), [&] (auto const & block) {
@@ -6046,11 +6046,11 @@ TEST (ledger, cement_bounded_diamond)
 		auto tx = ledger.tx_begin_write ();
 		confirmed4 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 64);
 	}
-	ASSERT_TRUE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_TRUE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_LT (confirmed4.size (), 64);
 	// Every block in the ledger should be cemented
 	ASSERT_TRUE (std::all_of (ctx.blocks ().begin (), ctx.blocks ().end (), [&] (auto const & block) {
-		return ledger.confirmed.block_exists (ledger.tx_begin_read (), block->hash ());
+		return ledger.cemented.block_exists (ledger.tx_begin_read (), block->hash ());
 	}));
 }
 

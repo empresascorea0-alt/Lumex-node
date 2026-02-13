@@ -42,11 +42,11 @@ TEST (ledger_cement, single)
 	ASSERT_EQ (nano::dev::genesis->hash (), node->store.confirmation_height.get (transaction, nano::dev::genesis_key.pub).value ().frontier);
 
 	ASSERT_EQ (nano::block_status::progress, node->ledger.process (transaction, send1));
-	ASSERT_FALSE (node->ledger.confirmed.block_exists (transaction, send1->hash ()));
+	ASSERT_FALSE (node->ledger.cemented.block_exists (transaction, send1->hash ()));
 	node->ledger.cement (transaction, send1->hash ());
-	ASSERT_TRUE (node->ledger.confirmed.block_exists (transaction, send1->hash ()));
-	ASSERT_EQ (2, node->ledger.confirmed.account_height (transaction, nano::dev::genesis_key.pub));
-	ASSERT_EQ (send1->hash (), node->ledger.confirmed.account_head (transaction, nano::dev::genesis_key.pub));
+	ASSERT_TRUE (node->ledger.cemented.block_exists (transaction, send1->hash ()));
+	ASSERT_EQ (2, node->ledger.cemented.account_height (transaction, nano::dev::genesis_key.pub));
+	ASSERT_EQ (send1->hash (), node->ledger.cemented.account_head (transaction, nano::dev::genesis_key.pub));
 
 	// Rollbacks should fail as these blocks have been cemented
 	ASSERT_TRUE (node->ledger.rollback (transaction, latest1));
@@ -199,19 +199,19 @@ TEST (ledger_cement, multiple_accounts)
 	ASSERT_EQ (10, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented, nano::stat::dir::in));
 	ASSERT_EQ (11, node->ledger.cemented_count ());
 
-	ASSERT_TRUE (node->ledger.confirmed.block_exists (transaction, receive3->hash ()));
+	ASSERT_TRUE (node->ledger.cemented.block_exists (transaction, receive3->hash ()));
 	ASSERT_EQ (4, node->ledger.any.account_get (transaction, nano::dev::genesis_key.pub).value ().block_count);
-	ASSERT_EQ (4, node->ledger.confirmed.account_height (transaction, nano::dev::genesis_key.pub));
-	ASSERT_EQ (send3->hash (), node->ledger.confirmed.account_head (transaction, nano::dev::genesis_key.pub));
+	ASSERT_EQ (4, node->ledger.cemented.account_height (transaction, nano::dev::genesis_key.pub));
+	ASSERT_EQ (send3->hash (), node->ledger.cemented.account_head (transaction, nano::dev::genesis_key.pub));
 	ASSERT_EQ (3, node->ledger.any.account_get (transaction, key1.pub).value ().block_count);
-	ASSERT_EQ (2, node->ledger.confirmed.account_height (transaction, key1.pub));
-	ASSERT_EQ (send4->hash (), node->ledger.confirmed.account_head (transaction, key1.pub));
+	ASSERT_EQ (2, node->ledger.cemented.account_height (transaction, key1.pub));
+	ASSERT_EQ (send4->hash (), node->ledger.cemented.account_head (transaction, key1.pub));
 	ASSERT_EQ (4, node->ledger.any.account_get (transaction, key2.pub).value ().block_count);
-	ASSERT_EQ (3, node->ledger.confirmed.account_height (transaction, key2.pub));
-	ASSERT_EQ (send6->hash (), node->ledger.confirmed.account_head (transaction, key2.pub));
+	ASSERT_EQ (3, node->ledger.cemented.account_height (transaction, key2.pub));
+	ASSERT_EQ (send6->hash (), node->ledger.cemented.account_head (transaction, key2.pub));
 	ASSERT_EQ (2, node->ledger.any.account_get (transaction, key3.pub).value ().block_count);
-	ASSERT_EQ (2, node->ledger.confirmed.account_height (transaction, key3.pub));
-	ASSERT_EQ (receive3->hash (), node->ledger.confirmed.account_head (transaction, key3.pub));
+	ASSERT_EQ (2, node->ledger.cemented.account_height (transaction, key3.pub));
+	ASSERT_EQ (receive3->hash (), node->ledger.cemented.account_head (transaction, key3.pub));
 
 	// The accounts for key1 and key2 have 1 more block in the chain than is confirmed.
 	// So this can be rolled back, but the one before that cannot. Check that this is the case
@@ -349,13 +349,13 @@ TEST (ledger_cement, send_receive_between_2_accounts)
 	ASSERT_EQ (10, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented, nano::stat::dir::in));
 	ASSERT_EQ (11, node->ledger.cemented_count ());
 
-	ASSERT_TRUE (node->ledger.confirmed.block_exists (transaction, receive4->hash ()));
+	ASSERT_TRUE (node->ledger.cemented.block_exists (transaction, receive4->hash ()));
 	ASSERT_EQ (7, node->ledger.any.account_get (transaction, nano::dev::genesis_key.pub).value ().block_count);
-	ASSERT_EQ (6, node->ledger.confirmed.account_height (transaction, nano::dev::genesis_key.pub));
-	ASSERT_EQ (send5->hash (), node->ledger.confirmed.account_head (transaction, nano::dev::genesis_key.pub));
+	ASSERT_EQ (6, node->ledger.cemented.account_height (transaction, nano::dev::genesis_key.pub));
+	ASSERT_EQ (send5->hash (), node->ledger.cemented.account_head (transaction, nano::dev::genesis_key.pub));
 	ASSERT_EQ (5, node->ledger.any.account_get (transaction, key1.pub).value ().block_count);
-	ASSERT_EQ (5, node->ledger.confirmed.account_height (transaction, key1.pub));
-	ASSERT_EQ (receive4->hash (), node->ledger.confirmed.account_head (transaction, key1.pub));
+	ASSERT_EQ (5, node->ledger.cemented.account_height (transaction, key1.pub));
+	ASSERT_EQ (receive4->hash (), node->ledger.cemented.account_head (transaction, key1.pub));
 }
 
 TEST (ledger_cement, send_receive_self)
@@ -439,10 +439,10 @@ TEST (ledger_cement, send_receive_self)
 	ASSERT_EQ (6, confirmed.size ());
 	ASSERT_EQ (6, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented, nano::stat::dir::in));
 
-	ASSERT_TRUE (node->ledger.confirmed.block_exists (transaction, receive3->hash ()));
+	ASSERT_TRUE (node->ledger.cemented.block_exists (transaction, receive3->hash ()));
 	ASSERT_EQ (8, node->ledger.any.account_get (transaction, nano::dev::genesis_key.pub).value ().block_count);
-	ASSERT_EQ (7, node->ledger.confirmed.account_height (transaction, nano::dev::genesis_key.pub));
-	ASSERT_EQ (receive3->hash (), node->ledger.confirmed.account_head (transaction, nano::dev::genesis_key.pub));
+	ASSERT_EQ (7, node->ledger.cemented.account_height (transaction, nano::dev::genesis_key.pub));
+	ASSERT_EQ (receive3->hash (), node->ledger.cemented.account_head (transaction, nano::dev::genesis_key.pub));
 	ASSERT_EQ (7, node->ledger.cemented_count ());
 }
 
@@ -665,18 +665,18 @@ TEST (ledger_cement, all_block_types)
 	ASSERT_EQ (15, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented, nano::stat::dir::in));
 	ASSERT_EQ (16, node->ledger.cemented_count ());
 
-	ASSERT_TRUE (node->ledger.confirmed.block_exists (transaction, state_send2->hash ()));
+	ASSERT_TRUE (node->ledger.cemented.block_exists (transaction, state_send2->hash ()));
 	nano::confirmation_height_info confirmation_height_info;
 	ASSERT_LE (4, node->ledger.any.account_get (transaction, nano::dev::genesis_key.pub).value ().block_count);
-	ASSERT_EQ (3, node->ledger.confirmed.account_height (transaction, nano::dev::genesis_key.pub));
-	ASSERT_EQ (send1->hash (), node->ledger.confirmed.account_head (transaction, nano::dev::genesis_key.pub));
+	ASSERT_EQ (3, node->ledger.cemented.account_height (transaction, nano::dev::genesis_key.pub));
+	ASSERT_EQ (send1->hash (), node->ledger.cemented.account_head (transaction, nano::dev::genesis_key.pub));
 
 	ASSERT_LE (7, node->ledger.any.account_get (transaction, key1.pub).value ().block_count);
-	ASSERT_EQ (6, node->ledger.confirmed.account_height (transaction, key1.pub));
-	ASSERT_EQ (state_send1->hash (), node->ledger.confirmed.account_head (transaction, key1.pub));
+	ASSERT_EQ (6, node->ledger.cemented.account_height (transaction, key1.pub));
+	ASSERT_EQ (state_send1->hash (), node->ledger.cemented.account_head (transaction, key1.pub));
 	ASSERT_EQ (8, node->ledger.any.account_get (transaction, key2.pub).value ().block_count);
-	ASSERT_EQ (7, node->ledger.confirmed.account_height (transaction, key2.pub));
-	ASSERT_EQ (state_send2->hash (), node->ledger.confirmed.account_head (transaction, key2.pub));
+	ASSERT_EQ (7, node->ledger.cemented.account_height (transaction, key2.pub));
+	ASSERT_EQ (state_send2->hash (), node->ledger.cemented.account_head (transaction, key2.pub));
 }
 
 // This test ensures a block that's cemented cannot be rolled back by the node
@@ -749,7 +749,7 @@ TEST (ledger_cement, observers)
 	auto transaction = node1->ledger.tx_begin_write ();
 	ASSERT_EQ (nano::block_status::progress, node1->ledger.process (transaction, send1));
 	node1->ledger.cement (transaction, send1->hash ());
-	ASSERT_TRUE (node1->ledger.confirmed.block_exists (transaction, send1->hash ()));
+	ASSERT_TRUE (node1->ledger.cemented.block_exists (transaction, send1->hash ()));
 	ASSERT_EQ (1, node1->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented, nano::stat::dir::in));
 	ASSERT_EQ (2, node1->ledger.cemented_count ());
 }
@@ -826,9 +826,9 @@ TEST (ledger_cement, pruned_source)
 	ledger.cement (transaction, send2->hash ());
 	ASSERT_EQ (2, ledger.pruning_action (transaction, send2->hash (), 2));
 	ASSERT_FALSE (ledger.any.block_exists (transaction, send2->hash ()));
-	ASSERT_FALSE (ledger.confirmed.block_exists (transaction, open2->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists (transaction, open2->hash ()));
 	auto confirmed = ledger.cement (transaction, open2->hash ());
-	ASSERT_TRUE (ledger.confirmed.block_exists (transaction, open2->hash ()));
+	ASSERT_TRUE (ledger.cemented.block_exists (transaction, open2->hash ()));
 }
 
 // TODO: It doesn't look like this test is actually testing anything related to rollbacks anymore

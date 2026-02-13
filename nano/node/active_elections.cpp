@@ -572,7 +572,7 @@ void nano::active_elections::checkup_elections (nano::unique_lock<nano::mutex> &
 		if (target)
 		{
 			// Cancel if the election's block is already cemented
-			return node.ledger.confirmed.block_exists (transaction, *target);
+			return node.ledger.cemented.block_exists (transaction, *target);
 		}
 		else
 		{

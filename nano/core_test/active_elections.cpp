@@ -354,7 +354,7 @@ TEST (active_elections, cached_vote_basic)
 	node.vote_processor.vote (vote, std::make_shared<nano::transport::inproc::channel> (node, node));
 	ASSERT_TIMELY_EQ (5s, node.vote_cache.size (), 1);
 	node.process_active (send);
-	ASSERT_TIMELY (5s, node.ledger.confirmed.block_exists_or_pruned (node.ledger.tx_begin_read (), send->hash ()));
+	ASSERT_TIMELY (5s, node.ledger.cemented.block_exists_or_pruned (node.ledger.tx_begin_read (), send->hash ()));
 	ASSERT_EQ (1, node.stats.count (nano::stat::type::election_vote, nano::stat::detail::cache));
 }
 
@@ -1829,7 +1829,7 @@ TEST (active_elections, cancel_cemented_races)
 	{
 		for (auto & block : blocks)
 		{
-			ASSERT_TRUE (node.ledger.confirmed.block_exists (transaction, block->hash ()));
+			ASSERT_TRUE (node.ledger.cemented.block_exists (transaction, block->hash ()));
 		}
 	}
 
@@ -1862,7 +1862,7 @@ TEST (active_elections, cancel_already_cemented)
 	}
 
 	// Verify the block is actually cemented
-	ASSERT_TRUE (node.ledger.confirmed.block_exists (node.ledger.tx_begin_read (), last_block->hash ()));
+	ASSERT_TRUE (node.ledger.cemented.block_exists (node.ledger.tx_begin_read (), last_block->hash ()));
 
 	// Now start an election for the already cemented block
 	auto election = node.active.insert (last_block, nano::election_behavior::priority);

@@ -131,10 +131,10 @@ private:
 	void cement_one (secure::write_transaction &, nano::block const & block);
 
 	std::unique_ptr<ledger_set_any> any_impl;
-	std::unique_ptr<ledger_set_cemented> confirmed_impl;
+	std::unique_ptr<ledger_set_cemented> cemented_impl;
 
 public:
 	ledger_set_any & any;
-	ledger_set_cemented & confirmed;
+	ledger_set_cemented & cemented;
 };
 }

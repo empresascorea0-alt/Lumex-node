@@ -307,7 +307,7 @@ auto nano::rep_crawler::prepare_query_target () const -> hash_root_t
 		}
 
 		// Nodes will not respond to queries for blocks that are not confirmed
-		if (!node.ledger.confirmed.block_exists (transaction, block->hash ()))
+		if (!node.ledger.cemented.block_exists (transaction, block->hash ()))
 		{
 			continue;
 		}
