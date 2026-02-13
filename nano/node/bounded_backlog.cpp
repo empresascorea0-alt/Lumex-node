@@ -173,7 +173,7 @@ void nano::bounded_backlog::activate (nano::secure::transaction & transaction, n
 void nano::bounded_backlog::update (nano::secure::transaction const & transaction, nano::block_hash const & hash)
 {
 	// Erase if the block is either confirmed or missing
-	if (!ledger.unconfirmed_exists (transaction, hash))
+	if (!ledger.block_uncemented (transaction, hash))
 	{
 		nano::lock_guard<nano::mutex> guard{ mutex };
 		index.erase (hash);
@@ -303,7 +303,7 @@ std::deque<nano::block_hash> nano::bounded_backlog::perform_rollbacks (std::dequ
 	for (auto const & hash : targets)
 	{
 		// Skip the rollback if the block is being used by the node, this should be race free as it's checked while holding the ledger write lock
-		if (!should_rollback (hash) || !ledger.unconfirmed_exists (transaction, hash))
+		if (!should_rollback (hash) || !ledger.block_uncemented (transaction, hash))
 		{
 			stats.inc (nano::stat::type::bounded_backlog, nano::stat::detail::rollback_skipped);
 			continue;

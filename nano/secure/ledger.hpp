@@ -48,7 +48,6 @@ public:
 	/** Start read-only transaction */
 	secure::read_transaction tx_begin_read () const;
 
-	bool unconfirmed_exists (secure::transaction const &, nano::block_hash const &) const;
 	nano::uint128_t account_receivable (secure::transaction const &, nano::account const &, bool = false) const;
 	/**
 	 * Returns the cached vote weight for the given representative.
@@ -81,6 +80,11 @@ public:
 
 	static nano::epoch version (nano::block const & block);
 	nano::epoch version (secure::transaction const &, nano::block_hash const & hash) const;
+
+	/**
+	 * Checks if a block exists in the ledger but has not yet been cemented
+	 */
+	bool block_uncemented (secure::transaction const &, nano::block_hash const &) const;
 
 	/**
 	 * Checks if all blocks that this block depends on are confirmed (or pruned)

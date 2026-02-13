@@ -257,9 +257,14 @@ void nano::ledger::verify_consistency (secure::transaction const & transaction) 
 	rep_weights.verify_consistency (0); // It's impractical to recompute burned weight, so we skip it here
 }
 
-bool nano::ledger::unconfirmed_exists (secure::transaction const & transaction, nano::block_hash const & hash) const
+bool nano::ledger::block_uncemented (secure::transaction const & transaction, nano::block_hash const & hash) const
 {
-	return any.block_exists (transaction, hash) && !confirmed.block_exists (transaction, hash);
+	auto block = any.block_get (transaction, hash);
+	if (block)
+	{
+		return !confirmed.block_exists (transaction, *block);
+	}
+	return false; // Block doesn't exist
 }
 
 nano::uint128_t nano::ledger::account_receivable (secure::transaction const & transaction_a, nano::account const & account_a, bool only_confirmed_a) const
