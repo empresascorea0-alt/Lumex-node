@@ -4,10 +4,10 @@ add_executable(
   fakes/websocket_client.hpp
   fakes/work_peer.hpp
   active_elections.cpp
-  backend.cpp
   active_elections_index.cpp
   assert.cpp
   async.cpp
+  backend.cpp
   backlog.cpp
   block.cpp
   block_store.cpp
@@ -16,6 +16,7 @@ add_executable(
   bootstrap.cpp
   bootstrap_frontier_scan.cpp
   bootstrap_server.cpp
+  bounded_dfs.cpp
   bucketing.cpp
   cli.cpp
   confirmation_solicitor.cpp

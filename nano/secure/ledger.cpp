@@ -1,6 +1,7 @@
 #include <nano/crypto_lib/random_pool.hpp>
 #include <nano/lib/block_type.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/bounded_dfs.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/numbers.hpp>
@@ -289,47 +290,47 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 {
 	std::deque<std::shared_ptr<nano::block>> result;
 
-	std::deque<nano::block_hash> stack;
-	stack.push_back (target_hash);
-	while (!stack.empty ())
-	{
-		auto hash = stack.back ();
-		auto block = any.block_get (transaction, hash);
-		release_assert (block);
+	auto start_block = any.block_get (transaction, target_hash);
+	release_assert (start_block, "attempting to cement a non-existent block", target_hash.to_string ());
 
-		auto dependencies = block->dependencies ();
-		for (auto const & dependency : dependencies)
+	auto is_resolved = [&] (std::shared_ptr<nano::block> const & block) {
+		if (block)
 		{
-			if (!dependency.is_zero () && !confirmed.block_exists_or_pruned (transaction, dependency))
+			return confirmed.block_exists (transaction, *block);
+		}
+		return true; // Pruned, must have been cemented
+	};
+
+	auto get_dependencies = [&] (std::shared_ptr<nano::block> const & block) {
+		auto dep_hashes = block->dependencies ();
+		std::array<std::shared_ptr<nano::block>, dep_hashes.size ()> deps{};
+		for (size_t i = 0; i < dep_hashes.size (); ++i)
+		{
+			auto const & dep_hash = dep_hashes[i];
+			if (!dep_hash.is_zero ())
 			{
-				stats.inc (nano::stat::type::confirmation_height, nano::stat::detail::dependency_unconfirmed);
-
-				stack.push_back (dependency);
-
-				// Limit the stack size to avoid excessive memory usage
-				// This will forget the bottom of the dependency tree
-				if (stack.size () > max_blocks)
+				auto dep_block = any.block_get (transaction, dep_hash);
+				if (dep_block)
 				{
-					stack.pop_front ();
+					deps[i] = dep_block;
 				}
+				else
+				{
+					// If the block doesn't exist, it must be pruned
+					debug_assert (any.block_pruned (transaction, dep_hash), "missing dependency block", dep_hash.to_string ());
+				}
+				// nullptr will be filtered by is_resolved
 			}
 		}
+		return deps;
+	};
 
-		if (stack.back () == hash)
-		{
-			stack.pop_back ();
-			if (!confirmed.block_exists_or_pruned (transaction, hash))
-			{
-				// We must only confirm blocks that have their dependencies confirmed
-				debug_assert (dependencies_confirmed (transaction, *block));
-				confirm_one (transaction, *block);
-				result.push_back (block);
-			}
-		}
-		else
-		{
-			// Unconfirmed dependencies were added
-		}
+	auto resolve = [&] (std::shared_ptr<nano::block> const & block) -> bool {
+		// We must only confirm blocks that have their dependencies confirmed
+		debug_assert (dependencies_confirmed (transaction, *block));
+		confirm_one (transaction, *block);
+
+		result.push_back (block);
 
 		// Refresh the transaction to avoid long-running transactions
 		// Ensure that the block wasn't rolled back during the refresh
@@ -338,16 +339,20 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 		{
 			if (!any.block_exists (transaction, target_hash))
 			{
-				break; // Block was rolled back during cementing
+				return false; // Block was rolled back during cementing
 			}
 		}
 
 		// Early return might leave parts of the dependency tree unconfirmed
-		if (result.size () >= max_blocks)
-		{
-			break;
-		}
-	}
+		return result.size () < max_blocks;
+	};
+
+	// Walk the dependency tree depth-first, cementing blocks bottom-up, newly cemented blocks are collected in result
+	auto dfs_result = nano::bounded_dfs (start_block, max_blocks, is_resolved, get_dependencies, resolve);
+	debug_assert (dfs_result.resolved == result.size ());
+
+	stats.inc (nano::stat::type::ledger, dfs_result.overflow ? nano::stat::detail::cementing_overflow : nano::stat::detail::cementing);
+	stats.inc (nano::stat::type::ledger, nano::stat::detail::cemented, dfs_result.resolved);
 
 	return result;
 }

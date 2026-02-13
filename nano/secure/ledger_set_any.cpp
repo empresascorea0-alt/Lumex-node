@@ -159,6 +159,11 @@ std::shared_ptr<nano::block> nano::ledger_set_any::block_get (secure::transactio
 	return ledger.store.block.get (transaction, hash);
 }
 
+bool nano::ledger_set_any::block_pruned (secure::transaction const & transaction, nano::block_hash const & hash) const
+{
+	return ledger.store.pruned.exists (transaction, hash);
+}
+
 uint64_t nano::ledger_set_any::block_height (secure::transaction const & transaction, nano::block_hash const & hash) const
 {
 	auto block = block_get (transaction, hash);

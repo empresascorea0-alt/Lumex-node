@@ -54,6 +54,7 @@ public: // Operations on blocks
 	bool block_exists (secure::transaction const & transaction, nano::block_hash const & hash) const;
 	bool block_exists_or_pruned (secure::transaction const & transaction, nano::block_hash const & hash) const;
 	std::shared_ptr<nano::block> block_get (secure::transaction const & transaction, nano::block_hash const & hash) const;
+	bool block_pruned (secure::transaction const & transaction, nano::block_hash const & hash) const;
 	uint64_t block_height (secure::transaction const & transaction, nano::block_hash const & hash) const;
 	std::optional<nano::block_hash> block_successor (secure::transaction const & transaction, nano::block_hash const & hash) const;
 	std::optional<nano::block_hash> block_successor (secure::transaction const & transaction, nano::qualified_root const & root) const;
