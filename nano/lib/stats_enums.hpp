@@ -132,7 +132,6 @@ enum class type
 	message_processor,
 	message_processor_overfill,
 	message_processor_type,
-	process_confirmed,
 	online_reps,
 	pruning,
 	fork_cache,

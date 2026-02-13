@@ -87,9 +87,9 @@ public:
 	bool block_uncemented (secure::transaction const &, nano::block_hash const &) const;
 
 	/**
-	 * Checks if all blocks that this block depends on are confirmed (or pruned)
+	 * Checks if all blocks that this block depends on are cemented (or pruned)
 	 */
-	bool dependencies_confirmed (secure::transaction const &, nano::block const &) const;
+	bool dependencies_cemented (secure::transaction const &, nano::block const &) const;
 
 	/**
 	 * Computes the priority balance and timestamp for bucket-based prioritization

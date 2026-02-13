@@ -3452,7 +3452,7 @@ TEST (node, deferred_dependent_elections)
 	ASSERT_FALSE (node.active.active (receive->qualified_root ()));
 	election_open->force_confirm ();
 	ASSERT_TIMELY (5s, node.block_confirmed (open->hash ()));
-	ASSERT_FALSE (node.ledger.dependencies_confirmed (node.ledger.tx_begin_read (), *receive));
+	ASSERT_FALSE (node.ledger.dependencies_cemented (node.ledger.tx_begin_read (), *receive));
 	ASSERT_NEVER (0.5s, node.active.active (receive->qualified_root ()));
 	ASSERT_FALSE (node.ledger.rollback (node.ledger.tx_begin_write (), receive->hash ()));
 	ASSERT_FALSE (node.block (receive->hash ()));

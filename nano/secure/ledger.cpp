@@ -332,7 +332,7 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::cement (secure::write_tra
 
 	auto resolve = [&] (std::shared_ptr<nano::block> const & block) -> bool {
 		// We must only cement blocks that have their dependencies cemented
-		debug_assert (dependencies_confirmed (transaction, *block));
+		debug_assert (dependencies_cemented (transaction, *block));
 		cement_one (transaction, *block);
 
 		result.push_back (block);
@@ -583,7 +583,7 @@ nano::root nano::ledger::latest_root (secure::transaction const & transaction_a,
 	}
 }
 
-bool nano::ledger::dependencies_confirmed (secure::transaction const & transaction, nano::block const & block) const
+bool nano::ledger::dependencies_cemented (secure::transaction const & transaction, nano::block const & block) const
 {
 	release_assert (block.has_sideband ());
 	auto dependencies = block.dependencies ();
