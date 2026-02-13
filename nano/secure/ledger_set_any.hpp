@@ -1,24 +1,10 @@
 #pragma once
 
 #include <nano/secure/account_iterator.hpp>
+#include <nano/secure/fwd.hpp>
 #include <nano/secure/receivable_iterator.hpp>
 
 #include <optional>
-
-namespace nano
-{
-class account_info;
-class block;
-class block_hash;
-class ledger;
-class pending_info;
-class pending_key;
-class qualified_root;
-}
-namespace nano::store
-{
-class transaction;
-}
 
 namespace nano
 {
@@ -28,7 +14,7 @@ public:
 	using account_iterator = nano::account_iterator<ledger_set_any>;
 	using receivable_iterator = nano::receivable_iterator<ledger_set_any>;
 
-	ledger_set_any (nano::ledger const & ledger);
+	explicit ledger_set_any (nano::ledger const &);
 
 public: // Operations on accounts
 	std::optional<nano::amount> account_balance (secure::transaction const & transaction, nano::account const & account) const;
@@ -77,5 +63,5 @@ public: // Operations on pending entries
 
 private:
 	nano::ledger const & ledger;
-}; // class ledger_set_any
-} // namespace nano
+};
+}

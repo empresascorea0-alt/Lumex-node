@@ -21,7 +21,7 @@ namespace nano
 {
 class ledger;
 class ledger_set_any;
-class ledger_set_confirmed;
+class ledger_set_cemented;
 
 class ledger_cache
 {
@@ -127,10 +127,10 @@ private:
 	void cement_one (secure::write_transaction &, nano::block const & block);
 
 	std::unique_ptr<ledger_set_any> any_impl;
-	std::unique_ptr<ledger_set_confirmed> confirmed_impl;
+	std::unique_ptr<ledger_set_cemented> confirmed_impl;
 
 public:
 	ledger_set_any & any;
-	ledger_set_confirmed & confirmed;
+	ledger_set_cemented & confirmed;
 };
 }

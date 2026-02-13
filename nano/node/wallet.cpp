@@ -11,7 +11,7 @@
 #include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/store/ledger/pending.hpp>
 #include <nano/store/lmdb/common.hpp>
 #include <nano/store/lmdb/db_val.hpp>

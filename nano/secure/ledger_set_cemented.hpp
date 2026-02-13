@@ -1,30 +1,18 @@
 #pragma once
 
+#include <nano/secure/fwd.hpp>
 #include <nano/secure/receivable_iterator.hpp>
 
 #include <optional>
 
 namespace nano
 {
-class account_info;
-class block;
-class block_hash;
-class ledger;
-class qualified_root;
-}
-namespace nano::store
-{
-class transaction;
-}
-
-namespace nano
-{
-class ledger_set_confirmed
+class ledger_set_cemented
 {
 public:
-	using receivable_iterator = nano::receivable_iterator<ledger_set_confirmed>;
+	using receivable_iterator = nano::receivable_iterator<ledger_set_cemented>;
 
-	ledger_set_confirmed (nano::ledger const & ledger);
+	explicit ledger_set_cemented (nano::ledger const &);
 
 public: // Operations on accounts
 	std::optional<nano::amount> account_balance (secure::transaction const & transaction, nano::account const & account) const;
@@ -54,5 +42,5 @@ public: // Operations on pending entries
 
 private:
 	nano::ledger const & ledger;
-}; // class ledger_set_confirmed
-} // namespace nano
+};
+}

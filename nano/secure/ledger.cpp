@@ -14,7 +14,7 @@
 #include <nano/secure/ledger_processor.hpp>
 #include <nano/secure/ledger_rollback.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/secure/rep_weights.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
@@ -41,7 +41,7 @@ nano::ledger::ledger (nano::store::ledger_store & store_a, nano::network_params 
 	rep_weights{ store_a.rep_weight, min_rep_weight_a },
 	max_backlog_size{ max_backlog_a },
 	any_impl{ std::make_unique<ledger_set_any> (*this) },
-	confirmed_impl{ std::make_unique<ledger_set_confirmed> (*this) },
+	confirmed_impl{ std::make_unique<ledger_set_cemented> (*this) },
 	any{ *any_impl },
 	confirmed{ *confirmed_impl }
 {
