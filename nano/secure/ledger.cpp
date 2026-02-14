@@ -14,7 +14,7 @@
 #include <nano/secure/ledger_processor.hpp>
 #include <nano/secure/ledger_rollback.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/secure/rep_weights.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
@@ -41,9 +41,9 @@ nano::ledger::ledger (nano::store::ledger_store & store_a, nano::network_params 
 	rep_weights{ store_a.rep_weight, min_rep_weight_a },
 	max_backlog_size{ max_backlog_a },
 	any_impl{ std::make_unique<ledger_set_any> (*this) },
-	confirmed_impl{ std::make_unique<ledger_set_confirmed> (*this) },
+	cemented_impl{ std::make_unique<ledger_set_cemented> (*this) },
 	any{ *any_impl },
-	confirmed{ *confirmed_impl }
+	cemented{ *cemented_impl }
 {
 	initialize (generate_cache_flags_a);
 }
@@ -257,9 +257,14 @@ void nano::ledger::verify_consistency (secure::transaction const & transaction) 
 	rep_weights.verify_consistency (0); // It's impractical to recompute burned weight, so we skip it here
 }
 
-bool nano::ledger::unconfirmed_exists (secure::transaction const & transaction, nano::block_hash const & hash) const
+bool nano::ledger::block_uncemented (secure::transaction const & transaction, nano::block_hash const & hash) const
 {
-	return any.block_exists (transaction, hash) && !confirmed.block_exists (transaction, hash);
+	auto block = any.block_get (transaction, hash);
+	if (block)
+	{
+		return !cemented.block_exists (transaction, *block);
+	}
+	return false; // Block doesn't exist
 }
 
 nano::uint128_t nano::ledger::account_receivable (secure::transaction const & transaction_a, nano::account const & account_a, bool only_confirmed_a) const
@@ -271,7 +276,7 @@ nano::uint128_t nano::ledger::account_receivable (secure::transaction const & tr
 		nano::pending_info const & info (i->second);
 		if (only_confirmed_a)
 		{
-			if (confirmed.block_exists_or_pruned (transaction_a, i->first.hash))
+			if (cemented.block_exists_or_pruned (transaction_a, i->first.hash))
 			{
 				result += info.amount.number ();
 			}
@@ -285,8 +290,8 @@ nano::uint128_t nano::ledger::account_receivable (secure::transaction const & tr
 }
 
 // Both stack and result set are bounded to limit maximum memory usage
-// Callers must ensure that the target block was confirmed, and if not, call this function multiple times
-std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_transaction & transaction, nano::block_hash const & target_hash, size_t max_blocks)
+// Due to the max_blocks limit, the target block may not be cemented in a single call. Callers should call this function multiple times until the target is cemented.
+std::deque<std::shared_ptr<nano::block>> nano::ledger::cement (secure::write_transaction & transaction, nano::block_hash const & target_hash, size_t max_blocks)
 {
 	std::deque<std::shared_ptr<nano::block>> result;
 
@@ -296,7 +301,7 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 	auto is_resolved = [&] (std::shared_ptr<nano::block> const & block) {
 		if (block)
 		{
-			return confirmed.block_exists (transaction, *block);
+			return cemented.block_exists (transaction, *block);
 		}
 		return true; // Pruned, must have been cemented
 	};
@@ -326,9 +331,9 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 	};
 
 	auto resolve = [&] (std::shared_ptr<nano::block> const & block) -> bool {
-		// We must only confirm blocks that have their dependencies confirmed
-		debug_assert (dependencies_confirmed (transaction, *block));
-		confirm_one (transaction, *block);
+		// We must only cement blocks that have their dependencies cemented
+		debug_assert (dependencies_cemented (transaction, *block));
+		cement_one (transaction, *block);
 
 		result.push_back (block);
 
@@ -343,7 +348,7 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 			}
 		}
 
-		// Early return might leave parts of the dependency tree unconfirmed
+		// Early return might leave parts of the dependency tree uncemented
 		return result.size () < max_blocks;
 	};
 
@@ -357,14 +362,14 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 	return result;
 }
 
-void nano::ledger::confirm_one (secure::write_transaction & transaction, nano::block const & block)
+void nano::ledger::cement_one (secure::write_transaction & transaction, nano::block const & block)
 {
 	debug_assert ((!store.confirmation_height.get (transaction, block.account ()) && block.sideband ().height == 1) || store.confirmation_height.get (transaction, block.account ()).value ().height + 1 == block.sideband ().height);
 	confirmation_height_info info{ block.sideband ().height, block.hash () };
 	store.confirmation_height.put (transaction, block.account (), info);
 	++cache.cemented_count;
 
-	stats.inc (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed);
+	stats.inc (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented);
 }
 
 nano::block_status nano::ledger::process (secure::write_transaction const & transaction, std::shared_ptr<nano::block> block)
@@ -578,12 +583,12 @@ nano::root nano::ledger::latest_root (secure::transaction const & transaction_a,
 	}
 }
 
-bool nano::ledger::dependencies_confirmed (secure::transaction const & transaction, nano::block const & block) const
+bool nano::ledger::dependencies_cemented (secure::transaction const & transaction, nano::block const & block) const
 {
 	release_assert (block.has_sideband ());
 	auto dependencies = block.dependencies ();
 	return std::all_of (dependencies.begin (), dependencies.end (), [this, &transaction] (nano::block_hash const & hash) {
-		return hash.is_zero () || confirmed.block_exists_or_pruned (transaction, hash);
+		return hash.is_zero () || cemented.block_exists_or_pruned (transaction, hash);
 	});
 }
 
@@ -702,7 +707,7 @@ uint64_t nano::ledger::pruning_action (secure::write_transaction & transaction_a
 		auto block_l = any.block_get (transaction_a, hash);
 		if (block_l != nullptr)
 		{
-			release_assert (confirmed.block_exists (transaction_a, hash));
+			release_assert (cemented.block_exists (transaction_a, hash));
 			store.block.del (transaction_a, hash);
 			store.pruned.put (transaction_a, hash);
 			hash = block_l->previous ();

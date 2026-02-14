@@ -7,7 +7,7 @@
 #include <nano/node/ledger_notifications.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/store/write_queue.hpp>
 
 nano::cementing_set::cementing_set (cementing_set_config const & config_a, nano::ledger & ledger_a, nano::ledger_notifications & ledger_notifications_a, nano::stats & stats_a, nano::logger & logger_a) :
@@ -253,7 +253,7 @@ void nano::cementing_set::run_batch (std::unique_lock<std::mutex> & lock)
 					break;
 				}
 
-				auto added = ledger.confirm (transaction, hash, config.max_blocks);
+				auto added = ledger.cement (transaction, hash, config.max_blocks);
 				if (!added.empty ())
 				{
 					// Confirming this block may implicitly confirm more
@@ -264,13 +264,13 @@ void nano::cementing_set::run_batch (std::unique_lock<std::mutex> & lock)
 					}
 					cemented_count += added.size ();
 				}
-				else if (ledger.confirmed.block_exists (transaction, hash))
+				else if (ledger.cemented.block_exists (transaction, hash))
 				{
 					stats.inc (nano::stat::type::cementing_set, nano::stat::detail::already_cemented);
 					already.push_back (hash);
 				}
 
-				success = ledger.confirmed.block_exists (transaction, hash);
+				success = ledger.cemented.block_exists (transaction, hash);
 			} while (!success);
 
 			if (success)

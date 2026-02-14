@@ -119,9 +119,6 @@ enum class detail
 
 	test,
 
-	// node
-	process_confirmed,
-
 	// active_elections
 	active_started,
 	active_stopped,

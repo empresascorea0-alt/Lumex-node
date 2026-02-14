@@ -231,7 +231,7 @@ void elections_benchmark::run_iteration (std::deque<std::shared_ptr<nano::block>
 			release_assert (result == nano::block_status::progress, to_string (result));
 
 			// Add to cementing set for direct cementing
-			auto cemented = node->ledger.confirm (transaction, send->hash ());
+			auto cemented = node->ledger.cement (transaction, send->hash ());
 			release_assert (!cemented.empty () && cemented.back ()->hash () == send->hash ());
 		}
 	}

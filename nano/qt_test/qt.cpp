@@ -513,7 +513,7 @@ TEST (history, pruned_source)
 		ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, receive1));
 		auto open = std::make_shared<nano::open_block> (send2->hash (), key.pub, key.pub, key.prv, key.pub, *system.work.generate (key.pub));
 		ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, open));
-		ledger.confirm (transaction, send1->hash ());
+		ledger.cement (transaction, send1->hash ());
 		ASSERT_EQ (1, ledger.pruning_action (transaction, send1->hash (), 2));
 		next_pruning = send2->hash ();
 	}
@@ -555,7 +555,7 @@ TEST (history, pruned_source)
 	// Additional legacy test
 	{
 		auto transaction = ledger.tx_begin_write ();
-		ledger.confirm (transaction, next_pruning);
+		ledger.cement (transaction, next_pruning);
 		ASSERT_EQ (1, ledger.pruning_action (transaction, next_pruning, 2));
 	}
 	// Genesis account pruned values
@@ -587,9 +587,9 @@ TEST (history, pruned_source)
 		auto latest_key (ledger.any.account_head (transaction, key.pub));
 		auto receive2 = std::make_shared<nano::state_block> (key.pub, latest_key, key.pub, 200, send3->hash (), key.prv, key.pub, *system.work.generate (latest_key));
 		ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, receive2));
-		ledger.confirm (transaction, latest);
+		ledger.cement (transaction, latest);
 		ASSERT_EQ (1, ledger.pruning_action (transaction, latest, 2));
-		ledger.confirm (transaction, latest_key);
+		ledger.cement (transaction, latest_key);
 		ASSERT_EQ (1, ledger.pruning_action (transaction, latest_key, 2));
 	}
 	// Genesis account pruned values
@@ -619,7 +619,7 @@ TEST (history, pruned_source)
 		auto latest (ledger.any.account_head (transaction, nano::dev::genesis_key.pub));
 		auto change = std::make_shared<nano::state_block> (nano::dev::genesis_key.pub, latest, key.pub, nano::dev::constants.genesis_amount - 200, 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (latest));
 		ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, change));
-		ledger.confirm (transaction, latest);
+		ledger.cement (transaction, latest);
 		ASSERT_EQ (1, ledger.pruning_action (transaction, latest, 2));
 	}
 	// Genesis account pruned values
@@ -653,7 +653,7 @@ TEST (history, pruned_source)
 		ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send4));
 		auto open2 = std::make_shared<nano::state_block> (key2.pub, 0, key2.pub, 100, send4->hash (), key2.prv, key2.pub, *system.work.generate (key2.pub));
 		ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, open2));
-		ledger.confirm (transaction, latest_key);
+		ledger.cement (transaction, latest_key);
 		ASSERT_EQ (1, ledger.pruning_action (transaction, latest_key, 2));
 	}
 	// New account (key) pruned values

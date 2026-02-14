@@ -10,7 +10,7 @@
 #include <nano/node/transport/fake.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/secure/ledger.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
@@ -308,7 +308,7 @@ TEST (request_aggregator, split)
 	{
 		// Confirm all blocks
 		auto tx = node.ledger.tx_begin_write ();
-		node.ledger.confirm (tx, blocks.back ()->hash ());
+		node.ledger.cement (tx, blocks.back ()->hash ());
 	}
 	ASSERT_TIMELY_EQ (5s, max_vbh + 2, node.ledger.cemented_count ());
 	ASSERT_EQ (max_vbh + 1, request.size ());
@@ -422,7 +422,7 @@ TEST (request_aggregator, cannot_vote)
 	ASSERT_EQ (nano::block_status::progress, node.process (send1));
 	ASSERT_EQ (nano::block_status::progress, node.process (send2));
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
-	ASSERT_FALSE (node.ledger.dependencies_confirmed (node.ledger.tx_begin_read (), *send2));
+	ASSERT_FALSE (node.ledger.dependencies_cemented (node.ledger.tx_begin_read (), *send2));
 
 	std::vector<std::pair<nano::block_hash, nano::root>> request;
 	// Correct hash, correct root

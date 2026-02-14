@@ -81,7 +81,7 @@ TEST (log_parse, parse_type)
 TEST (log_parse, parse_detail)
 {
 	ASSERT_EQ (nano::log::parse_detail ("all"), nano::log::detail::all);
-	ASSERT_EQ (nano::log::parse_detail ("process_confirmed"), nano::log::detail::process_confirmed);
+	ASSERT_EQ (nano::log::parse_detail ("test"), nano::log::detail::test);
 	ASSERT_THROW (nano::log::parse_detail ("enumnotpresent"), std::invalid_argument);
 	ASSERT_THROW (nano::log::parse_detail (""), std::invalid_argument);
 	ASSERT_THROW (nano::log::parse_detail ("_last"), std::invalid_argument);
@@ -92,7 +92,7 @@ TEST (log_parse, parse_logger_id)
 {
 	ASSERT_EQ (nano::log::parse_logger_id ("node"), std::make_pair (nano::log::type::node, nano::log::detail::all));
 	ASSERT_EQ (nano::log::parse_logger_id ("node::all"), std::make_pair (nano::log::type::node, nano::log::detail::all));
-	ASSERT_EQ (nano::log::parse_logger_id ("node::process_confirmed"), std::make_pair (nano::log::type::node, nano::log::detail::process_confirmed));
+	ASSERT_EQ (nano::log::parse_logger_id ("node::test"), std::make_pair (nano::log::type::node, nano::log::detail::test));
 	ASSERT_THROW (nano::log::parse_logger_id ("_last"), std::invalid_argument);
 	ASSERT_THROW (nano::log::parse_logger_id ("node::enumnotpresent"), std::invalid_argument);
 	ASSERT_THROW (nano::log::parse_logger_id ("node::"), std::invalid_argument);

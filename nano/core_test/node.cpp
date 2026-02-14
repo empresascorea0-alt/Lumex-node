@@ -22,7 +22,7 @@
 #include <nano/node/vote_router.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/peer.hpp>
 #include <nano/store/ledger/pruned.hpp>
@@ -403,7 +403,7 @@ TEST (node, search_receivable_pruned)
 
 	// Confirmation
 	ASSERT_TIMELY (10s, node1->active.empty () && node2->active.empty ());
-	ASSERT_TIMELY (5s, node1->ledger.confirmed.block_exists_or_pruned (node1->ledger.tx_begin_read (), send2->hash ()));
+	ASSERT_TIMELY (5s, node1->ledger.cemented.block_exists_or_pruned (node1->ledger.tx_begin_read (), send2->hash ()));
 	ASSERT_TIMELY_EQ (5s, node2->ledger.cemented_count (), 3);
 	system.wallet (0)->remove_account (nano::dev::genesis_key.pub);
 
@@ -1602,7 +1602,7 @@ TEST (node, unconfirmed_send)
 	ASSERT_TIMELY (5s, node2.block_confirmed (send1->hash ()));
 
 	// wait until receive1 (auto-receive created by wallet) is cemented
-	ASSERT_TIMELY_EQ (5s, node2.ledger.confirmed.account_height (node2.ledger.tx_begin_read (), key2.pub), 1);
+	ASSERT_TIMELY_EQ (5s, node2.ledger.cemented.account_height (node2.ledger.tx_begin_read (), key2.pub), 1);
 	ASSERT_EQ (node2.balance (key2.pub), 2 * nano::nano_ratio);
 	auto recv1 = node2.ledger.find_receive_block_by_send_hash (node2.ledger.tx_begin_read (), key2.pub, send1->hash ());
 
@@ -1861,7 +1861,7 @@ TEST (node, DISABLED_local_votes_cache_batch)
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, node.ledger.process (node.ledger.tx_begin_write (), send1));
 	node.cementing_set.add (send1->hash ());
-	ASSERT_TIMELY (5s, node.ledger.confirmed.block_exists_or_pruned (node.ledger.tx_begin_read (), send1->hash ()));
+	ASSERT_TIMELY (5s, node.ledger.cemented.block_exists_or_pruned (node.ledger.tx_begin_read (), send1->hash ()));
 	auto send2 = nano::state_block_builder ()
 				 .account (nano::dev::genesis_key.pub)
 				 .previous (send1->hash ())
@@ -2775,7 +2775,7 @@ TEST (node, bidirectional_tcp)
 	while (!confirmed)
 	{
 		auto transaction2 = node2->ledger.tx_begin_read ();
-		confirmed = node2->ledger.confirmed.block_exists_or_pruned (transaction2, send1->hash ());
+		confirmed = node2->ledger.cemented.block_exists_or_pruned (transaction2, send1->hash ());
 		ASSERT_NO_ERROR (system.poll ());
 	}
 	// Test block propagation & confirmation from node 2 (remove representative from node 1)
@@ -2805,7 +2805,7 @@ TEST (node, bidirectional_tcp)
 	while (!confirmed)
 	{
 		auto transaction1 = node1->ledger.tx_begin_read ();
-		confirmed = node1->ledger.confirmed.block_exists_or_pruned (transaction1, send2->hash ());
+		confirmed = node1->ledger.cemented.block_exists_or_pruned (transaction1, send2->hash ());
 		ASSERT_NO_ERROR (system.poll ());
 	}
 }
@@ -3452,7 +3452,7 @@ TEST (node, deferred_dependent_elections)
 	ASSERT_FALSE (node.active.active (receive->qualified_root ()));
 	election_open->force_confirm ();
 	ASSERT_TIMELY (5s, node.block_confirmed (open->hash ()));
-	ASSERT_FALSE (node.ledger.dependencies_confirmed (node.ledger.tx_begin_read (), *receive));
+	ASSERT_FALSE (node.ledger.dependencies_cemented (node.ledger.tx_begin_read (), *receive));
 	ASSERT_NEVER (0.5s, node.active.active (receive->qualified_root ()));
 	ASSERT_FALSE (node.ledger.rollback (node.ledger.tx_begin_write (), receive->hash ()));
 	ASSERT_FALSE (node.block (receive->hash ()));

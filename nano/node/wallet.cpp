@@ -11,7 +11,7 @@
 #include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/store/ledger/pending.hpp>
 #include <nano/store/lmdb/common.hpp>
 #include <nano/store/lmdb/db_val.hpp>
@@ -1321,7 +1321,7 @@ bool nano::wallet::search_receivable_impl (nano::store::transaction const & wall
 					auto amount (pending.amount.number ());
 					if (wallets.config.receive_minimum.number () <= amount)
 					{
-						bool const confirmed = wallets.ledger.confirmed.block_exists_or_pruned (ledger_txn, hash);
+						bool const confirmed = wallets.ledger.cemented.block_exists_or_pruned (ledger_txn, hash);
 
 						logger.info (nano::log::type::wallet, "Found a receivable block: {} ({}) for account: {} from: {}",
 						hash.to_string (),
@@ -2080,7 +2080,7 @@ void nano::wallets::receive_confirmed (nano::block_hash const & hash_a, nano::ac
 			}
 			else
 			{
-				if (!ledger.confirmed.block_exists_or_pruned (ledger.tx_begin_read (), hash_a))
+				if (!ledger.cemented.block_exists_or_pruned (ledger.tx_begin_read (), hash_a))
 				{
 					logger.warn (nano::log::type::wallet, "Confirmed block is missing: {}", hash_a.to_string ());
 					debug_assert (false, "confirmed block is missing");

@@ -21,7 +21,7 @@ namespace nano
 {
 class ledger;
 class ledger_set_any;
-class ledger_set_confirmed;
+class ledger_set_cemented;
 
 class ledger_cache
 {
@@ -48,7 +48,6 @@ public:
 	/** Start read-only transaction */
 	secure::read_transaction tx_begin_read () const;
 
-	bool unconfirmed_exists (secure::transaction const &, nano::block_hash const &) const;
 	nano::uint128_t account_receivable (secure::transaction const &, nano::account const &, bool = false) const;
 	/**
 	 * Returns the cached vote weight for the given representative.
@@ -65,7 +64,7 @@ public:
 	std::string block_text (nano::block_hash const &);
 	std::deque<std::shared_ptr<nano::block>> random_blocks (secure::transaction const &, size_t count) const;
 	std::optional<nano::pending_info> pending_info (secure::transaction const &, nano::pending_key const & key) const;
-	std::deque<std::shared_ptr<nano::block>> confirm (secure::write_transaction &, nano::block_hash const & hash, size_t max_blocks = 1024 * 128);
+	std::deque<std::shared_ptr<nano::block>> cement (secure::write_transaction &, nano::block_hash const & hash, size_t max_blocks = 1024 * 128);
 	nano::block_status process (secure::write_transaction const &, std::shared_ptr<nano::block> block);
 	bool rollback (secure::write_transaction const &, nano::block_hash const &, std::deque<std::shared_ptr<nano::block>> & rollback_list, size_t depth = 0, size_t max_depth = nano::ledger_max_rollback_depth ());
 	bool rollback (secure::write_transaction const &, nano::block_hash const &);
@@ -83,9 +82,14 @@ public:
 	nano::epoch version (secure::transaction const &, nano::block_hash const & hash) const;
 
 	/**
-	 * Checks if all blocks that this block depends on are confirmed (or pruned)
+	 * Checks if a block exists in the ledger but has not yet been cemented
 	 */
-	bool dependencies_confirmed (secure::transaction const &, nano::block const &) const;
+	bool block_uncemented (secure::transaction const &, nano::block_hash const &) const;
+
+	/**
+	 * Checks if all blocks that this block depends on are cemented (or pruned)
+	 */
+	bool dependencies_cemented (secure::transaction const &, nano::block const &) const;
 
 	/**
 	 * Computes the priority balance and timestamp for bucket-based prioritization
@@ -124,13 +128,13 @@ public:
 
 private:
 	void initialize (nano::generate_cache_flags const &);
-	void confirm_one (secure::write_transaction &, nano::block const & block);
+	void cement_one (secure::write_transaction &, nano::block const & block);
 
 	std::unique_ptr<ledger_set_any> any_impl;
-	std::unique_ptr<ledger_set_confirmed> confirmed_impl;
+	std::unique_ptr<ledger_set_cemented> cemented_impl;
 
 public:
 	ledger_set_any & any;
-	ledger_set_confirmed & confirmed;
+	ledger_set_cemented & cemented;
 };
 }
