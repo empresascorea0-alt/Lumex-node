@@ -68,7 +68,7 @@ public:
 
 public:
 	wallet_store (nano::kdf &, nano::store::write_transaction &, store::lmdb::env &, nano::account representative, unsigned fanout, std::string const & wallet_path);
-	wallet_store (nano::kdf &, nano::store::write_transaction &, store::lmdb::env &, nano::account representative, unsigned fanout, std::string const & wallet_path, std::string const & json);
+	wallet_store (nano::kdf &, nano::store::write_transaction &, store::lmdb::env &, unsigned fanout, std::string const & wallet_path, std::string const & json);
 
 	void initialize (nano::store::write_transaction const &, std::string const & path);
 	std::vector<nano::account> accounts (nano::store::transaction const &) const;

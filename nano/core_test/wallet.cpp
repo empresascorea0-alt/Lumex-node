@@ -393,7 +393,7 @@ TEST (wallet, serialize_json_empty)
 	nano::wallet_store wallet1 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
 	std::string serialized;
 	wallet1.serialize_json (transaction, serialized);
-	nano::wallet_store wallet2 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "1", serialized);
+	nano::wallet_store wallet2 (kdf, transaction, env, 1, "1", serialized);
 	nano::raw_key password1;
 	nano::raw_key password2;
 	wallet1.wallet_key (password1, transaction);
@@ -416,7 +416,7 @@ TEST (wallet, serialize_json_one)
 	wallet1.insert_adhoc (transaction, key.prv);
 	std::string serialized;
 	wallet1.serialize_json (transaction, serialized);
-	nano::wallet_store wallet2 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "1", serialized);
+	nano::wallet_store wallet2 (kdf, transaction, env, 1, "1", serialized);
 	nano::raw_key password1;
 	nano::raw_key password2;
 	wallet1.wallet_key (password1, transaction);
@@ -442,7 +442,7 @@ TEST (wallet, serialize_json_password)
 	wallet1.insert_adhoc (transaction, key.prv);
 	std::string serialized;
 	wallet1.serialize_json (transaction, serialized);
-	nano::wallet_store wallet2 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "1", serialized);
+	nano::wallet_store wallet2 (kdf, transaction, env, 1, "1", serialized);
 	ASSERT_FALSE (wallet2.valid_password (transaction));
 	ASSERT_FALSE (wallet2.attempt_password (transaction, "password"));
 	ASSERT_TRUE (wallet2.valid_password (transaction));

@@ -53,7 +53,7 @@ std::string const nano::wallet_store::default_password{ "" };
 std::size_t const nano::wallet_store::check_iv_index (0);
 std::size_t const nano::wallet_store::seed_iv_index (1);
 
-nano::wallet_store::wallet_store (nano::kdf & kdf_a, nano::store::write_transaction & transaction_a, store::lmdb::env & env_a, nano::account representative_a, unsigned fanout_a, std::string const & wallet_a, std::string const & json_a) :
+nano::wallet_store::wallet_store (nano::kdf & kdf_a, nano::store::write_transaction & transaction_a, store::lmdb::env & env_a, unsigned fanout_a, std::string const & wallet_a, std::string const & json_a) :
 	password (0, fanout_a),
 	wallet_key_mem (0, fanout_a),
 	kdf (kdf_a),
@@ -706,7 +706,7 @@ nano::wallet::wallet (nano::store::write_transaction & transaction_a, nano::wall
 
 nano::wallet::wallet (nano::store::write_transaction & transaction_a, nano::wallets & wallets_a, std::string const & wallet_a, std::string const & json) :
 	lock_observer ([] (bool, bool) {}),
-	store (wallets_a.kdf, transaction_a, wallets_a.env, wallets_a.config.random_representative (), wallets_a.config.password_fanout, wallet_a, json),
+	store (wallets_a.kdf, transaction_a, wallets_a.env, wallets_a.config.password_fanout, wallet_a, json),
 	wallets (wallets_a),
 	logger (wallets_a.logger)
 {
@@ -855,7 +855,7 @@ bool nano::wallet::import (std::string const & json_a, std::string const & passw
 	random_pool::generate_block (id.bytes.data (), id.bytes.size ());
 	try
 	{
-		auto temp = std::make_unique<nano::wallet_store> (wallets.kdf, transaction, wallets.env, 0, 1, id.to_string (), json_a);
+		auto temp = std::make_unique<nano::wallet_store> (wallets.kdf, transaction, wallets.env, 1, id.to_string (), json_a);
 		if (!temp->attempt_password (transaction, password_a))
 		{
 			error = store.import (transaction, *temp);
