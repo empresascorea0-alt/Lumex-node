@@ -12,7 +12,7 @@
 #include <nano/node/transport/inproc.hpp>
 #include <nano/node/vote_router.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
 #include <nano/store/ledger/confirmation_height.hpp>
@@ -61,7 +61,7 @@ TEST (ledger, confirmed_unconfirmed_view)
 	auto ctx = nano::test::ledger_empty ();
 	auto & ledger = ctx.ledger ();
 	auto & unconfirmed = ledger;
-	auto & confirmed = ledger.confirmed;
+	auto & cemented = ledger.cemented;
 }
 
 // Genesis account should have the max balance on empty initialization
@@ -4749,14 +4749,279 @@ TEST (ledger, work_validation)
 	process_block (epoch, nano::block_details (nano::epoch::epoch_1, false, false, true));
 }
 
-TEST (ledger, dependents_confirmed)
+TEST (ledger, block_dependencies)
+{
+	auto ctx = nano::test::ledger_empty ();
+	auto & ledger = ctx.ledger ();
+	auto & pool = ctx.pool ();
+	auto transaction = ledger.tx_begin_write ();
+	nano::block_builder builder;
+	nano::block_hash zero{ 0 };
+
+	// Genesis open block has no dependencies
+	{
+		auto deps = nano::dev::genesis->dependencies ();
+		ASSERT_EQ (deps[0], zero);
+		ASSERT_EQ (deps[1], zero);
+	}
+
+	nano::keypair key1;
+
+	// Legacy send
+	auto legacy_send = builder
+					   .send ()
+					   .previous (nano::dev::genesis->hash ())
+					   .destination (key1.pub)
+					   .balance (nano::dev::constants.genesis_amount - 100)
+					   .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					   .work (*pool.generate (nano::dev::genesis->hash ()))
+					   .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, legacy_send));
+	{
+		auto deps = legacy_send->dependencies ();
+		ASSERT_EQ (deps[0], nano::dev::genesis->hash ());
+		ASSERT_EQ (deps[1], zero);
+	}
+
+	// Legacy open (non-genesis)
+	auto legacy_open = builder
+					   .open ()
+					   .source (legacy_send->hash ())
+					   .representative (key1.pub)
+					   .account (key1.pub)
+					   .sign (key1.prv, key1.pub)
+					   .work (*pool.generate (key1.pub))
+					   .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, legacy_open));
+	{
+		auto deps = legacy_open->dependencies ();
+		ASSERT_EQ (deps[0], zero);
+		ASSERT_EQ (deps[1], legacy_send->hash ());
+	}
+
+	auto legacy_send2 = builder
+						.send ()
+						.previous (legacy_send->hash ())
+						.destination (key1.pub)
+						.balance (nano::dev::constants.genesis_amount - 200)
+						.sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+						.work (*pool.generate (legacy_send->hash ()))
+						.build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, legacy_send2));
+
+	// Legacy receive
+	auto legacy_receive = builder
+						  .receive ()
+						  .previous (legacy_open->hash ())
+						  .source (legacy_send2->hash ())
+						  .sign (key1.prv, key1.pub)
+						  .work (*pool.generate (legacy_open->hash ()))
+						  .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, legacy_receive));
+	{
+		auto deps = legacy_receive->dependencies ();
+		ASSERT_EQ (deps[0], legacy_open->hash ());
+		ASSERT_EQ (deps[1], legacy_send2->hash ());
+	}
+
+	// Legacy change
+	auto legacy_change = builder
+						 .change ()
+						 .previous (legacy_receive->hash ())
+						 .representative (nano::dev::genesis_key.pub)
+						 .sign (key1.prv, key1.pub)
+						 .work (*pool.generate (legacy_receive->hash ()))
+						 .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, legacy_change));
+	{
+		auto deps = legacy_change->dependencies ();
+		ASSERT_EQ (deps[0], legacy_receive->hash ());
+		ASSERT_EQ (deps[1], zero);
+	}
+
+	nano::keypair key2;
+
+	// State send
+	auto state_send = builder.state ()
+					  .account (nano::dev::genesis_key.pub)
+					  .previous (legacy_send2->hash ())
+					  .representative (nano::dev::genesis_key.pub)
+					  .balance (nano::dev::constants.genesis_amount - 300)
+					  .link (key2.pub)
+					  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					  .work (*pool.generate (legacy_send2->hash ()))
+					  .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, state_send));
+	{
+		ASSERT_TRUE (state_send->is_send ());
+		auto deps = state_send->dependencies ();
+		ASSERT_EQ (deps[0], legacy_send2->hash ());
+		ASSERT_EQ (deps[1], zero);
+	}
+
+	// State receive opening an account
+	auto state_open_receive = builder.state ()
+							  .account (key2.pub)
+							  .previous (0)
+							  .representative (key2.pub)
+							  .balance (100)
+							  .link (state_send->hash ())
+							  .sign (key2.prv, key2.pub)
+							  .work (*pool.generate (key2.pub))
+							  .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, state_open_receive));
+	{
+		ASSERT_TRUE (state_open_receive->is_receive ());
+		auto deps = state_open_receive->dependencies ();
+		ASSERT_EQ (deps[0], zero);
+		ASSERT_EQ (deps[1], state_send->hash ());
+	}
+
+	auto state_send2 = builder.state ()
+					   .account (nano::dev::genesis_key.pub)
+					   .previous (state_send->hash ())
+					   .representative (nano::dev::genesis_key.pub)
+					   .balance (nano::dev::constants.genesis_amount - 400)
+					   .link (key2.pub)
+					   .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					   .work (*pool.generate (state_send->hash ()))
+					   .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, state_send2));
+
+	// State receive on existing account
+	auto state_receive = builder.state ()
+						 .account (key2.pub)
+						 .previous (state_open_receive->hash ())
+						 .representative (key2.pub)
+						 .balance (200)
+						 .link (state_send2->hash ())
+						 .sign (key2.prv, key2.pub)
+						 .work (*pool.generate (state_open_receive->hash ()))
+						 .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, state_receive));
+	{
+		ASSERT_TRUE (state_receive->is_receive ());
+		auto deps = state_receive->dependencies ();
+		ASSERT_EQ (deps[0], state_open_receive->hash ());
+		ASSERT_EQ (deps[1], state_send2->hash ());
+	}
+
+	// State change
+	auto state_change = builder.state ()
+						.account (key2.pub)
+						.previous (state_receive->hash ())
+						.representative (nano::dev::genesis_key.pub)
+						.balance (200)
+						.link (0)
+						.sign (key2.prv, key2.pub)
+						.work (*pool.generate (state_receive->hash ()))
+						.build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, state_change));
+	{
+		ASSERT_TRUE (state_change->is_change ());
+		auto deps = state_change->dependencies ();
+		ASSERT_EQ (deps[0], state_receive->hash ());
+		ASSERT_EQ (deps[1], zero);
+	}
+
+	// Epoch v1 on existing account
+	auto epoch1 = builder.state ()
+				  .account (nano::dev::genesis_key.pub)
+				  .previous (state_send2->hash ())
+				  .representative (nano::dev::genesis_key.pub)
+				  .balance (nano::dev::constants.genesis_amount - 400)
+				  .link (ledger.epoch_link (nano::epoch::epoch_1))
+				  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				  .work (*pool.generate (state_send2->hash ()))
+				  .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, epoch1));
+	{
+		ASSERT_TRUE (epoch1->is_epoch ());
+		ASSERT_FALSE (epoch1->is_receive ());
+		auto deps = epoch1->dependencies ();
+		ASSERT_EQ (deps[0], state_send2->hash ());
+		ASSERT_EQ (deps[1], zero);
+	}
+
+	// Epoch v2 on existing account
+	auto epoch2 = builder.state ()
+				  .account (nano::dev::genesis_key.pub)
+				  .previous (epoch1->hash ())
+				  .representative (nano::dev::genesis_key.pub)
+				  .balance (nano::dev::constants.genesis_amount - 400)
+				  .link (ledger.epoch_link (nano::epoch::epoch_2))
+				  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				  .work (*pool.generate (epoch1->hash ()))
+				  .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, epoch2));
+	{
+		ASSERT_TRUE (epoch2->is_epoch ());
+		auto deps = epoch2->dependencies ();
+		ASSERT_EQ (deps[0], epoch1->hash ());
+		ASSERT_EQ (deps[1], zero);
+	}
+
+	nano::keypair key3;
+
+	// Send to key3 to create a pending entry for epoch open
+	auto send_for_epoch = builder.state ()
+						  .account (nano::dev::genesis_key.pub)
+						  .previous (epoch2->hash ())
+						  .representative (nano::dev::genesis_key.pub)
+						  .balance (nano::dev::constants.genesis_amount - 500)
+						  .link (key3.pub)
+						  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+						  .work (*pool.generate (epoch2->hash ()))
+						  .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send_for_epoch));
+
+	// Epoch v1 opening an account
+	auto epoch_open = builder.state ()
+					  .account (key3.pub)
+					  .previous (0)
+					  .representative (0)
+					  .balance (0)
+					  .link (ledger.epoch_link (nano::epoch::epoch_1))
+					  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					  .work (*pool.generate (key3.pub))
+					  .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, epoch_open));
+	{
+		ASSERT_TRUE (epoch_open->is_epoch ());
+		ASSERT_FALSE (epoch_open->is_receive ());
+		auto deps = epoch_open->dependencies ();
+		ASSERT_EQ (deps[0], zero);
+		ASSERT_EQ (deps[1], zero);
+	}
+
+	// Send to an account whose public key equals the epoch v1 link
+	auto send_to_epoch_link = builder.state ()
+							  .account (nano::dev::genesis_key.pub)
+							  .previous (send_for_epoch->hash ())
+							  .representative (nano::dev::genesis_key.pub)
+							  .balance (nano::dev::constants.genesis_amount - 600)
+							  .link (ledger.epoch_link (nano::epoch::epoch_1))
+							  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+							  .work (*pool.generate (send_for_epoch->hash ()))
+							  .build ();
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send_to_epoch_link));
+	{
+		ASSERT_TRUE (send_to_epoch_link->is_send ());
+		ASSERT_FALSE (send_to_epoch_link->is_epoch ());
+		auto deps = send_to_epoch_link->dependencies ();
+		ASSERT_EQ (deps[0], send_for_epoch->hash ());
+		ASSERT_EQ (deps[1], zero);
+	}
+}
+
+TEST (ledger, dependencies_cemented)
 {
 	auto ctx = nano::test::ledger_empty ();
 	auto & ledger = ctx.ledger ();
 	auto & store = ctx.store ();
 	auto transaction = ledger.tx_begin_write ();
 	nano::block_builder builder;
-	ASSERT_TRUE (ledger.dependents_confirmed (transaction, *nano::dev::genesis));
+	ASSERT_TRUE (ledger.dependencies_cemented (transaction, *nano::dev::genesis));
 	auto & pool = ctx.pool ();
 	nano::keypair key1;
 	auto send1 = builder.state ()
@@ -4769,7 +5034,7 @@ TEST (ledger, dependents_confirmed)
 				 .work (*pool.generate (nano::dev::genesis->hash ()))
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send1));
-	ASSERT_TRUE (ledger.dependents_confirmed (transaction, *send1));
+	ASSERT_TRUE (ledger.dependencies_cemented (transaction, *send1));
 	auto send2 = builder.state ()
 				 .account (nano::dev::genesis_key.pub)
 				 .previous (send1->hash ())
@@ -4780,7 +5045,7 @@ TEST (ledger, dependents_confirmed)
 				 .work (*pool.generate (send1->hash ()))
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
-	ASSERT_FALSE (ledger.dependents_confirmed (transaction, *send2));
+	ASSERT_FALSE (ledger.dependencies_cemented (transaction, *send2));
 	auto receive1 = builder.state ()
 					.account (key1.pub)
 					.previous (0)
@@ -4791,9 +5056,9 @@ TEST (ledger, dependents_confirmed)
 					.work (*pool.generate (key1.pub))
 					.build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, receive1));
-	ASSERT_FALSE (ledger.dependents_confirmed (transaction, *receive1));
-	ledger.confirm (transaction, send1->hash ());
-	ASSERT_TRUE (ledger.dependents_confirmed (transaction, *receive1));
+	ASSERT_FALSE (ledger.dependencies_cemented (transaction, *receive1));
+	ledger.cement (transaction, send1->hash ());
+	ASSERT_TRUE (ledger.dependencies_cemented (transaction, *receive1));
 	auto receive2 = builder.state ()
 					.account (key1.pub)
 					.previous (receive1->hash ())
@@ -4804,14 +5069,14 @@ TEST (ledger, dependents_confirmed)
 					.work (*pool.generate (receive1->hash ()))
 					.build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, receive2));
-	ASSERT_FALSE (ledger.dependents_confirmed (transaction, *receive2));
-	ledger.confirm (transaction, receive1->hash ());
-	ASSERT_FALSE (ledger.dependents_confirmed (transaction, *receive2));
-	ledger.confirm (transaction, send2->hash ());
-	ASSERT_TRUE (ledger.dependents_confirmed (transaction, *receive2));
+	ASSERT_FALSE (ledger.dependencies_cemented (transaction, *receive2));
+	ledger.cement (transaction, receive1->hash ());
+	ASSERT_FALSE (ledger.dependencies_cemented (transaction, *receive2));
+	ledger.cement (transaction, send2->hash ());
+	ASSERT_TRUE (ledger.dependencies_cemented (transaction, *receive2));
 }
 
-TEST (ledger, dependents_confirmed_pruning)
+TEST (ledger, dependencies_cemented_pruning)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
@@ -4842,8 +5107,8 @@ TEST (ledger, dependents_confirmed_pruning)
 				 .work (*pool.generate (send1->hash ()))
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
-	ledger.confirm (transaction, send2->hash ());
-	ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
+	ledger.cement (transaction, send2->hash ());
+	ASSERT_TRUE (ledger.cemented.block_exists_or_pruned (transaction, send1->hash ()));
 	ASSERT_EQ (2, ledger.pruning_action (transaction, send2->hash (), 1));
 	auto receive1 = builder.state ()
 					.account (key1.pub)
@@ -4854,7 +5119,8 @@ TEST (ledger, dependents_confirmed_pruning)
 					.sign (key1.prv, key1.pub)
 					.work (*pool.generate (key1.pub))
 					.build ();
-	ASSERT_TRUE (ledger.dependents_confirmed (transaction, *receive1));
+	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, receive1));
+	ASSERT_TRUE (ledger.dependencies_cemented (transaction, *receive1));
 }
 
 TEST (ledger, block_confirmed)
@@ -4864,7 +5130,7 @@ TEST (ledger, block_confirmed)
 	auto & store = ctx.store ();
 	auto transaction = ledger.tx_begin_write ();
 	nano::block_builder builder;
-	ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, nano::dev::genesis->hash ()));
+	ASSERT_TRUE (ledger.cemented.block_exists_or_pruned (transaction, nano::dev::genesis->hash ()));
 	auto & pool = ctx.pool ();
 	nano::keypair key1;
 	auto send1 = builder.state ()
@@ -4877,11 +5143,11 @@ TEST (ledger, block_confirmed)
 				 .work (*pool.generate (nano::dev::genesis->hash ()))
 				 .build ();
 	// Must be safe against non-existing blocks
-	ASSERT_FALSE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists_or_pruned (transaction, send1->hash ()));
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send1));
-	ASSERT_FALSE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
-	ledger.confirm (transaction, send1->hash ());
-	ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, send1->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists_or_pruned (transaction, send1->hash ()));
+	ledger.cement (transaction, send1->hash ());
+	ASSERT_TRUE (ledger.cemented.block_exists_or_pruned (transaction, send1->hash ()));
 }
 
 TEST (ledger, cache)
@@ -4958,8 +5224,8 @@ TEST (ledger, cache)
 
 		{
 			auto transaction = ledger.tx_begin_write ();
-			ledger.confirm (transaction, send->hash ());
-			ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, send->hash ()));
+			ledger.cement (transaction, send->hash ());
+			ASSERT_TRUE (ledger.cemented.block_exists_or_pruned (transaction, send->hash ()));
 		}
 
 		++cemented_count;
@@ -4968,8 +5234,8 @@ TEST (ledger, cache)
 
 		{
 			auto transaction = ledger.tx_begin_write ();
-			ledger.confirm (transaction, open->hash ());
-			ASSERT_TRUE (ledger.confirmed.block_exists_or_pruned (transaction, open->hash ()));
+			ledger.cement (transaction, open->hash ());
+			ASSERT_TRUE (ledger.cemented.block_exists_or_pruned (transaction, open->hash ()));
 		}
 
 		++cemented_count;
@@ -5025,7 +5291,7 @@ TEST (ledger, pruning_action)
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send2->hash ()));
 	// Pruning action
-	ledger.confirm (transaction, send1->hash ());
+	ledger.cement (transaction, send1->hash ());
 	ASSERT_EQ (1, ledger.pruning_action (transaction, send1->hash (), 1));
 	ASSERT_EQ (0, ledger.pruning_action (transaction, nano::dev::genesis->hash (), 1));
 	ASSERT_TRUE (ledger.any.pending_get (transaction, nano::pending_key{ nano::dev::genesis_key.pub, send1->hash () }));
@@ -5061,7 +5327,7 @@ TEST (ledger, pruning_action)
 	ASSERT_FALSE (receive1_stored->sideband ().details.is_epoch);
 	// Middle block pruning
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send2->hash ()));
-	ledger.confirm (transaction, send2->hash ());
+	ledger.cement (transaction, send2->hash ());
 	ASSERT_EQ (1, ledger.pruning_action (transaction, send2->hash (), 1));
 	ASSERT_TRUE (store->pruned.exists (transaction, send2->hash ()));
 	ASSERT_FALSE (ledger.any.block_exists (transaction, send2->hash ()));
@@ -5112,7 +5378,7 @@ TEST (ledger, pruning_large_chain)
 	}
 	ASSERT_EQ (0, store->pruned.count (transaction));
 	ASSERT_EQ (send_receive_pairs * 2 + 1, store->block.count (transaction));
-	ledger.confirm (transaction, last_hash);
+	ledger.cement (transaction, last_hash);
 	// Pruning action
 	ASSERT_EQ (send_receive_pairs * 2, ledger.pruning_action (transaction, last_hash, 5));
 	ASSERT_TRUE (store->pruned.exists (transaction, last_hash));
@@ -5169,7 +5435,7 @@ TEST (ledger, pruning_source_rollback)
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send2->hash ()));
-	ledger.confirm (transaction, send1->hash ());
+	ledger.cement (transaction, send1->hash ());
 	// Pruning action
 	ASSERT_EQ (2, ledger.pruning_action (transaction, send1->hash (), 1));
 	ASSERT_FALSE (ledger.any.block_exists (transaction, send1->hash ()));
@@ -5254,7 +5520,7 @@ TEST (ledger, pruning_source_rollback_legacy)
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send3));
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send3->hash ()));
 	ASSERT_TRUE (ledger.any.pending_get (transaction, nano::pending_key{ nano::dev::genesis_key.pub, send3->hash () }));
-	ledger.confirm (transaction, send2->hash ());
+	ledger.cement (transaction, send2->hash ());
 	// Pruning action
 	ASSERT_EQ (2, ledger.pruning_action (transaction, send2->hash (), 1));
 	ASSERT_FALSE (ledger.any.block_exists (transaction, send2->hash ()));
@@ -5387,7 +5653,7 @@ TEST (ledger, pruning_legacy_blocks)
 				 .work (*pool.generate (open1->hash ()))
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send3));
-	ledger.confirm (transaction, open1->hash ());
+	ledger.cement (transaction, open1->hash ());
 	// Pruning action
 	ASSERT_EQ (3, ledger.pruning_action (transaction, change1->hash (), 2));
 	ASSERT_EQ (1, ledger.pruning_action (transaction, open1->hash (), 1));
@@ -5442,7 +5708,7 @@ TEST (ledger, pruning_safe_functions)
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send2->hash ()));
-	ledger.confirm (transaction, send1->hash ());
+	ledger.cement (transaction, send1->hash ());
 	// Pruning action
 	ASSERT_EQ (1, ledger.pruning_action (transaction, send1->hash (), 1));
 	ASSERT_FALSE (ledger.any.block_exists (transaction, send1->hash ()));
@@ -5492,7 +5758,7 @@ TEST (ledger, random_blocks)
 				 .build ();
 	ASSERT_EQ (nano::block_status::progress, ledger.process (transaction, send2));
 	ASSERT_TRUE (ledger.any.block_exists (transaction, send2->hash ()));
-	ledger.confirm (transaction, send1->hash ());
+	ledger.cement (transaction, send1->hash ());
 	// Pruning action
 	ASSERT_EQ (1, ledger.pruning_action (transaction, send1->hash (), 1));
 	ASSERT_FALSE (ledger.any.block_exists (transaction, send1->hash ()));
@@ -5673,9 +5939,9 @@ TEST (ledger, cement_unbounded)
 	std::deque<std::shared_ptr<nano::block>> confirmed;
 	{
 		auto tx = ledger.tx_begin_write ();
-		confirmed = ledger.confirm (tx, bottom->hash ());
+		confirmed = ledger.cement (tx, bottom->hash ());
 	}
-	ASSERT_TRUE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_TRUE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	// Check that all blocks got confirmed in a single call
 	ASSERT_TRUE (std::all_of (ctx.blocks ().begin (), ctx.blocks ().end (), [&] (auto const & block) {
 		return std::find_if (confirmed.begin (), confirmed.end (), [&] (auto const & block2) {
@@ -5697,37 +5963,37 @@ TEST (ledger, cement_bounded)
 	{
 		// This should only cement some of the dependencies
 		auto tx = ledger.tx_begin_write ();
-		confirmed1 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 3);
+		confirmed1 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 3);
 	}
-	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed1.size (), 3);
 	// Only topmost dependencies should get cemented during this call
 	ASSERT_TRUE (std::all_of (confirmed1.begin (), confirmed1.end (), [&] (auto const & block) {
-		return ledger.dependents_confirmed (ledger.tx_begin_read (), *block);
+		return ledger.dependencies_cemented (ledger.tx_begin_read (), *block);
 	}));
 
 	{
 		// This should cement a few more dependencies
 		auto tx = ledger.tx_begin_write ();
-		confirmed2 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 16);
+		confirmed2 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 16);
 	}
-	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed2.size (), 16);
 	// Only topmost dependencies should get cemented during this call
 	ASSERT_TRUE (std::all_of (confirmed2.begin (), confirmed2.end (), [&] (auto const & block) {
-		return ledger.dependents_confirmed (ledger.tx_begin_read (), *block);
+		return ledger.dependencies_cemented (ledger.tx_begin_read (), *block);
 	}));
 
 	{
 		// This should cement the remaining dependencies
 		auto tx = ledger.tx_begin_write ();
-		confirmed3 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 64);
+		confirmed3 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 64);
 	}
-	ASSERT_TRUE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_TRUE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_LE (confirmed3.size (), 64);
 	// Every block in the ledger should be cemented
 	ASSERT_TRUE (std::all_of (ctx.blocks ().begin (), ctx.blocks ().end (), [&] (auto const & block) {
-		return ledger.confirmed.block_exists (ledger.tx_begin_read (), block->hash ());
+		return ledger.cemented.block_exists (ledger.tx_begin_read (), block->hash ());
 	}));
 }
 
@@ -5743,48 +6009,48 @@ TEST (ledger, cement_bounded_diamond)
 	{
 		// This should only cement some of the dependencies
 		auto tx = ledger.tx_begin_write ();
-		confirmed1 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 3);
+		confirmed1 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 3);
 	}
-	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed1.size (), 3);
 	// Only topmost dependencies should get cemented during this call
 	ASSERT_TRUE (std::all_of (confirmed1.begin (), confirmed1.end (), [&] (auto const & block) {
-		return ledger.dependents_confirmed (ledger.tx_begin_read (), *block);
+		return ledger.dependencies_cemented (ledger.tx_begin_read (), *block);
 	}));
 
 	{
 		// This should cement a few more dependencies
 		auto tx = ledger.tx_begin_write ();
-		confirmed2 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 16);
+		confirmed2 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 16);
 	}
-	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed2.size (), 16);
 	// Only topmost dependencies should get cemented during this call
 	ASSERT_TRUE (std::all_of (confirmed2.begin (), confirmed2.end (), [&] (auto const & block) {
-		return ledger.dependents_confirmed (ledger.tx_begin_read (), *block);
+		return ledger.dependencies_cemented (ledger.tx_begin_read (), *block);
 	}));
 
 	{
 		// A few more bounded calls should confirm the whole tree
 		auto tx = ledger.tx_begin_write ();
-		confirmed3 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 64);
+		confirmed3 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 64);
 	}
-	ASSERT_FALSE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_FALSE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_EQ (confirmed3.size (), 64);
 	// Only topmost dependencies should get cemented during this call
 	ASSERT_TRUE (std::all_of (confirmed2.begin (), confirmed2.end (), [&] (auto const & block) {
-		return ledger.dependents_confirmed (ledger.tx_begin_read (), *block);
+		return ledger.dependencies_cemented (ledger.tx_begin_read (), *block);
 	}));
 
 	{
 		auto tx = ledger.tx_begin_write ();
-		confirmed4 = ledger.confirm (tx, bottom->hash (), /* max cementing batch size */ 64);
+		confirmed4 = ledger.cement (tx, bottom->hash (), /* max cementing batch size */ 64);
 	}
-	ASSERT_TRUE (ledger.confirmed.block_exists (ledger.tx_begin_read (), bottom->hash ()));
+	ASSERT_TRUE (ledger.cemented.block_exists (ledger.tx_begin_read (), bottom->hash ()));
 	ASSERT_LT (confirmed4.size (), 64);
 	// Every block in the ledger should be cemented
 	ASSERT_TRUE (std::all_of (ctx.blocks ().begin (), ctx.blocks ().end (), [&] (auto const & block) {
-		return ledger.confirmed.block_exists (ledger.tx_begin_read (), block->hash ());
+		return ledger.cemented.block_exists (ledger.tx_begin_read (), block->hash ());
 	}));
 }
 

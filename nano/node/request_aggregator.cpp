@@ -12,7 +12,7 @@
 #include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/store/ledger/final_vote.hpp>
 
 nano::request_aggregator::request_aggregator (request_aggregator_config const & config_a, nano::node & node_a, nano::vote_generator & generator_a, nano::vote_generator & final_generator_a, nano::local_vote_history & history_a, nano::ledger & ledger_a, nano::wallets & wallets_a, nano::vote_router & vote_router_a) :
@@ -265,7 +265,7 @@ auto nano::request_aggregator::aggregate (nano::secure::transaction const & tran
 			// If the final vote is not set, generate vote if the block is confirmed
 			else
 			{
-				return ledger.confirmed.block_exists (transaction, block->hash ());
+				return ledger.cemented.block_exists (transaction, block->hash ());
 			}
 		};
 

@@ -11,40 +11,10 @@ fi
 
 echo "Running tests for target: ${target}"
 
-# Enable core dumps
-DEFAULT_COREDUMP_DIR="/cores"
-case "$(uname -s)" in
-    Linux*)
-        # Ensure directory exists and is writable for core dumps
-        sudo mkdir -p "${DEFAULT_COREDUMP_DIR}"
-        sudo chmod a+w "${DEFAULT_COREDUMP_DIR}"
-        # Enable core dumps
-        ulimit -c unlimited
-        echo "${DEFAULT_COREDUMP_DIR}/core-%e.%p" | sudo tee /proc/sys/kernel/core_pattern
-        export COREDUMP_DIR=${DEFAULT_COREDUMP_DIR}
-
-        echo "Core dumps enabled (Linux)"
-        ;;
-    Darwin*)
-        # Ensure directory exists and is writable for core dumps
-        sudo mkdir -p "${DEFAULT_COREDUMP_DIR}"
-        sudo chmod a+w "${DEFAULT_COREDUMP_DIR}"
-        # Enable core dumps
-        ulimit -c unlimited
-        # By default, macOS writes core dumps to /cores
-        export COREDUMP_DIR=${DEFAULT_COREDUMP_DIR}
-
-        echo "Core dumps enabled (macOS)"
-        ;;
-    CYGWIN*|MINGW32*|MSYS*|MINGW*)
-        # TODO: Support core dumps on Windows
-        echo "Core dumps not supported on Windows"
-        ;;
-    *)
-        echo "Unknown OS"
-        exit 1
-        ;;
-esac
+# Enable core dumps for this process
+if [ -n "${COREDUMP_DIR-}" ]; then
+    ulimit -c unlimited
+fi
 
 # Run the test
 shift
@@ -55,9 +25,10 @@ status=$?
 if [ $status -ne 0 ]; then
     echo "::error::Test failed: ${target}"
 
-    # Show core dumps
-    export EXECUTABLE=${executable}
-    "$(dirname "$BASH_SOURCE")/show-core-dumps.sh"
+    # Show core dumps if core dump collection is enabled
+    if [ -n "${COREDUMP_DIR-}" ]; then
+        "$(dirname "$BASH_SOURCE")/show-core-dumps.sh" "${executable}"
+    fi
 
     exit $status
 else

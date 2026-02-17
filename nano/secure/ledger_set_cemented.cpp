@@ -1,6 +1,6 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/secure/ledger.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
 #include <nano/store/ledger/confirmation_height.hpp>
@@ -8,12 +8,12 @@
 #include <nano/store/ledger/pruned.hpp>
 #include <nano/store/ledger_store.hpp>
 
-nano::ledger_set_confirmed::ledger_set_confirmed (nano::ledger const & ledger) :
+nano::ledger_set_cemented::ledger_set_cemented (nano::ledger const & ledger) :
 	ledger{ ledger }
 {
 }
 
-std::optional<nano::amount> nano::ledger_set_confirmed::account_balance (secure::transaction const & transaction, nano::account const & account_a) const
+std::optional<nano::amount> nano::ledger_set_cemented::account_balance (secure::transaction const & transaction, nano::account const & account_a) const
 {
 	auto block = block_get (transaction, account_head (transaction, account_a));
 	if (!block)
@@ -23,7 +23,7 @@ std::optional<nano::amount> nano::ledger_set_confirmed::account_balance (secure:
 	return block->balance ();
 }
 
-nano::block_hash nano::ledger_set_confirmed::account_head (secure::transaction const & transaction, nano::account const & account) const
+nano::block_hash nano::ledger_set_cemented::account_head (secure::transaction const & transaction, nano::account const & account) const
 {
 	auto info = ledger.store.confirmation_height.get (transaction, account);
 	if (!info)
@@ -33,7 +33,7 @@ nano::block_hash nano::ledger_set_confirmed::account_head (secure::transaction c
 	return info.value ().frontier;
 }
 
-uint64_t nano::ledger_set_confirmed::account_height (secure::transaction const & transaction, nano::account const & account) const
+uint64_t nano::ledger_set_cemented::account_height (secure::transaction const & transaction, nano::account const & account) const
 {
 	auto head_l = account_head (transaction, account);
 	if (head_l.is_zero ())
@@ -45,7 +45,7 @@ uint64_t nano::ledger_set_confirmed::account_height (secure::transaction const &
 	return block->sideband ().height;
 }
 
-std::optional<nano::amount> nano::ledger_set_confirmed::block_balance (secure::transaction const & transaction, nano::block_hash const & hash) const
+std::optional<nano::amount> nano::ledger_set_cemented::block_balance (secure::transaction const & transaction, nano::block_hash const & hash) const
 {
 	auto block = block_get (transaction, hash);
 	if (!block)
@@ -55,12 +55,22 @@ std::optional<nano::amount> nano::ledger_set_confirmed::block_balance (secure::t
 	return block->balance ();
 }
 
-bool nano::ledger_set_confirmed::block_exists (secure::transaction const & transaction, nano::block_hash const & hash) const
+bool nano::ledger_set_cemented::block_exists (secure::transaction const & transaction, nano::block_hash const & hash) const
 {
 	return block_get (transaction, hash) != nullptr;
 }
 
-bool nano::ledger_set_confirmed::block_exists_or_pruned (secure::transaction const & transaction, nano::block_hash const & hash) const
+bool nano::ledger_set_cemented::block_exists (secure::transaction const & transaction, nano::block const & block) const
+{
+	auto info = ledger.store.confirmation_height.get (transaction, block.account ());
+	if (!info)
+	{
+		return false;
+	}
+	return block.sideband ().height <= info.value ().height;
+}
+
+bool nano::ledger_set_cemented::block_exists_or_pruned (secure::transaction const & transaction, nano::block_hash const & hash) const
 {
 	if (hash.is_zero ())
 	{
@@ -73,7 +83,7 @@ bool nano::ledger_set_confirmed::block_exists_or_pruned (secure::transaction con
 	return block_exists (transaction, hash);
 }
 
-std::shared_ptr<nano::block> nano::ledger_set_confirmed::block_get (secure::transaction const & transaction, nano::block_hash const & hash) const
+std::shared_ptr<nano::block> nano::ledger_set_cemented::block_get (secure::transaction const & transaction, nano::block_hash const & hash) const
 {
 	if (hash.is_zero ())
 	{
@@ -91,17 +101,17 @@ std::shared_ptr<nano::block> nano::ledger_set_confirmed::block_get (secure::tran
 	}
 	return block->sideband ().height <= info.value ().height ? block : nullptr;
 }
-auto nano::ledger_set_confirmed::receivable_end () const -> receivable_iterator
+auto nano::ledger_set_cemented::receivable_end () const -> receivable_iterator
 {
 	return receivable_iterator{};
 }
 
-auto nano::ledger_set_confirmed::receivable_upper_bound (secure::transaction const & transaction, nano::account const & account) const -> receivable_iterator
+auto nano::ledger_set_cemented::receivable_upper_bound (secure::transaction const & transaction, nano::account const & account) const -> receivable_iterator
 {
 	return receivable_iterator{ transaction, *this, receivable_lower_bound (transaction, account.number () + 1, 0) };
 }
 
-auto nano::ledger_set_confirmed::receivable_upper_bound (secure::transaction const & transaction, nano::account const & account, nano::block_hash const & hash) const -> receivable_iterator
+auto nano::ledger_set_cemented::receivable_upper_bound (secure::transaction const & transaction, nano::account const & account, nano::block_hash const & hash) const -> receivable_iterator
 {
 	auto result = receivable_lower_bound (transaction, account, hash.number () + 1);
 	if (!result || result.value ().first.account != account)
@@ -111,7 +121,7 @@ auto nano::ledger_set_confirmed::receivable_upper_bound (secure::transaction con
 	return receivable_iterator{ transaction, *this, result };
 }
 
-std::optional<std::pair<nano::pending_key, nano::pending_info>> nano::ledger_set_confirmed::receivable_lower_bound (secure::transaction const & transaction, nano::account const & account, nano::block_hash const & hash) const
+std::optional<std::pair<nano::pending_key, nano::pending_info>> nano::ledger_set_cemented::receivable_lower_bound (secure::transaction const & transaction, nano::account const & account, nano::block_hash const & hash) const
 {
 	auto result = ledger.store.pending.begin (transaction, { account, hash });
 	while (result != ledger.store.pending.end (transaction) && !block_exists (transaction, result->first.hash))

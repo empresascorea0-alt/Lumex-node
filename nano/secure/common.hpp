@@ -201,7 +201,6 @@ public:
 	std::chrono::minutes backup_interval;
 	std::chrono::seconds search_pending_interval;
 	std::chrono::minutes unchecked_cleaning_interval;
-	std::chrono::milliseconds process_confirmed_interval;
 
 	/** Time between collecting online representative samples */
 	std::chrono::seconds weight_interval;

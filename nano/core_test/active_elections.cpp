@@ -13,7 +13,7 @@
 #include <nano/node/vote_router.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/test_common/chains.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
@@ -354,7 +354,7 @@ TEST (active_elections, cached_vote_basic)
 	node.vote_processor.vote (vote, std::make_shared<nano::transport::inproc::channel> (node, node));
 	ASSERT_TIMELY_EQ (5s, node.vote_cache.size (), 1);
 	node.process_active (send);
-	ASSERT_TIMELY (5s, node.ledger.confirmed.block_exists_or_pruned (node.ledger.tx_begin_read (), send->hash ()));
+	ASSERT_TIMELY (5s, node.ledger.cemented.block_exists_or_pruned (node.ledger.tx_begin_read (), send->hash ()));
 	ASSERT_EQ (1, node.stats.count (nano::stat::type::election_vote, nano::stat::detail::cache));
 }
 
@@ -633,8 +633,7 @@ TEST (active_elections, cached_vote_election_start)
 	node.process_active (send3);
 	// An election is started for send6 but does not
 	ASSERT_FALSE (node.block_confirmed_or_being_confirmed (send3->hash ()));
-	// send7 cannot be voted on but an election should be started from inactive votes
-	ASSERT_FALSE (node.ledger.dependents_confirmed (node.ledger.tx_begin_read (), *send4));
+	// send4 cannot be voted on but an election should be started from inactive votes
 	node.process_active (send4);
 	ASSERT_TIMELY_EQ (5s, 7, node.ledger.cemented_count ());
 }
@@ -1830,7 +1829,7 @@ TEST (active_elections, cancel_cemented_races)
 	{
 		for (auto & block : blocks)
 		{
-			ASSERT_TRUE (node.ledger.confirmed.block_exists (transaction, block->hash ()));
+			ASSERT_TRUE (node.ledger.cemented.block_exists (transaction, block->hash ()));
 		}
 	}
 
@@ -1859,11 +1858,11 @@ TEST (active_elections, cancel_already_cemented)
 	// First, cement the block through direct ledger confirmation process, skips callbacks
 	{
 		auto transaction = node.ledger.tx_begin_write ();
-		node.ledger.confirm (transaction, last_block->hash ());
+		node.ledger.cement (transaction, last_block->hash ());
 	}
 
 	// Verify the block is actually cemented
-	ASSERT_TRUE (node.ledger.confirmed.block_exists (node.ledger.tx_begin_read (), last_block->hash ()));
+	ASSERT_TRUE (node.ledger.cemented.block_exists (node.ledger.tx_begin_read (), last_block->hash ()));
 
 	// Now start an election for the already cemented block
 	auto election = node.active.insert (last_block, nano::election_behavior::priority);

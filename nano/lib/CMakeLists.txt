@@ -37,6 +37,7 @@ add_library(
   blockbuilders.cpp
   blocks.hpp
   blocks.cpp
+  bounded_dfs.hpp
   char_traits.hpp
   cli.hpp
   cli.cpp

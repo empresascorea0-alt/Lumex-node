@@ -1,6 +1,7 @@
 #include <nano/crypto_lib/random_pool.hpp>
 #include <nano/lib/block_type.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/bounded_dfs.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/numbers.hpp>
@@ -13,7 +14,7 @@
 #include <nano/secure/ledger_processor.hpp>
 #include <nano/secure/ledger_rollback.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/secure/rep_weights.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
@@ -40,9 +41,9 @@ nano::ledger::ledger (nano::store::ledger_store & store_a, nano::network_params 
 	rep_weights{ store_a.rep_weight, min_rep_weight_a },
 	max_backlog_size{ max_backlog_a },
 	any_impl{ std::make_unique<ledger_set_any> (*this) },
-	confirmed_impl{ std::make_unique<ledger_set_confirmed> (*this) },
+	cemented_impl{ std::make_unique<ledger_set_cemented> (*this) },
 	any{ *any_impl },
-	confirmed{ *confirmed_impl }
+	cemented{ *cemented_impl }
 {
 	initialize (generate_cache_flags_a);
 }
@@ -256,9 +257,14 @@ void nano::ledger::verify_consistency (secure::transaction const & transaction) 
 	rep_weights.verify_consistency (0); // It's impractical to recompute burned weight, so we skip it here
 }
 
-bool nano::ledger::unconfirmed_exists (secure::transaction const & transaction, nano::block_hash const & hash) const
+bool nano::ledger::block_uncemented (secure::transaction const & transaction, nano::block_hash const & hash) const
 {
-	return any.block_exists (transaction, hash) && !confirmed.block_exists (transaction, hash);
+	auto block = any.block_get (transaction, hash);
+	if (block)
+	{
+		return !cemented.block_exists (transaction, *block);
+	}
+	return false; // Block doesn't exist
 }
 
 nano::uint128_t nano::ledger::account_receivable (secure::transaction const & transaction_a, nano::account const & account_a, bool only_confirmed_a) const
@@ -270,7 +276,7 @@ nano::uint128_t nano::ledger::account_receivable (secure::transaction const & tr
 		nano::pending_info const & info (i->second);
 		if (only_confirmed_a)
 		{
-			if (confirmed.block_exists_or_pruned (transaction_a, i->first.hash))
+			if (cemented.block_exists_or_pruned (transaction_a, i->first.hash))
 			{
 				result += info.amount.number ();
 			}
@@ -284,52 +290,52 @@ nano::uint128_t nano::ledger::account_receivable (secure::transaction const & tr
 }
 
 // Both stack and result set are bounded to limit maximum memory usage
-// Callers must ensure that the target block was confirmed, and if not, call this function multiple times
-std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_transaction & transaction, nano::block_hash const & target_hash, size_t max_blocks)
+// Due to the max_blocks limit, the target block may not be cemented in a single call. Callers should call this function multiple times until the target is cemented.
+std::deque<std::shared_ptr<nano::block>> nano::ledger::cement (secure::write_transaction & transaction, nano::block_hash const & target_hash, size_t max_blocks)
 {
 	std::deque<std::shared_ptr<nano::block>> result;
 
-	std::deque<nano::block_hash> stack;
-	stack.push_back (target_hash);
-	while (!stack.empty ())
-	{
-		auto hash = stack.back ();
-		auto block = any.block_get (transaction, hash);
-		release_assert (block);
+	auto start_block = any.block_get (transaction, target_hash);
+	release_assert (start_block, "attempting to cement a non-existent block", target_hash.to_string ());
 
-		auto dependents = dependent_blocks (transaction, *block);
-		for (auto const & dependent : dependents)
+	auto is_resolved = [&] (std::shared_ptr<nano::block> const & block) {
+		if (block)
 		{
-			if (!dependent.is_zero () && !confirmed.block_exists_or_pruned (transaction, dependent))
+			return cemented.block_exists (transaction, *block);
+		}
+		return true; // Pruned, must have been cemented
+	};
+
+	auto get_dependencies = [&] (std::shared_ptr<nano::block> const & block) {
+		auto dep_hashes = block->dependencies ();
+		std::array<std::shared_ptr<nano::block>, dep_hashes.size ()> deps{};
+		for (size_t i = 0; i < dep_hashes.size (); ++i)
+		{
+			auto const & dep_hash = dep_hashes[i];
+			if (!dep_hash.is_zero ())
 			{
-				stats.inc (nano::stat::type::confirmation_height, nano::stat::detail::dependent_unconfirmed);
-
-				stack.push_back (dependent);
-
-				// Limit the stack size to avoid excessive memory usage
-				// This will forget the bottom of the dependency tree
-				if (stack.size () > max_blocks)
+				auto dep_block = any.block_get (transaction, dep_hash);
+				if (dep_block)
 				{
-					stack.pop_front ();
+					deps[i] = dep_block;
 				}
+				else
+				{
+					// If the block doesn't exist, it must be pruned
+					debug_assert (any.block_pruned (transaction, dep_hash), "missing dependency block", dep_hash.to_string ());
+				}
+				// nullptr will be filtered by is_resolved
 			}
 		}
+		return deps;
+	};
 
-		if (stack.back () == hash)
-		{
-			stack.pop_back ();
-			if (!confirmed.block_exists_or_pruned (transaction, hash))
-			{
-				// We must only confirm blocks that have their dependencies confirmed
-				debug_assert (dependents_confirmed (transaction, *block));
-				confirm_one (transaction, *block);
-				result.push_back (block);
-			}
-		}
-		else
-		{
-			// Unconfirmed dependencies were added
-		}
+	auto resolve = [&] (std::shared_ptr<nano::block> const & block) -> bool {
+		// We must only cement blocks that have their dependencies cemented
+		debug_assert (dependencies_cemented (transaction, *block));
+		cement_one (transaction, *block);
+
+		result.push_back (block);
 
 		// Refresh the transaction to avoid long-running transactions
 		// Ensure that the block wasn't rolled back during the refresh
@@ -338,28 +344,32 @@ std::deque<std::shared_ptr<nano::block>> nano::ledger::confirm (secure::write_tr
 		{
 			if (!any.block_exists (transaction, target_hash))
 			{
-				break; // Block was rolled back during cementing
+				return false; // Block was rolled back during cementing
 			}
 		}
 
-		// Early return might leave parts of the dependency tree unconfirmed
-		if (result.size () >= max_blocks)
-		{
-			break;
-		}
-	}
+		// Early return might leave parts of the dependency tree uncemented
+		return result.size () < max_blocks;
+	};
+
+	// Walk the dependency tree depth-first, cementing blocks bottom-up, newly cemented blocks are collected in result
+	auto dfs_result = nano::bounded_dfs (start_block, max_blocks, is_resolved, get_dependencies, resolve);
+	debug_assert (dfs_result.resolved == result.size ());
+
+	stats.inc (nano::stat::type::ledger, dfs_result.overflow ? nano::stat::detail::cementing_overflow : nano::stat::detail::cementing);
+	stats.inc (nano::stat::type::ledger, nano::stat::detail::cemented, dfs_result.resolved);
 
 	return result;
 }
 
-void nano::ledger::confirm_one (secure::write_transaction & transaction, nano::block const & block)
+void nano::ledger::cement_one (secure::write_transaction & transaction, nano::block const & block)
 {
 	debug_assert ((!store.confirmation_height.get (transaction, block.account ()) && block.sideband ().height == 1) || store.confirmation_height.get (transaction, block.account ()).value ().height + 1 == block.sideband ().height);
 	confirmation_height_info info{ block.sideband ().height, block.hash () };
 	store.confirmation_height.put (transaction, block.account (), info);
 	++cache.cemented_count;
 
-	stats.inc (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed);
+	stats.inc (nano::stat::type::confirmation_height, nano::stat::detail::blocks_cemented);
 }
 
 nano::block_status nano::ledger::process (secure::write_transaction const & transaction, std::shared_ptr<nano::block> block)
@@ -573,93 +583,18 @@ nano::root nano::ledger::latest_root (secure::transaction const & transaction_a,
 	}
 }
 
-bool nano::ledger::dependents_confirmed (secure::transaction const & transaction_a, nano::block const & block_a) const
+bool nano::ledger::dependencies_cemented (secure::transaction const & transaction, nano::block const & block) const
 {
-	auto dependencies (dependent_blocks (transaction_a, block_a));
-	return std::all_of (dependencies.begin (), dependencies.end (), [this, &transaction_a] (nano::block_hash const & hash_a) {
-		auto result (hash_a.is_zero ());
-		if (!result)
-		{
-			result = confirmed.block_exists_or_pruned (transaction_a, hash_a);
-		}
-		return result;
+	release_assert (block.has_sideband ());
+	auto dependencies = block.dependencies ();
+	return std::all_of (dependencies.begin (), dependencies.end (), [this, &transaction] (nano::block_hash const & hash) {
+		return hash.is_zero () || cemented.block_exists_or_pruned (transaction, hash);
 	});
 }
 
 bool nano::ledger::is_epoch_link (nano::link const & link_a) const
 {
 	return constants.epochs.is_epoch_link (link_a);
-}
-
-namespace
-{
-class dependent_block_visitor final : public nano::block_visitor
-{
-public:
-	dependent_block_visitor (nano::secure::transaction const & transaction, nano::ledger const & ledger) :
-		transaction{ transaction },
-		ledger{ ledger }
-	{
-	}
-
-	void send_block (nano::send_block const & block) override
-	{
-		result[0] = block.previous ();
-	}
-	void receive_block (nano::receive_block const & block) override
-	{
-		result[0] = block.previous ();
-		result[1] = block.source_field ().value ();
-	}
-	void open_block (nano::open_block const & block) override
-	{
-		if (block.source_field ().value () != ledger.constants.genesis->account ().as_union ())
-		{
-			result[0] = block.source_field ().value ();
-		}
-	}
-	void change_block (nano::change_block const & block) override
-	{
-		result[0] = block.previous ();
-	}
-	void state_block (nano::state_block const & block) override
-	{
-		result[0] = block.hashables.previous;
-		result[1] = block.hashables.link.as_block_hash ();
-		// ledger.is_send will check the sideband first, if block_a has a loaded sideband the check that previous block exists can be skipped
-		if (ledger.is_epoch_link (block.hashables.link) || is_send (block))
-		{
-			result[1].clear ();
-		}
-	}
-
-	// This function is used in place of block->is_send () as it is tolerant to the block not having the sideband information loaded
-	// This is needed for instance in vote generation on forks which have not yet had sideband information attached
-	bool is_send (nano::state_block const & block) const
-	{
-		if (block.previous ().is_zero ())
-		{
-			return false;
-		}
-		if (block.has_sideband ())
-		{
-			return block.sideband ().details.is_send;
-		}
-		return block.balance_field ().value () < ledger.any.block_balance (transaction, block.previous ());
-	}
-
-	nano::ledger const & ledger;
-	nano::secure::transaction const & transaction;
-
-	std::array<nano::block_hash, 2> result{ 0, 0 };
-};
-}
-
-std::array<nano::block_hash, 2> nano::ledger::dependent_blocks (secure::transaction const & transaction, nano::block const & block) const
-{
-	dependent_block_visitor visitor{ transaction, *this };
-	block.visit (visitor);
-	return visitor.result;
 }
 
 /** Given the block hash of a send block, find the associated receive block that receives that send.
@@ -772,7 +707,7 @@ uint64_t nano::ledger::pruning_action (secure::write_transaction & transaction_a
 		auto block_l = any.block_get (transaction_a, hash);
 		if (block_l != nullptr)
 		{
-			release_assert (confirmed.block_exists (transaction_a, hash));
+			release_assert (cemented.block_exists (transaction_a, hash));
 			store.block.del (transaction_a, hash);
 			store.pruned.put (transaction_a, hash);
 			hash = block_l->previous ();
@@ -797,6 +732,9 @@ uint64_t nano::ledger::pruning_action (secure::write_transaction & transaction_a
 	return pruned_count;
 }
 
+// Balance uses the maximum of current and previous block balance to avoid deprioritizing full sends
+// Timestamp uses the previous block's timestamp for least-recently-used ordering within a bucket,
+// falling back to the current block's sideband timestamp when there is no previous block (e.g. open blocks)
 auto nano::ledger::block_priority (nano::secure::transaction const & transaction, nano::block const & block) const -> block_priority_result
 {
 	auto const balance = block.balance ();

@@ -17,8 +17,8 @@ add_library(
   ledger_rollback.cpp
   ledger_set_any.hpp
   ledger_set_any.cpp
-  ledger_set_confirmed.hpp
-  ledger_set_confirmed.cpp
+  ledger_set_cemented.hpp
+  ledger_set_cemented.cpp
   pending_info.hpp
   pending_info.cpp
   receivable_iterator.cpp

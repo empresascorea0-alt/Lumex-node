@@ -21,7 +21,7 @@ namespace nano
 {
 class ledger;
 class ledger_set_any;
-class ledger_set_confirmed;
+class ledger_set_cemented;
 
 class ledger_cache
 {
@@ -48,7 +48,6 @@ public:
 	/** Start read-only transaction */
 	secure::read_transaction tx_begin_read () const;
 
-	bool unconfirmed_exists (secure::transaction const &, nano::block_hash const &) const;
 	nano::uint128_t account_receivable (secure::transaction const &, nano::account const &, bool = false) const;
 	/**
 	 * Returns the cached vote weight for the given representative.
@@ -65,15 +64,13 @@ public:
 	std::string block_text (nano::block_hash const &);
 	std::deque<std::shared_ptr<nano::block>> random_blocks (secure::transaction const &, size_t count) const;
 	std::optional<nano::pending_info> pending_info (secure::transaction const &, nano::pending_key const & key) const;
-	std::deque<std::shared_ptr<nano::block>> confirm (secure::write_transaction &, nano::block_hash const & hash, size_t max_blocks = 1024 * 128);
+	std::deque<std::shared_ptr<nano::block>> cement (secure::write_transaction &, nano::block_hash const & hash, size_t max_blocks = 1024 * 128);
 	nano::block_status process (secure::write_transaction const &, std::shared_ptr<nano::block> block);
 	bool rollback (secure::write_transaction const &, nano::block_hash const &, std::deque<std::shared_ptr<nano::block>> & rollback_list, size_t depth = 0, size_t max_depth = nano::ledger_max_rollback_depth ());
 	bool rollback (secure::write_transaction const &, nano::block_hash const &);
 	void update_account (secure::write_transaction const &, nano::account const &, nano::account_info const &, nano::account_info const &);
 	uint64_t pruning_action (secure::write_transaction &, nano::block_hash const &, uint64_t const);
-	bool dependents_confirmed (secure::transaction const &, nano::block const &) const;
 	bool is_epoch_link (nano::link const &) const;
-	std::array<nano::block_hash, 2> dependent_blocks (secure::transaction const &, nano::block const &) const;
 	std::shared_ptr<nano::block> find_receive_block_by_send_hash (secure::transaction const &, nano::account const & destination, nano::block_hash const & send_block_hash);
 	std::optional<nano::account> linked_account (secure::transaction const &, nano::block const &);
 	nano::account const & epoch_signer (nano::link const &) const;
@@ -84,17 +81,28 @@ public:
 	static nano::epoch version (nano::block const & block);
 	nano::epoch version (secure::transaction const &, nano::block_hash const & hash) const;
 
+	/**
+	 * Checks if a block exists in the ledger but has not yet been cemented
+	 */
+	bool block_uncemented (secure::transaction const &, nano::block_hash const &) const;
+
+	/**
+	 * Checks if all blocks that this block depends on are cemented (or pruned)
+	 */
+	bool dependencies_cemented (secure::transaction const &, nano::block const &) const;
+
+	/**
+	 * Computes the priority balance and timestamp for bucket-based prioritization
+	 */
+	using block_priority_result = std::pair<nano::amount, nano::priority_timestamp>;
+	block_priority_result block_priority (secure::transaction const &, nano::block const &) const;
+
 	uint64_t cemented_count () const;
 	uint64_t block_count () const;
 	uint64_t account_count () const;
 	uint64_t pruned_count () const;
 	uint64_t backlog_size () const;
 	uint64_t max_backlog () const;
-
-	// Returned priority balance is maximum of block balance and previous block balance to handle full account balance send cases
-	// Returned timestamp is the previous block timestamp or the current timestamp if there's no previous block
-	using block_priority_result = std::pair<nano::amount, nano::priority_timestamp>;
-	block_priority_result block_priority (secure::transaction const &, nano::block const &) const;
 
 	void verify_consistency (secure::transaction const &) const;
 
@@ -120,13 +128,13 @@ public:
 
 private:
 	void initialize (nano::generate_cache_flags const &);
-	void confirm_one (secure::write_transaction &, nano::block const & block);
+	void cement_one (secure::write_transaction &, nano::block const & block);
 
 	std::unique_ptr<ledger_set_any> any_impl;
-	std::unique_ptr<ledger_set_confirmed> confirmed_impl;
+	std::unique_ptr<ledger_set_cemented> cemented_impl;
 
 public:
 	ledger_set_any & any;
-	ledger_set_confirmed & confirmed;
+	ledger_set_cemented & cemented;
 };
 }

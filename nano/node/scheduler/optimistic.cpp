@@ -7,7 +7,7 @@
 #include <nano/node/scheduler/optimistic.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 
 nano::scheduler::optimistic::optimistic (optimistic_config const & config_a, nano::node & node_a, nano::ledger & ledger_a, nano::active_elections & active_a, nano::network_constants const & network_constants_a, nano::stats & stats_a) :
 	config{ config_a },

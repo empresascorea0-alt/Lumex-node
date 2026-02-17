@@ -10,7 +10,7 @@
 #include <nano/node/vote_router.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
 #include <nano/store/ledger/confirmation_height.hpp>
@@ -129,7 +129,7 @@ void nano::test::confirm (nano::ledger & ledger, std::shared_ptr<nano::block> co
 void nano::test::confirm (nano::ledger & ledger, nano::block_hash const & hash)
 {
 	auto transaction = ledger.tx_begin_write ();
-	ledger.confirm (transaction, hash);
+	ledger.cement (transaction, hash);
 }
 
 bool nano::test::block_or_pruned_all_exists (nano::node & node, std::vector<nano::block_hash> hashes)
@@ -328,7 +328,7 @@ void nano::test::print_all_account_info (const nano::ledger & ledger)
 		nano::confirmation_height_info height_info;
 		std::cout << "Account: " << acc.to_account () << std::endl;
 		std::cout << "  Unconfirmed Balance: " << acc_info.balance.to_string_dec () << std::endl;
-		std::cout << "  Confirmed Balance:   " << ledger.confirmed.account_balance (tx, acc).value_or (0) << std::endl;
+		std::cout << "  Confirmed Balance:   " << ledger.cemented.account_balance (tx, acc).value_or (0) << std::endl;
 		std::cout << "  Block Count:         " << acc_info.block_count << std::endl;
 		if (!ledger.store.confirmation_height.get (tx, acc, height_info))
 		{

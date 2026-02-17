@@ -191,7 +191,7 @@ void nano::test::system::setup_node (nano::node & node)
 		auto result = node.ledger.process (transaction, block);
 		debug_assert (result == nano::block_status::progress);
 
-		auto cemented = node.ledger.confirm (transaction, block->hash ());
+		auto cemented = node.ledger.cement (transaction, block->hash ());
 		debug_assert (std::find_if (cemented.begin (), cemented.end (), [&block] (auto const & cemented_block) {
 			return cemented_block->hash () == block->hash ();
 		})

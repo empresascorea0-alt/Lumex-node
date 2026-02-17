@@ -132,7 +132,6 @@ enum class type
 	message_processor,
 	message_processor_overfill,
 	message_processor_type,
-	process_confirmed,
 	online_reps,
 	pruning,
 	fork_cache,
@@ -447,9 +446,9 @@ enum class detail
 	invocations,
 
 	// confirmation height
-	blocks_confirmed,
-	blocks_confirmed_unbounded,
-	blocks_confirmed_bounded,
+	blocks_cemented,
+	blocks_cemented_unbounded,
+	blocks_cemented_bounded,
 
 	// request aggregator
 	aggregator_accepted,
@@ -497,11 +496,11 @@ enum class detail
 
 	// hinting
 	missing_block,
-	dependent_unconfirmed,
+	dependency_unconfirmed,
 	already_confirmed,
 	activate,
 	activate_immediate,
-	dependent_activated,
+	dependency_activated,
 
 	// bootstrap server
 	response,
@@ -654,6 +653,7 @@ enum class detail
 	notify_intermediate,
 	already_cemented,
 	cementing,
+	cementing_overflow,
 	cemented_hash,
 	cementing_failed,
 	deferred_failed,

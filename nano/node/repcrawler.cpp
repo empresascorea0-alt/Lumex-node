@@ -4,7 +4,7 @@
 #include <nano/node/online_reps.hpp>
 #include <nano/node/repcrawler.hpp>
 #include <nano/secure/ledger.hpp>
-#include <nano/secure/ledger_set_confirmed.hpp>
+#include <nano/secure/ledger_set_cemented.hpp>
 
 #include <ranges>
 
@@ -307,7 +307,7 @@ auto nano::rep_crawler::prepare_query_target () const -> hash_root_t
 		}
 
 		// Nodes will not respond to queries for blocks that are not confirmed
-		if (!node.ledger.confirmed.block_exists (transaction, block->hash ()))
+		if (!node.ledger.cemented.block_exists (transaction, block->hash ()))
 		{
 			continue;
 		}
