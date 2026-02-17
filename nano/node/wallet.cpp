@@ -183,7 +183,7 @@ void nano::wallet_store::initialize (nano::store::write_transaction const & tran
 	auto error = mdb_dbi_open (env.tx (transaction_a), path_a.c_str (), MDB_CREATE, &handle_l);
 	if (error != 0)
 	{
-		throw std::runtime_error ("Failed to open wallet database");
+		throw std::runtime_error ("Failed to open wallet database '" + path_a + "': " + nano::store::lmdb::error_string (error));
 	}
 	handle = handle_l;
 }
