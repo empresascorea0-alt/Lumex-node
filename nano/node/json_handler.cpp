@@ -23,9 +23,12 @@
 #include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/secure/transaction.hpp>
 #include <nano/store/ledger/account.hpp>
+#include <nano/store/ledger/block.hpp>
 #include <nano/store/ledger/confirmation_height.hpp>
 #include <nano/store/ledger/pending.hpp>
 #include <nano/store/ledger/pruned.hpp>
+#include <nano/store/ledger/successor.hpp>
+#include <nano/store/ledger_store.hpp>
 
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -1159,7 +1162,7 @@ void nano::json_handler::block_info ()
 			response_l.put ("balance", balance.number ().convert_to<std::string> ());
 			response_l.put ("height", std::to_string (block->sideband ().height));
 			response_l.put ("local_timestamp", std::to_string (block->sideband ().timestamp));
-			response_l.put ("successor", block->sideband ().successor.to_string ());
+			response_l.put ("successor", node.store.successor.get (transaction, hash).value_or (nano::block_hash{ 0 }).to_string ());
 			auto confirmed (node.ledger.cemented.block_exists_or_pruned (transaction, hash));
 			response_l.put ("confirmed", confirmed);
 
@@ -1329,7 +1332,7 @@ void nano::json_handler::blocks_info ()
 					entry.put ("balance", balance.number ().convert_to<std::string> ());
 					entry.put ("height", std::to_string (block->sideband ().height));
 					entry.put ("local_timestamp", std::to_string (block->sideband ().timestamp));
-					entry.put ("successor", block->sideband ().successor.to_string ());
+					entry.put ("successor", node.store.successor.get (transaction, hash).value_or (nano::block_hash{ 0 }).to_string ());
 					auto confirmed (node.ledger.cemented.block_exists_or_pruned (transaction, hash));
 					entry.put ("confirmed", confirmed);
 

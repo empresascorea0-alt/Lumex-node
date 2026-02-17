@@ -1,6 +1,12 @@
+#include <nano/lib/block_sideband.hpp>
+#include <nano/lib/block_type.hpp>
+#include <nano/lib/blocks.hpp>
+#include <nano/lib/config.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/stats.hpp>
+#include <nano/lib/stream.hpp>
 #include <nano/store/backend.hpp>
+#include <nano/store/db_val_templ.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
 #include <nano/store/ledger/confirmation_height.hpp>
@@ -10,6 +16,7 @@
 #include <nano/store/ledger/pending.hpp>
 #include <nano/store/ledger/pruned.hpp>
 #include <nano/store/ledger/rep_weight.hpp>
+#include <nano/store/ledger/successor.hpp>
 #include <nano/store/ledger/version.hpp>
 #include <nano/store/ledger_store.hpp>
 
@@ -22,6 +29,7 @@ nano::store::column_schema const ledger_store::schema_current{
 	{ nano::store::table::rep_weights, "rep_weights" },
 	{ nano::store::table::online_weight, "online_weight" },
 	{ nano::store::table::pruned, "pruned" },
+	{ nano::store::table::successor, "successor" },
 	{ nano::store::table::peers, "peers" },
 	{ nano::store::table::confirmation_height, "confirmation_height" },
 	{ nano::store::table::final_votes, "final_votes" },
@@ -35,7 +43,8 @@ ledger_store::ledger_store (std::unique_ptr<nano::store::backend> backend_a, nan
 	stats{ stats_a },
 	logger{ logger_a },
 	backend_impl{ std::move (backend_a) },
-	block_impl{ std::make_unique<nano::store::ledger::block_view> (*backend_impl) },
+	successor_impl{ std::make_unique<nano::store::ledger::successor_view> (*backend_impl) },
+	block_impl{ std::make_unique<nano::store::ledger::block_view> (*backend_impl, *successor_impl) },
 	account_impl{ std::make_unique<nano::store::ledger::account_view> (*backend_impl) },
 	pending_impl{ std::make_unique<nano::store::ledger::pending_view> (*backend_impl) },
 	rep_weight_impl{ std::make_unique<nano::store::ledger::rep_weight_view> (*backend_impl) },
@@ -46,6 +55,7 @@ ledger_store::ledger_store (std::unique_ptr<nano::store::backend> backend_a, nan
 	final_vote_impl{ std::make_unique<nano::store::ledger::final_vote_view> (*backend_impl) },
 	version_impl{ std::make_unique<nano::store::ledger::version_view> (*backend_impl) },
 	backend{ *backend_impl },
+	successor{ *successor_impl },
 	block{ *block_impl },
 	account{ *account_impl },
 	pending{ *pending_impl },
@@ -192,6 +202,9 @@ void ledger_store::perform_upgrades (nano::store::backend_meta meta)
 			upgrade_v23_to_v24 ();
 			[[fallthrough]];
 		case 24:
+			upgrade_v24_to_v25 ();
+			[[fallthrough]];
+		case 25:
 			break;
 		default:
 			release_assert (false, "invalid ledger database version for upgrade", std::to_string (meta.version));
@@ -288,7 +301,8 @@ void ledger_store::upgrade_v22_to_v23 ()
 
 		// Always drop rep_weights table to ensure it's empty before populating
 		// This can happen if an upgrade was attempted but failed halfway through
-		backend.clear (nano::store::table::rep_weights);
+		auto clear_status = backend.clear (nano::store::table::rep_weights);
+		release_assert (backend.success (clear_status), "failed to clear rep_weights table during upgrade", backend.error_string (clear_status));
 
 		auto transaction = backend.tx_begin_write ();
 
@@ -362,6 +376,64 @@ void ledger_store::upgrade_v23_to_v24 ()
 	backend.close ();
 
 	logger.info (nano::log::type::ledger_upgrade, "Upgrading database from v23 to v24 completed");
+}
+
+// Populate dedicated successor table from block sideband data
+void ledger_store::upgrade_v24_to_v25 ()
+{
+	logger.info (nano::log::type::ledger_upgrade, "Upgrading database from v24 to v25...");
+
+	// Open with schema_current so we have access to the successor table
+	backend.open (schema_current, nano::store::open_mode::read_write);
+	{
+		release_assert (backend.get_version (backend.tx_begin_read ()) == 24, "unexpected version during upgrade", std::to_string (backend.get_version (backend.tx_begin_read ())));
+
+		// Always clear successor table to ensure clean state before populating
+		auto clear_result = backend.clear (nano::store::table::successor);
+		release_assert (backend.success (clear_result), "failed to clear successor table during upgrade", backend.error_string (clear_result));
+
+		auto transaction = backend.tx_begin_write ();
+
+		// Smaller batch size for dev runs to potentially trigger edge cases
+		const size_t batch_size = nano::is_dev_run () ? 2 : 250000;
+		size_t processed = 0;
+		auto const total_blocks = backend.count (backend.tx_begin_read (), nano::store::table::blocks);
+
+		// Iterate all blocks using a separate read transaction
+		auto iterate_blocks = [this] (auto && func) {
+			auto read_txn = backend.tx_begin_read ();
+			auto it = nano::store::typed_iterator<nano::block_hash, nano::store::block_w_sideband>{ backend.begin (read_txn, nano::store::table::blocks) };
+			auto const end = nano::store::typed_iterator<nano::block_hash, nano::store::block_w_sideband>{ backend.end (read_txn, nano::store::table::blocks) };
+			for (; it != end; ++it)
+			{
+				auto const & [hash, block_w_sideband] = *it;
+				func (hash, block_w_sideband);
+			}
+		};
+
+		iterate_blocks ([this, &transaction, &processed, batch_size, total_blocks] (nano::block_hash const & hash, nano::store::block_w_sideband const & block_w_sideband) {
+			// If successor is non-zero, write to successor table
+			if (!block_w_sideband.sideband.successor.is_zero ())
+			{
+				auto status = backend.put (transaction, nano::store::table::successor, hash, block_w_sideband.sideband.successor);
+				backend.release_assert_success (status);
+			}
+
+			processed++;
+			if (processed % batch_size == 0)
+			{
+				double const percentage = total_blocks > 0 ? (static_cast<double> (processed) / total_blocks * 100.0) : 0.0;
+				logger.info (nano::log::type::ledger_upgrade, "Processed {} blocks ({:.1f}%)", processed, percentage);
+				transaction.refresh ();
+			}
+		});
+
+		logger.info (nano::log::type::ledger_upgrade, "Done processing {} blocks", processed);
+		version.put (transaction, 25);
+	}
+	backend.close ();
+
+	logger.info (nano::log::type::ledger_upgrade, "Upgrading database from v24 to v25 completed");
 }
 
 std::string ledger_store::vendor_get () const

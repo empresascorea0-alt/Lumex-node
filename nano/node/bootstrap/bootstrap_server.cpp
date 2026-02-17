@@ -9,6 +9,7 @@
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
 #include <nano/store/ledger/confirmation_height.hpp>
+#include <nano/store/ledger/successor.hpp>
 #include <nano/store/ledger_store.hpp>
 
 nano::bootstrap_server::bootstrap_server (bootstrap_server_config const & config_a, nano::store::ledger_store & store_a, nano::ledger & ledger_a, nano::network_constants const & network_constants_a, nano::stats & stats_a) :
@@ -344,8 +345,8 @@ std::deque<std::shared_ptr<nano::block>> nano::bootstrap_server::prepare_blocks 
 		{
 			result.push_back (current);
 
-			auto successor = current->sideband ().successor;
-			current = ledger.any.block_get (transaction, successor);
+			auto successor_hash = ledger.store.successor.get (transaction, current->hash ());
+			current = successor_hash ? ledger.any.block_get (transaction, *successor_hash) : nullptr;
 		}
 	}
 	return result;
