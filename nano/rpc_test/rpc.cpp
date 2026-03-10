@@ -7046,9 +7046,9 @@ TEST (rpc, bootstrap_priorities)
 	request.put ("action", "bootstrap_priorities");
 	auto response = wait_response (system, rpc_ctx, request);
 
-	ASSERT_TRUE (response.get_child_optional ("priorities"));
-	ASSERT_TRUE (response.get_child_optional ("blocking"));
-	ASSERT_FALSE (response.get_child_optional ("priorities").value ().empty ());
+	ASSERT_TRUE (response.get_child_optional ("bootstrap.priorities"));
+	ASSERT_TRUE (response.get_child_optional ("bootstrap.blocking"));
+	ASSERT_FALSE (response.get_child_optional ("bootstrap.priorities").value ().empty ());
 }
 
 TEST (rpc, bootstrap_reset)
