@@ -33,21 +33,32 @@ add_library(
   bucketing.cpp
   bounded_backlog.hpp
   bounded_backlog.cpp
-  bootstrap/account_sets.hpp
-  bootstrap/account_sets.cpp
+  bootstrap/account_sets_index.hpp
+  bootstrap/account_sets_index.cpp
   bootstrap/bootstrap_config.hpp
   bootstrap/bootstrap_config.cpp
+  bootstrap/bootstrap_context.hpp
+  bootstrap/bootstrap_context.cpp
   bootstrap/bootstrap_server.hpp
   bootstrap/bootstrap_server.cpp
   bootstrap/bootstrap_service.hpp
   bootstrap/bootstrap_service.cpp
   bootstrap/common.hpp
+  bootstrap/common.cpp
+  bootstrap/database_strategy.hpp
+  bootstrap/database_strategy.cpp
+  bootstrap/dependency_strategy.hpp
+  bootstrap/dependency_strategy.cpp
+  bootstrap/frontier_strategy.hpp
+  bootstrap/frontier_strategy.cpp
+  bootstrap/priority_strategy.hpp
+  bootstrap/priority_strategy.cpp
   bootstrap/throttle.hpp
   bootstrap/throttle.cpp
-  bootstrap/database_scan.hpp
-  bootstrap/database_scan.cpp
-  bootstrap/frontier_scan.hpp
-  bootstrap/frontier_scan.cpp
+  bootstrap/database_scan_index.hpp
+  bootstrap/database_scan_index.cpp
+  bootstrap/frontier_scan_index.hpp
+  bootstrap/frontier_scan_index.cpp
   bootstrap/peer_scoring.hpp
   bootstrap/peer_scoring.cpp
   cli.hpp
