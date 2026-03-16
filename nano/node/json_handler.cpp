@@ -5011,7 +5011,10 @@ void nano::json_handler::work_generate ()
 		}
 		if (!ec && response_l.empty ())
 		{
-			auto use_peers (request.get<bool> ("use_peers", false));
+			// Use distributed work peers if any are configured
+			bool default_use_peers = !node.config.work_peers.empty ();
+			auto use_peers (request.get<bool> ("use_peers", default_use_peers));
+
 			auto rpc_l (shared_from_this ());
 			auto callback = [rpc_l, hash, work_version, this] (std::optional<uint64_t> const & work_a) {
 				if (work_a)
