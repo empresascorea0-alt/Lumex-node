@@ -27,7 +27,7 @@ enum class mutexes
 	gap_cache,
 	network_filter,
 	observer_set,
-	request_aggregator,
+	vote_replier,
 	state_block_signature_verification,
 	telemetry,
 	vote_generator,

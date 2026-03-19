@@ -67,7 +67,6 @@ add_executable(
   rep_weight_store.cpp
   scheduler_buckets.cpp
   stats.cpp
-  request_aggregator.cpp
   signal_manager.cpp
   socket.cpp
   stacktrace.cpp
@@ -85,6 +84,7 @@ add_executable(
   voting_policy.cpp
   vote_processor.cpp
   vote_rebroadcaster.cpp
+  vote_replier.cpp
   voting.cpp
   wallet.cpp
   wallets.cpp

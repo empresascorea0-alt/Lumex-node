@@ -1808,16 +1808,16 @@ TEST (node, DISABLED_local_votes_cache)
 	nano::messages::confirm_req message2{ nano::dev::network_params.network, send2->hash (), send2->root () };
 	auto channel = std::make_shared<nano::transport::fake::channel> (node);
 	node.inbound (message1, channel);
-	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::requests, nano::stat::detail::requests_generated_votes), 1);
+	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::vote_replier, nano::stat::detail::reply_final), 1);
 	node.inbound (message2, channel);
-	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::requests, nano::stat::detail::requests_generated_votes), 2);
+	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::vote_replier, nano::stat::detail::reply_final), 2);
 	for (auto i (0); i < 100; ++i)
 	{
 		node.inbound (message1, channel);
 		node.inbound (message2, channel);
 	}
 	// Make sure a new vote was not generated
-	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::requests, nano::stat::detail::requests_generated_votes), 2);
+	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::vote_replier, nano::stat::detail::reply_final), 2);
 	// Max cache
 	{
 		auto transaction = node.ledger.tx_begin_write ();
@@ -1825,7 +1825,7 @@ TEST (node, DISABLED_local_votes_cache)
 	}
 	nano::messages::confirm_req message3{ nano::dev::network_params.network, send3->hash (), send3->root () };
 	node.inbound (message3, channel);
-	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::requests, nano::stat::detail::requests_generated_votes), 3);
+	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::vote_replier, nano::stat::detail::reply_final), 3);
 	ASSERT_TIMELY (3s, !node.history.votes (send1->root (), send1->hash ()).empty ());
 	ASSERT_TIMELY (3s, !node.history.votes (send2->root (), send2->hash ()).empty ());
 	ASSERT_TIMELY (3s, !node.history.votes (send3->root (), send3->hash ()).empty ());
@@ -1834,7 +1834,7 @@ TEST (node, DISABLED_local_votes_cache)
 	{
 		node.inbound (message3, channel);
 	}
-	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::requests, nano::stat::detail::requests_generated_votes), 3);
+	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::vote_replier, nano::stat::detail::reply_final), 3);
 }
 
 // Test disabled because it's failing intermittently.
@@ -1934,7 +1934,7 @@ TEST (node, DISABLED_local_votes_cache_generate_new_vote)
 	ASSERT_EQ (1, votes1.size ());
 	ASSERT_EQ (1, votes1[0]->hashes.size ());
 	ASSERT_EQ (nano::dev::genesis->hash (), votes1[0]->hashes[0]);
-	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::requests, nano::stat::detail::requests_generated_votes), 1);
+	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::vote_replier, nano::stat::detail::reply_final), 1);
 
 	auto send1 = nano::state_block_builder ()
 				 .account (nano::dev::genesis_key.pub)
@@ -1954,7 +1954,7 @@ TEST (node, DISABLED_local_votes_cache_generate_new_vote)
 	auto votes2 (node.history.votes (send1->root (), send1->hash ()));
 	ASSERT_EQ (1, votes2.size ());
 	ASSERT_EQ (1, votes2[0]->hashes.size ());
-	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::requests, nano::stat::detail::requests_generated_votes), 2);
+	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::vote_replier, nano::stat::detail::reply_final), 2);
 	ASSERT_FALSE (node.history.votes (nano::dev::genesis->root (), nano::dev::genesis->hash ()).empty ());
 	ASSERT_FALSE (node.history.votes (send1->root (), send1->hash ()).empty ());
 	// First generated + again cached + new generated
@@ -2899,8 +2899,8 @@ TEST (node, rollback_vote_self)
 		// Insert genesis key in the wallet
 		system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 
-		// Without the rollback being finished, the aggregator should not reply with any vote
-		node.aggregator.request ({ { send2->hash (), send2->root () } }, node.loopback_channel);
+		// Without the rollback being finished, the vote replier should not reply with any vote
+		node.vote_replier.request ({ { send2->hash (), send2->root () } }, node.loopback_channel);
 		ASSERT_ALWAYS (1s, !election->votes ().contains (nano::dev::genesis_key.pub));
 
 		// Going out of the scope allows the rollback to complete

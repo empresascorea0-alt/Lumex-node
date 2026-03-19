@@ -135,7 +135,6 @@ nano::error nano::node_config::serialize_toml (nano::tomlconfig & toml) const
 	toml.put ("backup_before_upgrade", backup_before_upgrade, "Backup the ledger database before performing upgrades.\nWarning: uses more disk storage and increases startup time when upgrading.\ntype:bool");
 	toml.put ("max_work_generate_multiplier", max_work_generate_multiplier, "Maximum allowed difficulty multiplier for work generation.\ntype:double,[1..]");
 	toml.put ("max_queued_requests", max_queued_requests, "Limit for number of queued confirmation requests for one channel, after which new requests are dropped until the queue drops below this value.\ntype:uint32");
-	toml.put ("request_aggregator_threads", request_aggregator_threads, "Number of threads to dedicate to request aggregator. Defaults to using all cpu threads, up to a maximum of 4");
 	toml.put ("max_unchecked_blocks", max_unchecked_blocks, "Maximum number of unchecked blocks to store in memory. Defaults to 65536. \ntype:uint64,[0..]");
 	toml.put ("max_backlog", max_backlog, "Maximum number of unconfirmed blocks to keep in the ledger. If this limit is exceeded, the node will start dropping low-priority unconfirmed blocks.\ntype:uint64");
 	toml.put ("rep_crawler_weight_minimum", rep_crawler_weight_minimum.to_string_dec (), "Rep crawler minimum weight, if this is less than minimum principal weight then this is taken as the minimum weight a rep must have to be tracked. If you want to track all reps set this to 0. If you do not want this to influence anything then set it to max value. This is only useful for debugging or for people who really know what they are doing.\ntype:string,amount,raw");
@@ -263,9 +262,9 @@ nano::error nano::node_config::serialize_toml (nano::tomlconfig & toml) const
 	network.serialize (network_l);
 	toml.put_child ("network", network_l);
 
-	nano::tomlconfig request_aggregator_l;
-	request_aggregator.serialize (request_aggregator_l);
-	toml.put_child ("request_aggregator", request_aggregator_l);
+	nano::tomlconfig vote_replier_l;
+	vote_replier.serialize (vote_replier_l);
+	toml.put_child ("vote_replier", vote_replier_l);
 
 	nano::tomlconfig message_processor_l;
 	message_processor.serialize (message_processor_l);
@@ -440,10 +439,10 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 			network.deserialize (config_l);
 		}
 
-		if (toml.has_key ("request_aggregator"))
+		if (toml.has_key ("vote_replier"))
 		{
-			auto config_l = toml.get_required_child ("request_aggregator");
-			request_aggregator.deserialize (config_l);
+			auto config_l = toml.get_required_child ("vote_replier");
+			vote_replier.deserialize (config_l);
 		}
 
 		if (toml.has_key ("message_processor"))
@@ -649,7 +648,6 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		toml.get<double> ("max_work_generate_multiplier", max_work_generate_multiplier);
 
 		toml.get<uint32_t> ("max_queued_requests", max_queued_requests);
-		toml.get<uint32_t> ("request_aggregator_threads", request_aggregator_threads);
 
 		toml.get<unsigned> ("max_unchecked_blocks", max_unchecked_blocks);
 		toml.get<std::size_t> ("max_backlog", max_backlog);

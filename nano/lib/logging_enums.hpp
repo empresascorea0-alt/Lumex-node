@@ -92,7 +92,7 @@ enum class type
 	monitor,
 	cementing_set,
 	bounded_backlog,
-	request_aggregator,
+	vote_replier,
 	vote_rebroadcaster,
 	block_rebroadcaster,
 	migration,

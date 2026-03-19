@@ -43,6 +43,7 @@ class unchecked_map;
 class stats;
 class vote_cache;
 class vote_generator;
+class vote_replier;
 class vote_processor;
 class vote_rebroadcaster;
 class vote_router;

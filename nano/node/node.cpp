@@ -35,7 +35,6 @@
 #include <nano/node/peer_history.hpp>
 #include <nano/node/portmapping.hpp>
 #include <nano/node/pruning.hpp>
-#include <nano/node/request_aggregator.hpp>
 #include <nano/node/rpc_callbacks.hpp>
 #include <nano/node/scheduler/component.hpp>
 #include <nano/node/scheduler/hinted.hpp>
@@ -48,6 +47,7 @@
 #include <nano/node/vote_generator.hpp>
 #include <nano/node/vote_processor.hpp>
 #include <nano/node/vote_rebroadcaster.hpp>
+#include <nano/node/vote_replier.hpp>
 #include <nano/node/vote_router.hpp>
 #include <nano/node/wallet.hpp>
 #include <nano/node/websocket.hpp>
@@ -184,8 +184,8 @@ nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, std::filesy
 	final_generator{ *final_generator_impl },
 	scheduler_impl{ std::make_unique<nano::scheduler::component> (config, *this, ledger, ledger_notifications, bucketing, active, online_reps, vote_cache, cementing_set, stats, logger) },
 	scheduler{ *scheduler_impl },
-	aggregator_impl{ std::make_unique<nano::request_aggregator> (config.request_aggregator, *this, voting_policy, generator, final_generator, history, ledger, wallets, vote_router) },
-	aggregator{ *aggregator_impl },
+	vote_replier_impl{ std::make_unique<nano::vote_replier> (config.vote_replier, voting_policy, ledger, wallets, network_params.network, stats, logger, config.enable_voting) },
+	vote_replier{ *vote_replier_impl },
 	backlog_scan_impl{ std::make_unique<nano::backlog_scan> (config.backlog_scan, ledger, stats) },
 	backlog_scan{ *backlog_scan_impl },
 	backlog_impl{ std::make_unique<nano::bounded_backlog> (config, *this, ledger, ledger_notifications, bucketing, backlog_scan, block_processor, cementing_set, stats, logger) },
@@ -547,7 +547,7 @@ void nano::node::start ()
 	final_generator.start ();
 	cementing_set.start ();
 	scheduler.start ();
-	aggregator.start ();
+	vote_replier.start ();
 	backlog_scan.start ();
 	backlog.start ();
 	bootstrap_server.start ();
@@ -591,7 +591,7 @@ void nano::node::stop ()
 	rep_crawler.stop ();
 	unchecked.stop ();
 	block_processor.stop ();
-	aggregator.stop ();
+	vote_replier.stop ();
 	vote_cache_processor.stop ();
 	vote_processor.stop ();
 	rep_tiers.stop ();
@@ -963,7 +963,7 @@ nano::container_info nano::node::container_info () const
 	info.add ("vote_uniquer", vote_uniquer.container_info ());
 	info.add ("cementing_set", cementing_set.container_info ());
 	info.add ("distributed_work", distributed_work.container_info ());
-	info.add ("aggregator", aggregator.container_info ());
+	info.add ("vote_replier", vote_replier.container_info ());
 	info.add ("scheduler", scheduler.container_info ());
 	info.add ("vote_cache", vote_cache.container_info ());
 	info.add ("vote_router", vote_router.container_info ());

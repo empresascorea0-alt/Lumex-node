@@ -34,7 +34,7 @@ enum class name
 	confirmation_height_notifications,
 	worker,
 	election_worker,
-	request_aggregator,
+	vote_replier,
 	state_block_signature_verification,
 	epoch_upgrader,
 	db_parallel_traversal,

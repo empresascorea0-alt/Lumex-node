@@ -209,7 +209,7 @@ public:
 		{
 			if (!message.roots_hashes.empty ())
 			{
-				node.aggregator.request (message.roots_hashes, channel);
+				node.vote_replier.request (message.roots_hashes, channel);
 			}
 		}
 	}

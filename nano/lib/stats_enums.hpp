@@ -68,11 +68,8 @@ enum class type
 	confirmation_height,
 	confirmation_observer,
 	cementing_set,
-	aggregator,
-	requests,
-	request_aggregator,
-	request_aggregator_vote,
-	request_aggregator_replies,
+	vote_replier,
+	vote_replier_ec,
 	filter,
 	telemetry,
 	vote_generator,
@@ -199,6 +196,7 @@ enum class detail
 	reset,
 	close,
 	read,
+	oversize,
 
 	// processing queue
 	queue,
@@ -453,25 +451,13 @@ enum class detail
 	blocks_cemented_unbounded,
 	blocks_cemented_bounded,
 
-	// request aggregator
-	aggregator_accepted,
-	aggregator_dropped,
-
-	// requests
-	requests_cached_hashes,
-	requests_generated_hashes,
-	requests_cached_votes,
-	requests_generated_votes,
-	requests_cannot_vote,
-	requests_unknown,
-	requests_non_final,
-	requests_final,
-
-	// request_aggregator
+	// vote_replier
 	request_hashes,
 	overfill_hashes,
-	normal_vote,
-	final_vote,
+	reply_final,
+	reply_skip,
+	reply_unknown,
+	reply_hashes,
 
 	// duplicate
 	duplicate_publish_message,
@@ -491,8 +477,6 @@ enum class detail
 
 	// vote_generator
 	generator_broadcasts,
-	generator_replies,
-	generator_replies_discarded,
 	generator_spacing,
 	sent_pr,
 	sent_non_pr,
