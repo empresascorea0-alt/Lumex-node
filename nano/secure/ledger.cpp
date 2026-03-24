@@ -3,6 +3,7 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/bounded_dfs.hpp>
 #include <nano/lib/files.hpp>
+#include <nano/lib/formatting.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/stats.hpp>
@@ -244,12 +245,12 @@ void nano::ledger::initialize (nano::generate_cache_flags const & generate_cache
 	logger.info (nano::log::type::ledger, "Pruned count:   {:>11}", cache.pruned_count.load ());
 	logger.info (nano::log::type::ledger, "Representative count: {:>5}", rep_weights.size ());
 	logger.info (nano::log::type::ledger, "Active balance: {} | pending: {} | burned: {}",
-	nano::uint128_union{ static_cast<nano::uint128_t> (active_balance) }.format_balance (nano::nano_ratio, 0, true),
-	nano::uint128_union{ static_cast<nano::uint128_t> (pending_balance) }.format_balance (nano::nano_ratio, 0, true),
-	nano::uint128_union{ static_cast<nano::uint128_t> (burned_balance) }.format_balance (nano::nano_ratio, 0, true));
+	nano::log::as_nano (static_cast<nano::uint128_t> (active_balance)),
+	nano::log::as_nano (static_cast<nano::uint128_t> (pending_balance)),
+	nano::log::as_nano (static_cast<nano::uint128_t> (burned_balance)));
 	logger.info (nano::log::type::ledger, "Weight committed: {} | unused: {}",
-	nano::uint128_union{ rep_weights.get_weight_committed () }.format_balance (nano::nano_ratio, 0, true),
-	nano::uint128_union{ rep_weights.get_weight_unused () }.format_balance (nano::nano_ratio, 0, true));
+	nano::log::as_nano (rep_weights.get_weight_committed ()),
+	nano::log::as_nano (rep_weights.get_weight_unused ()));
 }
 
 void nano::ledger::verify_consistency (secure::transaction const & transaction) const
@@ -660,21 +661,21 @@ std::optional<nano::account> nano::ledger::linked_account (secure::transaction c
 	{
 		return block.destination ();
 	}
-	else if (block.is_receive ())
+	if (block.is_receive ())
 	{
 		return any.block_account (transaction, block.source ());
 	}
 	return std::nullopt;
 }
 
-nano::account const & nano::ledger::epoch_signer (nano::link const & link_a) const
+nano::account nano::ledger::epoch_signer (nano::link const & link) const
 {
-	return constants.epochs.signer (constants.epochs.epoch (link_a));
+	return constants.epochs.signer (constants.epochs.epoch (link));
 }
 
-nano::link const & nano::ledger::epoch_link (nano::epoch epoch_a) const
+nano::link nano::ledger::epoch_link (nano::epoch epoch) const
 {
-	return constants.epochs.link (epoch_a);
+	return constants.epochs.link (epoch);
 }
 
 void nano::ledger::update_account (secure::write_transaction const & transaction_a, nano::account const & account_a, nano::account_info const & old_a, nano::account_info const & new_a)

@@ -58,8 +58,8 @@ public:
 	bool decode_dec (std::string const &, bool = false);
 	bool decode_dec (std::string const &, nano::uint128_t);
 
+	void encode_balance (std::ostream &, nano::uint128_t scale, int precision, bool group_digits) const;
 	std::string format_balance (nano::uint128_t scale, int precision, bool group_digits) const;
-	std::string format_balance (nano::uint128_t scale, int precision, bool group_digits, std::locale const & locale) const;
 
 	void clear ()
 	{
@@ -229,7 +229,7 @@ public: // Keep operators inlined
 	}
 };
 
-class public_key final : public uint256_union
+class public_key : public uint256_union
 {
 public:
 	using uint256_union::uint256_union;
@@ -241,6 +241,7 @@ public:
 
 	bool decode_node_id (std::string const &);
 	void encode_account (std::ostream &) const;
+	void encode_node_id (std::ostream &) const;
 	bool decode_account (std::string const &);
 
 	std::string to_node_id () const;
@@ -277,13 +278,20 @@ public: // Keep operators inlined
 	}
 };
 
-class wallet_id : public uint256_union
+class wallet_id final : public uint256_union
 {
 	using uint256_union::uint256_union;
 };
 
-// These are synonymous
-using account = public_key;
+class account final : public public_key
+{
+public:
+	using public_key::public_key;
+
+	account () = default;
+	account (nano::public_key const & key) :
+		public_key{ key } {};
+};
 
 class hash_or_account
 {
@@ -525,11 +533,13 @@ std::ostream & operator<< (std::ostream &, const uint512_union &);
 std::ostream & operator<< (std::ostream &, const hash_or_account &);
 std::ostream & operator<< (std::ostream &, const account &);
 
+void encode_balance (std::ostream &, nano::uint128_t value, nano::uint128_t scale, int precision, bool group_digits);
+
 /**
  * Convert a double to string in fixed format
- * @param precision_a (optional) use a specific precision (default is the maximum)
+ * @param precision (optional) use a specific precision (default is the maximum)
  */
-std::string to_string (double const, int const precision_a = std::numeric_limits<double>::digits10);
+std::string to_string (double const, int const precision = std::numeric_limits<double>::digits10);
 
 namespace difficulty
 {

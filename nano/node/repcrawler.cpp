@@ -1,8 +1,10 @@
+#include <nano/lib/formatting.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/repcrawler.hpp>
+#include <nano/node/transport/formatting.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>
 
@@ -129,15 +131,15 @@ void nano::rep_crawler::validate_and_process (nano::unique_lock<nano::mutex> & l
 		if (inserted)
 		{
 			logger.info (nano::log::type::rep_crawler, "Found representative: {} at: {}",
-			vote->account.to_account (),
-			channel->to_string ());
+			vote->account,
+			channel);
 		}
 		if (updated)
 		{
 			logger.warn (nano::log::type::rep_crawler, "Updated representative: {} at: {} (was at: {})",
-			vote->account.to_account (),
-			channel->to_string (),
-			prev_channel->to_string ());
+			vote->account,
+			channel,
+			prev_channel);
 		}
 	}
 }
@@ -226,7 +228,7 @@ void nano::rep_crawler::cleanup ()
 		if (!rep.channel->alive ())
 		{
 			stats.inc (nano::stat::type::rep_crawler, nano::stat::detail::channel_dead);
-			logger.info (nano::log::type::rep_crawler, "Evicting representative: {} with dead channel at: {}", rep.account, rep.channel->to_string ());
+			logger.info (nano::log::type::rep_crawler, "Evicting representative: {} with dead channel at: {}", rep.account, rep.channel);
 			return true; // Erase
 		}
 		return false;
@@ -239,12 +241,12 @@ void nano::rep_crawler::cleanup ()
 			if (query.replies == 0)
 			{
 				stats.inc (nano::stat::type::rep_crawler, nano::stat::detail::query_timeout);
-				logger.debug (nano::log::type::rep_crawler, "Aborting unresponsive query for block: {} from: {}", query.hash, query.channel->to_string ());
+				logger.debug (nano::log::type::rep_crawler, "Aborting unresponsive query for block: {} from: {}", query.hash, query.channel);
 			}
 			else
 			{
 				stats.inc (nano::stat::type::rep_crawler, nano::stat::detail::query_completion);
-				logger.debug (nano::log::type::rep_crawler, "Completion of query with: {} replies for block: {} from: {}", query.replies, query.hash, query.channel->to_string ());
+				logger.debug (nano::log::type::rep_crawler, "Completion of query with: {} replies for block: {} from: {}", query.replies, query.hash, query.channel);
 			}
 			return true; // Erase
 		}
@@ -354,7 +356,7 @@ void nano::rep_crawler::query (std::deque<std::shared_ptr<nano::transport::chann
 		if (tracked)
 		{
 			stats.inc (nano::stat::type::rep_crawler, nano::stat::detail::query_sent);
-			logger.debug (nano::log::type::rep_crawler, "Sending query for block: {} to: {}", hash_root.first, channel->to_string ());
+			logger.debug (nano::log::type::rep_crawler, "Sending query for block: {} to: {}", hash_root.first, channel);
 
 			lock.unlock ();
 
@@ -370,7 +372,7 @@ void nano::rep_crawler::query (std::deque<std::shared_ptr<nano::transport::chann
 		else
 		{
 			stats.inc (nano::stat::type::rep_crawler, nano::stat::detail::query_duplicate);
-			logger.debug (nano::log::type::rep_crawler, "Ignoring duplicate query for block: {} to: {}", hash_root.first, channel->to_string ());
+			logger.debug (nano::log::type::rep_crawler, "Ignoring duplicate query for block: {} to: {}", hash_root.first, channel);
 		}
 	}
 }
@@ -406,7 +408,7 @@ bool nano::rep_crawler::process (std::shared_ptr<nano::vote> const & vote, std::
 		if (found)
 		{
 			stats.inc (nano::stat::type::rep_crawler, nano::stat::detail::response);
-			logger.debug (nano::log::type::rep_crawler, "Processing response for block: {} from: {}", target_hash, channel->to_string ());
+			logger.debug (nano::log::type::rep_crawler, "Processing response for block: {} from: {}", target_hash, channel);
 
 			// Track response time
 			stats.sample (nano::stat::sample::rep_response_time, nano::log::milliseconds_delta (it->time), { 0, config.query_timeout.count () });

@@ -1,6 +1,7 @@
 #include <nano/crypto/blake2/blake2.h>
 #include <nano/crypto_lib/random_pool.hpp>
 #include <nano/crypto_lib/secure_memory.hpp>
+#include <nano/lib/balance_formatting.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/secure/common.hpp>
@@ -97,7 +98,35 @@ nano::public_key const & nano::public_key::null ()
 
 std::string nano::public_key::to_node_id () const
 {
-	return to_account ().replace (0, 4, "node");
+	std::stringstream stream;
+	encode_node_id (stream);
+	return stream.str ();
+}
+
+void nano::public_key::encode_node_id (std::ostream & os) const
+{
+	// Same encoding as account but with "node_" prefix instead of "nano_"
+	uint64_t check = 0;
+
+	blake2b_state hash;
+	blake2b_init (&hash, 5);
+	blake2b_update (&hash, bytes.data (), bytes.size ());
+	blake2b_final (&hash, reinterpret_cast<uint8_t *> (&check), 5);
+
+	nano::uint512_t number_l{ number () };
+	number_l <<= 40;
+	number_l |= nano::uint512_t{ check };
+
+	std::array<char, 60> encoded{};
+	for (auto i (0); i < 60; ++i)
+	{
+		uint8_t r{ number_l & static_cast<uint8_t> (0x1f) };
+		number_l >>= 5;
+		encoded[59 - i] = account_encode (r);
+	}
+
+	os << "node_";
+	os.write (encoded.data (), encoded.size ());
 }
 
 bool nano::public_key::decode_node_id (std::string const & source_a)
@@ -557,134 +586,16 @@ std::string nano::uint128_union::to_string_dec () const
 	return stream.str ();
 }
 
-/*
- *
- */
-
-void format_frac (std::ostringstream & stream, nano::uint128_t value, nano::uint128_t scale, int precision)
+void nano::uint128_union::encode_balance (std::ostream & os, nano::uint128_t scale, int precision, bool group_digits) const
 {
-	auto reduce = scale;
-	auto rem = value;
-	while (reduce > 1 && rem > 0 && precision > 0)
-	{
-		reduce /= 10;
-		auto val = rem / reduce;
-		rem -= val * reduce;
-		stream << val;
-		precision--;
-	}
-}
-
-void format_dec (std::ostringstream & stream, nano::uint128_t value, char group_sep, std::string const & groupings)
-{
-	auto largestPow10 = nano::uint256_t (1);
-	int dec_count = 1;
-	while (1)
-	{
-		auto next = largestPow10 * 10;
-		if (next > value)
-		{
-			break;
-		}
-		largestPow10 = next;
-		dec_count++;
-	}
-
-	if (dec_count > 39)
-	{
-		// Impossible.
-		return;
-	}
-
-	// This could be cached per-locale.
-	bool emit_group[39];
-	if (group_sep != 0)
-	{
-		int group_index = 0;
-		int group_count = 0;
-		for (int i = 0; i < dec_count; i++)
-		{
-			group_count++;
-			if (group_count > groupings[group_index])
-			{
-				group_index = std::min (group_index + 1, (int)groupings.length () - 1);
-				group_count = 1;
-				emit_group[i] = true;
-			}
-			else
-			{
-				emit_group[i] = false;
-			}
-		}
-	}
-
-	auto reduce = nano::uint128_t (largestPow10);
-	nano::uint128_t rem = value;
-	while (reduce > 0)
-	{
-		auto val = rem / reduce;
-		rem -= val * reduce;
-		stream << val;
-		dec_count--;
-		if (group_sep != 0 && emit_group[dec_count] && reduce > 1)
-		{
-			stream << group_sep;
-		}
-		reduce /= 10;
-	}
-}
-
-std::string format_balance (nano::uint128_t balance, nano::uint128_t scale, int precision, bool group_digits, char thousands_sep, char decimal_point, std::string & grouping)
-{
-	std::ostringstream stream;
-	auto int_part = balance / scale;
-	auto frac_part = balance % scale;
-	auto prec_scale = scale;
-	for (int i = 0; i < precision; i++)
-	{
-		prec_scale /= 10;
-	}
-	if (int_part == 0 && frac_part > 0 && frac_part / prec_scale == 0)
-	{
-		// Display e.g. "< 0.01" rather than 0.
-		stream << "< ";
-		if (precision > 0)
-		{
-			stream << "0";
-			stream << decimal_point;
-			for (int i = 0; i < precision - 1; i++)
-			{
-				stream << "0";
-			}
-		}
-		stream << "1";
-	}
-	else
-	{
-		format_dec (stream, int_part, group_digits && grouping.length () > 0 ? thousands_sep : 0, grouping);
-		if (precision > 0 && frac_part > 0)
-		{
-			stream << decimal_point;
-			format_frac (stream, frac_part, scale, precision);
-		}
-	}
-	return stream.str ();
+	nano::encode_balance (os, number (), scale, precision, group_digits);
 }
 
 std::string nano::uint128_union::format_balance (nano::uint128_t scale, int precision, bool group_digits) const
 {
-	auto thousands_sep = std::use_facet<std::numpunct<char>> (std::locale ()).thousands_sep ();
-	auto decimal_point = std::use_facet<std::numpunct<char>> (std::locale ()).decimal_point ();
-	std::string grouping = "\3";
-	return ::format_balance (number (), scale, precision, group_digits, thousands_sep, decimal_point, grouping);
-}
-
-std::string nano::uint128_union::format_balance (nano::uint128_t scale, int precision, bool group_digits, std::locale const & locale) const
-{
-	auto thousands_sep = std::use_facet<std::moneypunct<char>> (locale).thousands_sep ();
-	auto decimal_point = std::use_facet<std::moneypunct<char>> (locale).decimal_point ();
-	std::string grouping = std::use_facet<std::moneypunct<char>> (locale).grouping ();
-	return ::format_balance (number (), scale, precision, group_digits, thousands_sep, decimal_point, grouping);
+	std::ostringstream stream;
+	encode_balance (stream, scale, precision, group_digits);
+	return stream.str ();
 }
 
 bool nano::hash_or_account::decode_hex (std::string const & text_a)
@@ -710,6 +621,14 @@ std::string nano::hash_or_account::to_account () const
 /*
  *
  */
+
+void nano::encode_balance (std::ostream & os, nano::uint128_t value, nano::uint128_t scale, int precision, bool group_digits)
+{
+	auto thousands_sep = std::use_facet<std::numpunct<char>> (std::locale ()).thousands_sep ();
+	auto decimal_point = std::use_facet<std::numpunct<char>> (std::locale ()).decimal_point ();
+	std::string grouping = "\3";
+	nano::encode_balance (os, value, scale, precision, group_digits, thousands_sep, decimal_point, grouping);
+}
 
 std::string nano::to_string_hex (uint64_t const value_a)
 {

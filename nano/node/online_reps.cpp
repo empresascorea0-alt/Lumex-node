@@ -1,4 +1,5 @@
 #include <nano/lib/config.hpp>
+#include <nano/lib/formatting.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/timer.hpp>
 #include <nano/node/node.hpp>
@@ -35,7 +36,7 @@ void nano::online_reps::start ()
 		cached_trended = trended_result.trended;
 
 		logger.info (nano::log::type::online_reps, "Initial trended weight: {} (samples: {})",
-		nano::uint128_union{ trended_result.trended }.format_balance (nano_ratio, 1, true),
+		nano::log::as_nano (trended_result.trended),
 		trended_result.samples);
 	}
 
@@ -72,7 +73,7 @@ void nano::online_reps::observe (nano::account const & rep)
 
 		if (new_insert)
 		{
-			logger.debug (nano::log::type::online_reps, "Observed new representative: {}", rep.to_account ());
+			logger.debug (nano::log::type::online_reps, "Observed new representative: {}", rep);
 			update_online ();
 		}
 	}
@@ -92,7 +93,7 @@ void nano::online_reps::trim ()
 		{
 			stats.inc (nano::stat::type::online_reps, nano::stat::detail::rep_trim);
 			logger.debug (nano::log::type::online_reps, "Removing representative: {}, last observed: {}s ago",
-			oldest->account.to_account (),
+			oldest->account,
 			nano::log::seconds_delta (oldest->time, now));
 
 			reps.get<tag_time> ().erase (oldest);
@@ -159,8 +160,8 @@ bool nano::online_reps::sample ()
 		if (node.warmed_up () && low_weight_warning_interval.elapse (1min))
 		{
 			logger.warn (nano::log::type::online_reps, "Current online weight {} is below minimum threshold {}. This often occurs when the node cannot reach enough peers; check network connectivity and peer count.",
-			nano::uint128_union{ current_online }.format_balance (nano_ratio, 1, true),
-			nano::uint128_union{ config.online_weight_minimum.number () }.format_balance (nano_ratio, 1, true));
+			nano::log::as_nano (current_online),
+			nano::log::as_nano (config.online_weight_minimum));
 		}
 
 		return false; // Skipped
@@ -184,7 +185,7 @@ bool nano::online_reps::sample ()
 	}
 
 	logger.info (nano::log::type::online_reps, "Updated trended weight: {} (samples: {})",
-	nano::uint128_union{ trended_result.trended }.format_balance (nano_ratio, 1, true),
+	nano::log::as_nano (trended_result.trended),
 	trended_result.samples);
 
 	return true; // Sampled
