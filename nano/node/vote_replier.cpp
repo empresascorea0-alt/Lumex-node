@@ -209,8 +209,7 @@ void nano::vote_replier::process (nano::secure::transaction const & transaction,
 
 	stats.add (nano::stat::type::vote_replier, nano::stat::detail::reply_hashes, permits.size ());
 
-	auto signer = [this] (auto const & callback) { wallets.foreach_representative (callback); };
-	auto votes = policy.sign (nano::vote_type::final, permits, signer);
+	auto votes = policy.sign (nano::vote_type::final, permits, wallets.signer ());
 
 	for (auto const & vote : votes)
 	{

@@ -154,8 +154,7 @@ void nano::vote_generator::broadcast (nano::unique_lock<nano::mutex> & lock_a)
 	if (!permits.empty ())
 	{
 		lock_a.unlock ();
-		auto signer = [this] (auto const & callback) { wallets.foreach_representative (callback); };
-		auto votes = policy.sign (is_final ? nano::vote_type::final : nano::vote_type::normal, permits, signer);
+		auto votes = policy.sign (is_final ? nano::vote_type::final : nano::vote_type::normal, permits, wallets.signer ());
 		for (auto const & vote : votes)
 		{
 			for (auto const & permit : permits)

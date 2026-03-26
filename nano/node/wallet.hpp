@@ -329,6 +329,10 @@ public:
 	void compute_reps ();
 	nano::wallet_representatives reps () const;
 
+	/// Returns a signer that iterates over all representatives in the wallet
+	using signer_t = std::function<void (std::function<void (nano::public_key const &, nano::raw_key const &)> const &)>;
+	signer_t signer ();
+
 	nano::container_info container_info () const;
 
 private: // Transactions
