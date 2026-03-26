@@ -126,34 +126,6 @@ void nano::vote_generator::process_batch (std::deque<queue_entry_t> & batch)
 	}
 }
 
-std::size_t nano::vote_generator::generate (std::vector<std::shared_ptr<nano::block>> const & blocks_a, std::shared_ptr<nano::transport::channel> const & channel_a)
-{
-	request_t::first_type req_candidates;
-	{
-		auto transaction = ledger.tx_begin_read ();
-		for (auto const & block : blocks_a)
-		{
-			auto permit = is_final
-			? policy.reply_final (transaction, *block)
-			: policy.vote_normal (transaction, *block);
-			if (permit)
-			{
-				req_candidates.push_back (*permit);
-			}
-		}
-	}
-	auto const result = req_candidates.size ();
-	nano::lock_guard<nano::mutex> guard{ mutex };
-	requests.emplace_back (std::move (req_candidates), channel_a);
-	while (requests.size () > max_requests)
-	{
-		// On a large queue of requests, erase the oldest one
-		requests.pop_front ();
-		stats.inc (stat_type (), nano::stat::detail::generator_replies_discarded);
-	}
-	return result;
-}
-
 void nano::vote_generator::broadcast (nano::unique_lock<nano::mutex> & lock_a)
 {
 	debug_assert (lock_a.owns_lock ());
@@ -182,8 +154,7 @@ void nano::vote_generator::broadcast (nano::unique_lock<nano::mutex> & lock_a)
 	if (!permits.empty ())
 	{
 		lock_a.unlock ();
-		auto signer = [this] (auto const & callback) { wallets.foreach_representative (callback); };
-		auto votes = policy.sign (is_final ? nano::vote_type::final : nano::vote_type::normal, permits, signer);
+		auto votes = policy.sign (is_final ? nano::vote_type::final : nano::vote_type::normal, permits, wallets.signer ());
 		for (auto const & vote : votes)
 		{
 			for (auto const & permit : permits)
@@ -197,60 +168,6 @@ void nano::vote_generator::broadcast (nano::unique_lock<nano::mutex> & lock_a)
 		}
 		lock_a.lock ();
 	}
-}
-
-void nano::vote_generator::reply (nano::unique_lock<nano::mutex> & lock_a, request_t && request_a)
-{
-	if (request_a.second->max (nano::transport::traffic_type::vote_reply))
-	{
-		return;
-	}
-	lock_a.unlock ();
-	auto i (request_a.first.cbegin ());
-	auto n (request_a.first.cend ());
-	while (i != n && !stopped)
-	{
-		std::vector<nano::vote_permit> permits;
-		permits.reserve (nano::network::confirm_ack_hashes_max);
-		std::vector<nano::root> seen_roots;
-		seen_roots.reserve (nano::network::confirm_ack_hashes_max);
-		for (; i != n && permits.size () < nano::network::confirm_ack_hashes_max; ++i)
-		{
-			auto const & permit = *i;
-			if (std::find (seen_roots.begin (), seen_roots.end (), permit.root ()) == seen_roots.end ())
-			{
-				if (spacing.votable (permit.root (), permit.hash ()))
-				{
-					seen_roots.push_back (permit.root ());
-					permits.push_back (permit);
-				}
-				else
-				{
-					stats.inc (stat_type (), nano::stat::detail::generator_spacing);
-				}
-			}
-		}
-		if (!permits.empty ())
-		{
-			stats.add (nano::stat::type::requests, nano::stat::detail::requests_generated_hashes, stat::dir::in, permits.size ());
-
-			auto signer = [this] (auto const & callback) { wallets.foreach_representative (callback); };
-			auto votes = policy.sign (is_final ? nano::vote_type::final : nano::vote_type::normal, permits, signer);
-			for (auto const & vote : votes)
-			{
-				for (auto const & permit : permits)
-				{
-					history.add (permit.root (), permit.hash (), vote);
-					spacing.flag (permit.root (), permit.hash ());
-				}
-				nano::messages::confirm_ack confirm{ node.network_params.network, vote };
-				request_a.second->send (confirm, nano::transport::traffic_type::vote_reply);
-				stats.inc (nano::stat::type::requests, nano::stat::detail::requests_generated_votes, stat::dir::in);
-			}
-		}
-	}
-	stats.inc (stat_type (), nano::stat::detail::generator_replies);
-	lock_a.lock ();
 }
 
 void nano::vote_generator::broadcast_action (std::shared_ptr<nano::vote> const & vote_a) const
@@ -269,9 +186,8 @@ void nano::vote_generator::run ()
 	nano::unique_lock<nano::mutex> lock{ mutex };
 	while (!stopped)
 	{
-		// Wait for at most delay in case no further notification is received
 		condition.wait_for (lock, config.delay, [this] () {
-			return stopped || broadcast_predicate () || !requests.empty ();
+			return stopped || broadcast_predicate ();
 		});
 
 		if (stopped)
@@ -279,28 +195,17 @@ void nano::vote_generator::run ()
 			return;
 		}
 
-		if (broadcast_predicate () || !requests.empty ())
+		if (broadcast_predicate ())
 		{
 			stats.inc (stat_type (), nano::stat::detail::loop);
 
-			// Only log if component is under pressure
-			if ((candidates.size () + requests.size ()) > nano::queue_warning_threshold () && log_interval.elapse (15s))
+			if (candidates.size () > nano::queue_warning_threshold () && log_interval.elapse (15s))
 			{
-				logger.info (log_type (), "{} candidates, {} requests in processing queue", candidates.size (), requests.size ());
+				logger.info (log_type (), "{} candidates in processing queue", candidates.size ());
 			}
 
-			if (broadcast_predicate ())
-			{
-				broadcast (lock);
-				next_broadcast = std::chrono::steady_clock::now () + config.delay;
-			}
-
-			if (!requests.empty ())
-			{
-				auto request (requests.front ());
-				requests.pop_front ();
-				reply (lock, std::move (request));
-			}
+			broadcast (lock);
+			next_broadcast = std::chrono::steady_clock::now () + config.delay;
 		}
 	}
 }
@@ -326,7 +231,6 @@ nano::container_info nano::vote_generator::container_info () const
 
 	nano::container_info info;
 	info.put ("candidates", candidates.size ());
-	info.put ("requests", requests.size ());
 	info.add ("queue", vote_generation_queue.container_info ());
 	return info;
 }

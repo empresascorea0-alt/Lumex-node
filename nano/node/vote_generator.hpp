@@ -39,7 +39,6 @@ public:
 class vote_generator final
 {
 private:
-	using request_t = std::pair<std::vector<nano::vote_permit>, std::shared_ptr<nano::transport::channel>>;
 	using queue_entry_t = std::pair<nano::root, nano::block_hash>;
 	std::chrono::steady_clock::time_point next_broadcast = { std::chrono::steady_clock::now () };
 
@@ -49,8 +48,6 @@ public:
 
 	/** Queue items for vote generation, or broadcast votes already in cache */
 	void add (nano::root const &, nano::block_hash const &);
-	/** Queue blocks for vote generation, returning the number of successful candidates.*/
-	std::size_t generate (std::vector<std::shared_ptr<nano::block>> const & blocks_a, std::shared_ptr<nano::transport::channel> const & channel_a);
 
 	void start ();
 	void stop ();
@@ -60,7 +57,6 @@ public:
 private:
 	void run ();
 	void broadcast (nano::unique_lock<nano::mutex> &);
-	void reply (nano::unique_lock<nano::mutex> &, request_t &&);
 	void broadcast_action (std::shared_ptr<nano::vote> const &) const;
 	void process_batch (std::deque<queue_entry_t> & batch);
 	bool broadcast_predicate () const;
@@ -86,8 +82,6 @@ private:
 	const bool is_final;
 	mutable nano::mutex mutex;
 	nano::condition_variable condition;
-	static std::size_t constexpr max_requests{ 2048 };
-	std::deque<request_t> requests;
 	std::deque<nano::vote_permit> candidates;
 	std::atomic<bool> stopped{ false };
 	std::thread thread;

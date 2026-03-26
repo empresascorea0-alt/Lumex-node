@@ -154,8 +154,8 @@ add_library(
   repcrawler.cpp
   rep_tiers.hpp
   rep_tiers.cpp
-  request_aggregator.hpp
-  request_aggregator.cpp
+  vote_replier.hpp
+  vote_replier.cpp
   rpc_callbacks.hpp
   rpc_callbacks.cpp
   scheduler/bucket.cpp

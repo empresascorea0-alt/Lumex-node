@@ -265,8 +265,8 @@ char const * nano::mutex_identifier (mutexes mutex)
 			return "network_filter";
 		case mutexes::observer_set:
 			return "observer_set";
-		case mutexes::request_aggregator:
-			return "request_aggregator";
+		case mutexes::vote_replier:
+			return "vote_replier";
 		case mutexes::state_block_signature_verification:
 			return "state_block_signature_verification";
 		case mutexes::telemetry:

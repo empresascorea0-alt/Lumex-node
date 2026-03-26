@@ -383,3 +383,94 @@ TEST (wallets, receivable_scan)
 	ASSERT_EQ (receive->sideband ().height, 3);
 	ASSERT_EQ (send->hash (), receive->source ());
 }
+
+/*
+ * Signer with no representatives should not invoke the callback
+ */
+TEST (wallets, signer_none)
+{
+	nano::test::system system (1);
+	auto & node = *system.nodes[0];
+
+	auto sign = node.wallets.signer ();
+
+	int called = 0;
+	sign ([&] (nano::public_key const &, nano::raw_key const &) {
+		++called;
+	});
+	ASSERT_EQ (0, called);
+}
+
+/*
+ * Signer should invoke the callback for each representative with voting weight
+ */
+TEST (wallets, signer_multiple)
+{
+	nano::test::system system (1);
+	auto & node = *system.nodes[0];
+
+	nano::keypair rep2;
+	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
+	system.wallet (0)->insert_adhoc (rep2.prv);
+
+	auto const amount = 100 * nano::Knano_ratio;
+	system.wallet (0)->send_sync (nano::dev::genesis_key.pub, rep2.pub, amount);
+	ASSERT_TIMELY (5s, node.balance (rep2.pub) == amount);
+	system.wallet (0)->change_sync (rep2.pub, rep2.pub);
+	node.wallets.compute_reps ();
+	ASSERT_EQ (2, node.wallets.reps ().voting);
+
+	auto sign = node.wallets.signer ();
+
+	std::set<nano::account> accounts;
+	sign ([&] (nano::public_key const & pub, nano::raw_key const &) {
+		accounts.insert (pub);
+	});
+
+	ASSERT_EQ (2, accounts.size ());
+	ASSERT_TRUE (accounts.count (nano::dev::genesis_key.pub));
+	ASSERT_TRUE (accounts.count (rep2.pub));
+}
+
+/*
+ * Signer should skip representatives with zero weight or weight below vote_minimum
+ */
+TEST (wallets, signer_below_weight)
+{
+	nano::test::system system;
+	nano::node_config config = system.default_config ();
+	config.vote_minimum = nano::Knano_ratio; // 1000 nano
+	auto & node = *system.add_node (config);
+
+	nano::keypair zero_weight;
+	nano::keypair below_minimum;
+	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
+	system.wallet (0)->insert_adhoc (zero_weight.prv);
+	system.wallet (0)->insert_adhoc (below_minimum.prv);
+
+	// Give below_minimum account less than vote_minimum
+	auto const amount = nano::Knano_ratio - 1;
+	system.wallet (0)->send_sync (nano::dev::genesis_key.pub, below_minimum.pub, amount);
+	ASSERT_TIMELY (5s, node.balance (below_minimum.pub) == amount);
+	system.wallet (0)->change_sync (below_minimum.pub, below_minimum.pub);
+
+	ASSERT_EQ (0, node.weight (zero_weight.pub));
+	ASSERT_TRUE (node.weight (below_minimum.pub) > 0);
+	ASSERT_TRUE (node.weight (below_minimum.pub) < config.vote_minimum.number ());
+
+	node.wallets.compute_reps ();
+	ASSERT_EQ (1, node.wallets.reps ().voting);
+
+	auto sign = node.wallets.signer ();
+
+	std::set<nano::account> accounts;
+	sign ([&] (nano::public_key const & pub, nano::raw_key const &) {
+		accounts.insert (pub);
+	});
+
+	// Only genesis should sign, others are below threshold
+	ASSERT_EQ (1, accounts.size ());
+	ASSERT_TRUE (accounts.count (nano::dev::genesis_key.pub));
+	ASSERT_FALSE (accounts.count (zero_weight.pub));
+	ASSERT_FALSE (accounts.count (below_minimum.pub));
+}

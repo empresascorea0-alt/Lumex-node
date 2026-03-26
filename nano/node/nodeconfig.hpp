@@ -24,7 +24,6 @@
 #include <nano/node/network.hpp>
 #include <nano/node/peer_history.hpp>
 #include <nano/node/repcrawler.hpp>
-#include <nano/node/request_aggregator.hpp>
 #include <nano/node/scheduler/bucket.hpp>
 #include <nano/node/scheduler/hinted.hpp>
 #include <nano/node/scheduler/optimistic.hpp>
@@ -35,6 +34,7 @@
 #include <nano/node/vote_generator.hpp>
 #include <nano/node/vote_processor.hpp>
 #include <nano/node/vote_rebroadcaster.hpp>
+#include <nano/node/vote_replier.hpp>
 #include <nano/node/websocketconfig.hpp>
 #include <nano/secure/common.hpp>
 #include <nano/secure/generate_cache_flags.hpp>
@@ -127,7 +127,6 @@ public:
 	bool backup_before_upgrade{ false };
 	double max_work_generate_multiplier{ 64. };
 	uint32_t max_queued_requests{ 512 };
-	unsigned request_aggregator_threads{ std::min (nano::hardware_concurrency (), 4u) }; // Max 4 threads if available
 	unsigned max_unchecked_blocks{ 65536 };
 	std::size_t max_backlog{ 100000 };
 	std::chrono::seconds max_pruning_age{ !network_params.network.is_beta_network () ? std::chrono::seconds (24 * 60 * 60) : std::chrono::seconds (5 * 60) }; // 1 day; 5 minutes for beta network
@@ -147,7 +146,7 @@ public:
 	nano::vote_processor_config vote_processor;
 	nano::peer_history_config peer_history;
 	nano::transport::tcp_config tcp;
-	nano::request_aggregator_config request_aggregator;
+	nano::vote_replier_config vote_replier;
 	nano::message_processor_config message_processor;
 	nano::network_config network;
 	nano::local_block_broadcaster_config local_block_broadcaster;

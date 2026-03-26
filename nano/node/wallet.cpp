@@ -1870,6 +1870,11 @@ void nano::wallets::queue_wallet_action (nano::uint128_t const & amount_a, std::
 	condition.notify_all ();
 }
 
+auto nano::wallets::signer () -> signer_t
+{
+	return [this] (auto const & callback) { foreach_representative (callback); };
+}
+
 void nano::wallets::foreach_representative (std::function<void (nano::public_key const & pub_a, nano::raw_key const & prv_a)> const & action_a)
 {
 	if (config.enable_voting)
