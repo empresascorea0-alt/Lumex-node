@@ -504,7 +504,7 @@ void nano::election::confirm_if_quorum (nano::unique_lock<nano::mutex> & lock_a)
 		if (!is_quorum.exchange (true) && node.config.enable_voting && node.wallets.reps ().voting > 0)
 		{
 			++vote_broadcast_count;
-			node.final_generator.add (root, status.winner->hash ());
+			node.vote_generator.vote_final (qualified_root, status.winner->hash (), bucket);
 		}
 		if (final_weight >= node.online_reps.delta ())
 		{
@@ -712,7 +712,7 @@ void nano::election::broadcast_vote_locked (nano::unique_lock<nano::mutex> & loc
 			nano::log::arg{ "winner", status.winner },
 			nano::log::arg{ "type", "final" });
 
-			node.final_generator.add (root, status.winner->hash ()); // Broadcasts vote to the network
+			node.vote_generator.vote_final (qualified_root, status.winner->hash (), bucket);
 		}
 		else
 		{
@@ -723,7 +723,7 @@ void nano::election::broadcast_vote_locked (nano::unique_lock<nano::mutex> & loc
 			nano::log::arg{ "winner", status.winner },
 			nano::log::arg{ "type", "normal" });
 
-			node.generator.add (root, status.winner->hash ()); // Broadcasts vote to the network
+			node.vote_generator.vote_normal (qualified_root, status.winner->hash (), bucket);
 		}
 	}
 }
