@@ -37,8 +37,8 @@ nano::vote_generator::vote_generator (vote_generator_config const & config_a, na
 	final_verifier.process_batch = [this] (auto batch) { process_final (std::move (batch)); };
 	normal_broadcaster.broadcast_batch = [this] (auto batch) { broadcast_normal (std::move (batch)); };
 	final_broadcaster.broadcast_batch = [this] (auto batch) { broadcast_final (std::move (batch)); };
-	normal_broadcaster.check_capacity = [] () { return true; }; // TODO: Implement network backpressure
-	final_broadcaster.check_capacity = [] () { return true; }; // TODO: Implement network backpressure
+	normal_broadcaster.check_capacity = [this] () { return check_normal_capacity (); };
+	final_broadcaster.check_capacity = [this] () { return check_final_capacity (); };
 }
 
 nano::vote_generator::~vote_generator () = default;
@@ -184,6 +184,36 @@ void nano::vote_generator::broadcast_final (std::vector<nano::vote_permit> permi
 
 		broadcast_vote (vote);
 	}
+}
+
+bool nano::vote_generator::check_normal_capacity ()
+{
+	bool ok = network.check_capacity_fanout (nano::transport::traffic_type::vote_normal);
+	if (!ok)
+	{
+		stats.inc (nano::stat::type::vote_generator, nano::stat::detail::cooldown);
+		if (normal_capacity_log_interval.elapse (15s))
+		{
+			logger.warn (nano::log::type::vote_generator, "Network capacity for vote broadcasting unavailable, {} normal / {} final votes pending",
+			normal_broadcaster.size (), final_broadcaster.size ());
+		}
+	}
+	return ok;
+}
+
+bool nano::vote_generator::check_final_capacity ()
+{
+	bool ok = network.check_capacity_fanout (nano::transport::traffic_type::vote_final);
+	if (!ok)
+	{
+		stats.inc (nano::stat::type::vote_generator_final, nano::stat::detail::cooldown);
+		if (final_capacity_log_interval.elapse (15s))
+		{
+			logger.warn (nano::log::type::vote_generator_final, "Network capacity for final vote broadcasting unavailable, {} normal / {} final votes pending",
+			normal_broadcaster.size (), final_broadcaster.size ());
+		}
+	}
+	return ok;
 }
 
 void nano::vote_generator::broadcast_vote (std::shared_ptr<nano::vote> const & vote) const

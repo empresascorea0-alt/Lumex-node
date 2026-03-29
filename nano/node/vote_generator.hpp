@@ -223,6 +223,8 @@ private:
 	void broadcast_normal (std::vector<nano::vote_permit> batch);
 	void broadcast_final (std::vector<nano::vote_permit> batch);
 	void broadcast_vote (std::shared_ptr<nano::vote> const & vote) const;
+	bool check_normal_capacity ();
+	bool check_final_capacity ();
 
 private: // Dependencies
 	vote_generator_config const & config;
@@ -243,6 +245,7 @@ private:
 	vote_generator_verifier final_verifier;
 	vote_generator_broadcaster final_broadcaster;
 
-	nano::interval log_interval;
+	nano::interval normal_capacity_log_interval;
+	nano::interval final_capacity_log_interval;
 };
 }
