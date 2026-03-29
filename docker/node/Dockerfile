@@ -26,8 +26,11 @@ RUN echo ${NANO_NETWORK} >/etc/nano-network
 
 FROM ubuntu:24.04
 
-RUN groupadd --gid 1000 nanocurrency && \
-    useradd --uid 1000 --gid nanocurrency --shell /bin/bash --create-home nanocurrency
+# Create nanocurrency user with UID/GID 1000, handling base images where 1000 is already taken
+RUN getent group 1000 >/dev/null || groupadd --gid 1000 nanocurrency && \
+    user_1000="$(getent passwd 1000 | cut -d: -f1 || true)" && \
+    [ -z "$user_1000" ] && useradd --uid 1000 --gid 1000 --shell /bin/bash --create-home nanocurrency || \
+    [ "$user_1000" = nanocurrency ] || usermod --login nanocurrency --home /home/nanocurrency --move-home "$user_1000"
 
 COPY --from=builder /tmp/src/build/nano_node /usr/bin
 COPY --from=builder /tmp/src/build/nano_rpc /usr/bin
