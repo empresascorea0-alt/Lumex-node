@@ -1,5 +1,7 @@
 #include <nano/node/vote_generator.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/voting_policy.hpp>
+#include <nano/test_common/chains.hpp>
 #include <nano/test_common/random.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
@@ -624,4 +626,165 @@ TEST (vote_generator_broadcaster, check_capacity_backpressure)
 
 	ASSERT_TIMELY_EQ (5s, broadcast_count.load (), 2);
 	ASSERT_TRUE (broadcaster.empty ());
+}
+
+/*
+ * vote_generator
+ */
+
+// Confirmed block produces a normal vote broadcast with correct contents
+TEST (vote_generator, basic_broadcast)
+{
+	nano::test::system system;
+	auto & node = *system.add_node ();
+	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
+
+	auto blocks = nano::test::setup_chain (system, node, 1);
+	auto & block = blocks.front ();
+
+	nano::shared_locked<std::vector<std::shared_ptr<nano::vote>>> votes;
+	node.observers.vote.add ([votes] (std::shared_ptr<nano::vote> const & vote, std::shared_ptr<nano::transport::channel> const &, nano::vote_source, nano::vote_code) {
+		votes->push_back (vote);
+	});
+
+	node.vote_generator.vote_normal (block->qualified_root (), block->hash (), 0);
+	ASSERT_TIMELY_EQ (5s, votes->size (), 1);
+	ASSERT_TIMELY_EQ (5s, node.stats.count (nano::stat::type::vote_generator, nano::stat::detail::broadcast), 1);
+
+	auto locked = votes.lock ();
+	ASSERT_EQ (nano::dev::genesis_key.pub, locked->at (0)->account);
+	ASSERT_EQ (1, locked->at (0)->hashes.size ());
+	ASSERT_EQ (block->hash (), locked->at (0)->hashes[0]);
+	ASSERT_FALSE (locked->at (0)->is_final ());
+}
+
+// Each wallet representative produces its own vote broadcast for the same block
+TEST (vote_generator, multiple_representatives)
+{
+	nano::test::system system;
+	auto & node = *system.add_node ();
+	auto & wallet = *system.wallet (0);
+
+	// Setup representatives without wallet keys to avoid background voting during setup
+	nano::keypair key1, key2, key3;
+	auto const amount = 100 * nano::Knano_ratio;
+	auto rep1 = nano::test::setup_rep (system, node, amount, nano::dev::genesis_key);
+	auto rep2 = nano::test::setup_rep (system, node, amount, nano::dev::genesis_key);
+	auto rep3 = nano::test::setup_rep (system, node, amount, nano::dev::genesis_key);
+
+	// Create a confirmed block to vote on before adding wallet keys
+	auto blocks = nano::test::setup_chain (system, node, 1);
+	auto & block = blocks.front ();
+
+	// Now insert all keys into wallet so they become voting representatives
+	wallet.insert_adhoc (nano::dev::genesis_key.prv);
+	wallet.insert_adhoc (rep1.prv);
+	wallet.insert_adhoc (rep2.prv);
+	wallet.insert_adhoc (rep3.prv);
+	node.wallets.compute_reps ();
+	ASSERT_EQ (4, node.wallets.reps ().voting);
+
+	nano::shared_locked<std::vector<std::shared_ptr<nano::vote>>> votes;
+	node.observers.vote.add ([votes] (std::shared_ptr<nano::vote> const & vote, std::shared_ptr<nano::transport::channel> const &, nano::vote_source, nano::vote_code) {
+		votes->push_back (vote);
+	});
+
+	node.vote_generator.vote_normal (block->qualified_root (), block->hash (), 0);
+
+	// 4 representatives should each produce a vote
+	ASSERT_TIMELY_EQ (5s, votes->size (), 4);
+	ASSERT_TIMELY_EQ (5s, node.stats.count (nano::stat::type::vote_generator, nano::stat::detail::broadcast), 4);
+
+	auto locked = votes.lock ();
+	std::set<nano::account> signers;
+	for (auto const & vote : locked.get ())
+	{
+		ASSERT_TRUE (std::find (vote->hashes.begin (), vote->hashes.end (), block->hash ()) != vote->hashes.end ());
+		signers.insert (vote->account);
+	}
+	ASSERT_EQ (4, signers.size ());
+	ASSERT_TRUE (signers.count (nano::dev::genesis_key.pub));
+	ASSERT_TRUE (signers.count (rep1.pub));
+	ASSERT_TRUE (signers.count (rep2.pub));
+	ASSERT_TRUE (signers.count (rep3.pub));
+}
+
+// Normal vote for a root with an existing final vote record is upgraded and routed to final broadcaster
+TEST (vote_generator, normal_upgraded_to_final)
+{
+	nano::test::system system;
+	auto & node = *system.add_node ();
+	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
+
+	auto blocks = nano::test::setup_chain (system, node, 1);
+	auto & block = blocks.front ();
+
+	nano::shared_locked<std::vector<std::shared_ptr<nano::vote>>> votes;
+	node.observers.vote.add ([votes] (std::shared_ptr<nano::vote> const & vote, std::shared_ptr<nano::transport::channel> const &, nano::vote_source, nano::vote_code) {
+		votes->push_back (vote);
+	});
+
+	// Issue a final vote first to establish the final vote record in the ledger
+	node.vote_generator.vote_final (block->qualified_root (), block->hash (), 0);
+	ASSERT_TIMELY_EQ (5s, votes->size (), 1);
+	ASSERT_TIMELY_EQ (5s, node.stats.count (nano::stat::type::vote_generator_final, nano::stat::detail::broadcast), 1);
+	ASSERT_TRUE (votes->at (0)->is_final ());
+
+	// Clear stats to isolate the next vote's broadcasts
+	node.stats.clear ();
+
+	// Now issue a NORMAL vote for the same root
+	// voting_policy::vote() detects the existing final vote record and upgrades the permit to final
+	node.vote_generator.vote_normal (block->qualified_root (), block->hash (), 0);
+	ASSERT_TIMELY_EQ (5s, votes->size (), 2);
+
+	// The upgraded permit should go through the final broadcaster, not the normal one
+	ASSERT_TIMELY_EQ (5s, node.stats.count (nano::stat::type::vote_generator_final, nano::stat::detail::broadcast), 1);
+	ASSERT_EQ (0, node.stats.count (nano::stat::type::vote_generator, nano::stat::detail::broadcast));
+
+	// The upgraded vote should also be final
+	auto locked = votes.lock ();
+	ASSERT_TRUE (locked->at (1)->is_final ());
+	ASSERT_EQ (block->hash (), locked->at (1)->hashes[0]);
+	ASSERT_EQ (nano::dev::genesis_key.pub, locked->at (1)->account);
+}
+
+// Vote for a nonexistent block is skipped without blocking subsequent votes
+TEST (vote_generator, block_missing_skipped)
+{
+	nano::test::system system;
+	auto & node = *system.add_node ();
+	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
+
+	nano::shared_locked<std::vector<std::shared_ptr<nano::vote>>> votes;
+	node.observers.vote.add ([votes] (std::shared_ptr<nano::vote> const & vote, std::shared_ptr<nano::transport::channel> const &, nano::vote_source, nano::vote_code) {
+		votes->push_back (vote);
+	});
+
+	// Submit a vote for a nonexistent block
+	auto fake_root = nano::qualified_root{ nano::root{ 999 }, nano::block_hash{ 999 } };
+	auto fake_hash = nano::block_hash{ 12345 };
+	node.vote_generator.vote_normal (fake_root, fake_hash, 0);
+
+	// Submit a vote for a real confirmed block
+	auto blocks = nano::test::setup_chain (system, node, 1);
+	auto const & block = blocks.front ();
+	node.vote_generator.vote_normal (block->qualified_root (), block->hash (), 0);
+
+	// Only the real block should produce a vote
+	ASSERT_TIMELY_EQ (5s, votes->size (), 1);
+	ASSERT_TIMELY_EQ (5s, node.stats.count (nano::stat::type::vote_generator, nano::stat::detail::broadcast), 1);
+
+	auto locked = votes.lock ();
+	ASSERT_EQ (1, locked->at (0)->hashes.size ());
+	ASSERT_EQ (block->hash (), locked->at (0)->hashes[0]);
+
+	// The fake hash should never appear in any vote
+	for (auto const & vote : locked.get ())
+	{
+		for (auto const & hash : vote->hashes)
+		{
+			ASSERT_NE (fake_hash, hash);
+		}
+	}
 }

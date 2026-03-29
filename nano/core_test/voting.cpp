@@ -60,44 +60,7 @@ TEST (local_vote_history, basic)
 }
 }
 
-TEST (vote_generator, cache)
-{
-	nano::test::system system (1);
-	auto & node (*system.nodes[0]);
-	auto epoch1 = system.upgrade_genesis_epoch (node, nano::epoch::epoch_1);
-	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
-	node.vote_generator.vote_normal (epoch1->qualified_root (), epoch1->hash (), 0);
-	ASSERT_TIMELY_EQ (3s, node.stats.count (nano::stat::type::vote_generator, nano::stat::detail::generator_broadcasts), 1);
-}
-
-TEST (vote_generator, multiple_representatives)
-{
-	nano::test::system system (1);
-	auto & node (*system.nodes[0]);
-	nano::keypair key1, key2, key3;
-	auto & wallet (*system.wallet (0));
-	wallet.insert_adhoc (nano::dev::genesis_key.prv);
-	wallet.insert_adhoc (key1.prv);
-	wallet.insert_adhoc (key2.prv);
-	wallet.insert_adhoc (key3.prv);
-	auto const amount = 100 * nano::Knano_ratio;
-	wallet.send_sync (nano::dev::genesis_key.pub, key1.pub, amount);
-	wallet.send_sync (nano::dev::genesis_key.pub, key2.pub, amount);
-	wallet.send_sync (nano::dev::genesis_key.pub, key3.pub, amount);
-	ASSERT_TIMELY (3s, node.balance (key1.pub) == amount && node.balance (key2.pub) == amount && node.balance (key3.pub) == amount);
-	wallet.change_sync (key1.pub, key1.pub);
-	wallet.change_sync (key2.pub, key2.pub);
-	wallet.change_sync (key3.pub, key3.pub);
-	ASSERT_EQ (node.weight (key1.pub), amount);
-	ASSERT_EQ (node.weight (key2.pub), amount);
-	ASSERT_EQ (node.weight (key3.pub), amount);
-	node.wallets.compute_reps ();
-	ASSERT_EQ (4, node.wallets.reps ().voting);
-	auto hash = wallet.send_sync (nano::dev::genesis_key.pub, nano::dev::genesis_key.pub, 1);
-	auto send = node.block (hash);
-	ASSERT_NE (nullptr, send);
-	ASSERT_TIMELY_EQ (5s, node.stats.count (nano::stat::type::vote_generator, nano::stat::detail::generator_broadcasts), 4);
-}
+// vote_generator tests moved to nano/core_test/vote_generator.cpp
 
 TEST (vote_spacing, basic)
 {
