@@ -37,6 +37,9 @@ public:
 	nano::root root () const;
 	nano::block_hash const & hash () const;
 	nano::vote_type type () const;
+
+	/// For tests
+	static vote_permit dummy (nano::qualified_root const & root, nano::block_hash const & hash, nano::vote_type type);
 };
 
 /**
@@ -50,10 +53,11 @@ public:
 	explicit voting_policy (nano::ledger &);
 
 	/**
-	 * Check normal vote eligibility for an already-fetched block.
-	 * Returns a permit if the block's dependencies are cemented and no conflicting final vote exists.
+	 * Check vote eligibility for an already-fetched block.
+	 * Returns a permit if the block's dependencies are cemented.
+	 * If a final vote was previously recorded for this root, upgrades to a final vote permit for the already recorded hash.
 	 */
-	std::optional<vote_permit> vote_normal (
+	std::optional<vote_permit> vote (
 	nano::secure::transaction const &,
 	nano::block const & block) const;
 

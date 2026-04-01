@@ -1,4 +1,6 @@
+#include <nano/lib/assert.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/config.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
@@ -37,6 +39,12 @@ nano::vote_type nano::vote_permit::type () const
 	return type_m;
 }
 
+nano::vote_permit nano::vote_permit::dummy (nano::qualified_root const & root, nano::block_hash const & hash, nano::vote_type type)
+{
+	release_assert (nano::is_dev_run ());
+	return nano::vote_permit{ root, hash, type };
+}
+
 /*
  * voting_policy
  */
@@ -46,19 +54,19 @@ nano::voting_policy::voting_policy (nano::ledger & ledger) :
 {
 }
 
-std::optional<nano::vote_permit> nano::voting_policy::vote_normal (nano::secure::transaction const & txn, nano::block const & block) const
+std::optional<nano::vote_permit> nano::voting_policy::vote (nano::secure::transaction const & txn, nano::block const & block) const
 {
 	if (ledger.dependencies_cemented (txn, block))
 	{
-		// If a final vote was already committed for a different block at this root, refuse to vote
+		// If a final vote was already recorded for this root, upgrade to a final vote for the already recorded hash
 		if (auto final_hash = ledger.store.final_vote.get (txn, block.qualified_root ()))
 		{
-			if (*final_hash != block.hash ())
-			{
-				return std::nullopt;
-			}
+			return nano::vote_permit{ block.qualified_root (), *final_hash, vote_type::final };
 		}
-		return nano::vote_permit{ block.qualified_root (), block.hash (), vote_type::normal };
+		else // No final vote recorded, proceed with a normal vote
+		{
+			return nano::vote_permit{ block.qualified_root (), block.hash (), vote_type::normal };
+		}
 	}
 	return std::nullopt;
 }
