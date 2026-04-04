@@ -244,6 +244,16 @@ inline db_val::operator nano::store::block_w_sideband () const
 	return block_w_sideband;
 }
 
+inline db_val::operator nano::store::block_w_sideband_v25 () const
+{
+	nano::bufferstream stream{ span_view.data (), span_view.size () };
+	nano::store::block_w_sideband_v25 block_w_sideband;
+	block_w_sideband.block = (nano::deserialize_block (stream));
+	auto error = block_w_sideband.sideband.deserialize (stream, block_w_sideband.block->type ());
+	release_assert (!error);
+	return block_w_sideband;
+}
+
 inline db_val::operator std::shared_ptr<nano::vote> () const
 {
 	nano::bufferstream stream{ span_view.data (), span_view.size () };

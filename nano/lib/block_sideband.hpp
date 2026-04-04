@@ -49,8 +49,8 @@ class block_sideband final
 {
 public:
 	block_sideband () = default;
-	block_sideband (nano::account const & account, nano::block_hash const & successor, nano::amount const & balance, uint64_t height, nano::seconds_t timestamp, nano::block_details const & details, nano::epoch source_epoch);
-	block_sideband (nano::account const & account, nano::block_hash const & successor, nano::amount const & balance, uint64_t height, nano::seconds_t timestamp, nano::epoch epoch, bool is_send, bool is_receive, bool is_epoch, nano::epoch source_epoch);
+	block_sideband (nano::account const & account, nano::amount const & balance, uint64_t height, nano::seconds_t timestamp, nano::block_details const & details, nano::epoch source_epoch);
+	block_sideband (nano::account const & account, nano::amount const & balance, uint64_t height, nano::seconds_t timestamp, nano::epoch epoch, bool is_send, bool is_receive, bool is_epoch, nano::epoch source_epoch);
 
 	void serialize (nano::stream &, nano::block_type) const;
 	bool deserialize (nano::stream &, nano::block_type);
@@ -63,7 +63,6 @@ public:
 	static bool includes_details (nano::block_type);
 
 public:
-	nano::block_hash successor{ 0 };
 	nano::account account{}; // Not serialized for state/open blocks
 	nano::amount balance{ 0 }; // Serialized only for receive/change/open blocks
 	uint64_t height{ 0 }; // Not serialized for open blocks (deserialized as 1)
@@ -73,5 +72,28 @@ public:
 
 public: // Logging
 	void operator() (nano::object_stream &) const;
+};
+
+/**
+ * Snapshot of the block sideband format at v25 (includes successor field).
+ * Used during v24->v25 and v25->v26 database migrations.
+ */
+class block_sideband_v25 final
+{
+public:
+	block_sideband_v25 () = default;
+
+	void serialize (nano::stream &, nano::block_type) const;
+	bool deserialize (nano::stream &, nano::block_type);
+	static size_t size (nano::block_type);
+
+public:
+	nano::block_hash successor{ 0 };
+	nano::account account{};
+	nano::amount balance{ 0 };
+	uint64_t height{ 0 };
+	uint64_t timestamp{ 0 };
+	nano::block_details details;
+	nano::epoch source_epoch{ nano::epoch::epoch_0 };
 };
 }

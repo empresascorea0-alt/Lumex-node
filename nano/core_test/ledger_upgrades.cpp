@@ -86,6 +86,7 @@ nano::store::column_schema const schema_v24{
 	{ nano::store::table::final_votes, "final_votes" },
 	{ nano::store::table::meta, "meta" }
 };
+
 }
 
 /*
@@ -618,16 +619,20 @@ public:
 	{
 		auto tx = backend->tx_begin_write ();
 
-		// Set successor in sideband before serializing
-		auto sideband = block.sideband ();
-		sideband.successor = successor_hash;
-		block.sideband_set (sideband);
+		nano::block_sideband_v25 sideband_v25;
+		sideband_v25.successor = successor_hash;
+		sideband_v25.account = block.sideband ().account;
+		sideband_v25.balance = block.sideband ().balance;
+		sideband_v25.height = block.sideband ().height;
+		sideband_v25.timestamp = block.sideband ().timestamp;
+		sideband_v25.details = block.sideband ().details;
+		sideband_v25.source_epoch = block.sideband ().source_epoch;
 
 		std::vector<uint8_t> data;
 		{
 			nano::vectorstream stream{ data };
 			nano::serialize_block (stream, block);
-			block.sideband ().serialize (stream, block.type ());
+			sideband_v25.serialize (stream, block.type ());
 		}
 
 		nano::store::db_val value{ data.size (), data.data () };
@@ -661,7 +666,6 @@ TEST (ledger_upgrades, upgrade_v24_to_v25)
 				  .build ();
 	block1->sideband_set (nano::block_sideband{
 	key1.pub,
-	nano::block_hash{ 0 },
 	nano::amount{ 1000 },
 	1, 0, nano::epoch::epoch_0,
 	false, false, false, nano::epoch::epoch_0 });
@@ -679,7 +683,6 @@ TEST (ledger_upgrades, upgrade_v24_to_v25)
 				  .build ();
 	block2->sideband_set (nano::block_sideband{
 	key1.pub,
-	nano::block_hash{ 0 },
 	nano::amount{ 500 },
 	2, 0, nano::epoch::epoch_0,
 	true, false, false, nano::epoch::epoch_0 });
@@ -719,7 +722,268 @@ TEST (ledger_upgrades, upgrade_v24_to_v25)
 	auto stored_block2 = store.block.get (tx, block2->hash ());
 	ASSERT_NE (nullptr, stored_block2);
 	ASSERT_EQ (stored_block2->sideband ().height, 2);
-	ASSERT_EQ (stored_block2->sideband ().successor, nano::block_hash{ 0 });
+}
+
+namespace
+{
+class legacy_database_v25
+{
+public:
+	legacy_database_v25 (std::filesystem::path const & path_a) :
+		path{ path_a },
+		backend{ nano::test::make_backend (path_a) }
+	{
+		backend->create (nano::store::ledger_store::schema_v25, 25);
+		backend->open (nano::store::ledger_store::schema_v25, nano::store::open_mode::read_write);
+	}
+
+	// Write a block with v25 sideband format (successor is part of sideband)
+	void add_block_legacy (nano::block & block, nano::block_hash const & successor_hash)
+	{
+		auto tx = backend->tx_begin_write ();
+
+		nano::block_sideband_v25 sideband_v25;
+		sideband_v25.successor = successor_hash;
+		sideband_v25.account = block.sideband ().account;
+		sideband_v25.balance = block.sideband ().balance;
+		sideband_v25.height = block.sideband ().height;
+		sideband_v25.timestamp = block.sideband ().timestamp;
+		sideband_v25.details = block.sideband ().details;
+		sideband_v25.source_epoch = block.sideband ().source_epoch;
+
+		std::vector<uint8_t> data;
+		{
+			nano::vectorstream stream{ data };
+			nano::serialize_block (stream, block);
+			sideband_v25.serialize (stream, block.type ());
+		}
+
+		nano::store::db_val value{ data.size (), data.data () };
+		auto status = backend->put (tx, nano::store::table::blocks, block.hash (), value);
+		backend->release_assert_success (status);
+
+		// Also populate successor table (as v25 migration would have done)
+		if (!successor_hash.is_zero ())
+		{
+			status = backend->put (tx, nano::store::table::successor, block.hash (), successor_hash);
+			backend->release_assert_success (status);
+		}
+	}
+
+	// Write a block with v26 sideband format (no successor in sideband)
+	void add_block (nano::block & block, nano::block_hash const & successor_hash)
+	{
+		auto tx = backend->tx_begin_write ();
+
+		std::vector<uint8_t> data;
+		{
+			nano::vectorstream stream{ data };
+			nano::serialize_block (stream, block);
+			block.sideband ().serialize (stream, block.type ());
+		}
+
+		nano::store::db_val value{ data.size (), data.data () };
+		auto status = backend->put (tx, nano::store::table::blocks, block.hash (), value);
+		backend->release_assert_success (status);
+
+		if (!successor_hash.is_zero ())
+		{
+			status = backend->put (tx, nano::store::table::successor, block.hash (), successor_hash);
+			backend->release_assert_success (status);
+		}
+	}
+
+	std::filesystem::path path;
+	std::unique_ptr<nano::store::backend> backend;
+};
+}
+
+/*
+ * Test v25 to v26 upgrade: removes successor from block sideband
+ */
+TEST (ledger_upgrades, upgrade_v25_to_v26)
+{
+	nano::keypair key1;
+	nano::keypair key2;
+
+	nano::block_builder builder;
+
+	// Create an open block (genesis-like, no predecessor)
+	auto block1 = builder
+				  .open ()
+				  .source (nano::block_hash{ key1.pub.number () })
+				  .representative (key1.pub)
+				  .account (key1.pub)
+				  .sign (key1.prv, key1.pub)
+				  .work (0)
+				  .build ();
+	block1->sideband_set (nano::block_sideband{
+	key1.pub,
+	nano::amount{ 1000 },
+	1, 0, nano::epoch::epoch_0,
+	false, false, false, nano::epoch::epoch_0 });
+
+	// Create a state block with a previous (block1)
+	auto block2 = builder
+				  .state ()
+				  .account (key1.pub)
+				  .previous (block1->hash ())
+				  .representative (key1.pub)
+				  .balance (500)
+				  .link (key2.pub)
+				  .sign (key1.prv, key1.pub)
+				  .work (0)
+				  .build ();
+	block2->sideband_set (nano::block_sideband{
+	key1.pub,
+	nano::amount{ 500 },
+	2, 0, nano::epoch::epoch_0,
+	true, false, false, nano::epoch::epoch_0 });
+
+	// Record old sideband sizes (v25 format, includes successor)
+	auto const old_size_open = nano::block_sideband_v25::size (nano::block_type::open);
+	auto const old_size_state = nano::block_sideband_v25::size (nano::block_type::state);
+
+	// Record new sideband sizes (v26 format, no successor)
+	auto const new_size_open = nano::block_sideband::size (nano::block_type::open);
+	auto const new_size_state = nano::block_sideband::size (nano::block_type::state);
+
+	// Verify the new format is 32 bytes smaller (sizeof block_hash)
+	ASSERT_EQ (old_size_open - new_size_open, 32);
+	ASSERT_EQ (old_size_state - new_size_state, 32);
+
+	auto const path = nano::unique_path ();
+	{
+		legacy_database_v25 legacy_db{ path };
+
+		// block1 has block2 as successor
+		legacy_db.add_block_legacy (*block1, block2->hash ());
+
+		// block2 has no successor (zero hash)
+		legacy_db.add_block_legacy (*block2, nano::block_hash{ 0 });
+
+		// Verify blocks are stored with v25 format size
+		auto tx = legacy_db.backend->tx_begin_read ();
+		nano::store::db_val value;
+		auto status = legacy_db.backend->get (tx, nano::store::table::blocks, block1->hash (), value);
+		ASSERT_TRUE (legacy_db.backend->success (status));
+	}
+
+	// Open through ledger_store which should trigger upgrade
+	nano::store::ledger_store store (
+	nano::test::make_backend (path),
+	nano::store::open_mode::read_write,
+	nano::test::default_stats (),
+	nano::test::default_logger ());
+
+	auto tx = store.tx_begin_read ();
+
+	// Verify version is now 26
+	ASSERT_EQ (store.version.get (tx), nano::store::ledger_store::version_current);
+	ASSERT_EQ (store.version.get (tx), 26);
+
+	// Verify blocks are readable with new format
+	auto stored_block1 = store.block.get (tx, block1->hash ());
+	ASSERT_NE (nullptr, stored_block1);
+	ASSERT_EQ (stored_block1->sideband ().height, 1);
+	ASSERT_EQ (stored_block1->sideband ().balance, nano::amount{ 1000 });
+
+	auto stored_block2 = store.block.get (tx, block2->hash ());
+	ASSERT_NE (nullptr, stored_block2);
+	ASSERT_EQ (stored_block2->sideband ().height, 2);
+	ASSERT_TRUE (stored_block2->sideband ().details.is_send);
+
+	// Verify successor table still works
+	auto successor_result = store.successor.get (tx, block1->hash ());
+	ASSERT_TRUE (successor_result.has_value ());
+	ASSERT_EQ (*successor_result, block2->hash ());
+
+	auto no_successor = store.successor.get (tx, block2->hash ());
+	ASSERT_FALSE (no_successor.has_value ());
+}
+
+/*
+ * Test v25 to v26 upgrade resilience: handles interrupted upgrade where some blocks
+ * are already in v26 format and some are still in v25 format
+ */
+TEST (ledger_upgrades, upgrade_v25_to_v26_interrupted)
+{
+	nano::keypair key1;
+	nano::keypair key2;
+
+	nano::block_builder builder;
+
+	auto block1 = builder
+				  .open ()
+				  .source (nano::block_hash{ key1.pub.number () })
+				  .representative (key1.pub)
+				  .account (key1.pub)
+				  .sign (key1.prv, key1.pub)
+				  .work (0)
+				  .build ();
+	block1->sideband_set (nano::block_sideband{
+	key1.pub,
+	nano::amount{ 1000 },
+	1, 0, nano::epoch::epoch_0,
+	false, false, false, nano::epoch::epoch_0 });
+
+	auto block2 = builder
+				  .state ()
+				  .account (key1.pub)
+				  .previous (block1->hash ())
+				  .representative (key1.pub)
+				  .balance (500)
+				  .link (key2.pub)
+				  .sign (key1.prv, key1.pub)
+				  .work (0)
+				  .build ();
+	block2->sideband_set (nano::block_sideband{
+	key1.pub,
+	nano::amount{ 500 },
+	2, 0, nano::epoch::epoch_0,
+	true, false, false, nano::epoch::epoch_0 });
+
+	auto const path = nano::unique_path ();
+	{
+		// Simulate an interrupted v25->v26 upgrade:
+		// block1 is already in v26 format (no successor in sideband)
+		// block2 is still in v25 format (successor in sideband)
+		legacy_database_v25 legacy_db{ path };
+
+		// block1 already converted to v26 format
+		legacy_db.add_block (*block1, block2->hash ());
+
+		// block2 still in v25 format (not yet converted)
+		legacy_db.add_block_legacy (*block2, nano::block_hash{ 0 });
+	}
+
+	// Open through ledger_store which should trigger v25->v26 upgrade
+	// Must handle the mixed v25/v26 format blocks
+	nano::store::ledger_store store (
+	nano::test::make_backend (path),
+	nano::store::open_mode::read_write,
+	nano::test::default_stats (),
+	nano::test::default_logger ());
+
+	auto tx = store.tx_begin_read ();
+
+	ASSERT_EQ (store.version.get (tx), 26);
+
+	// Both blocks should be readable
+	auto stored_block1 = store.block.get (tx, block1->hash ());
+	ASSERT_NE (nullptr, stored_block1);
+	ASSERT_EQ (stored_block1->sideband ().height, 1);
+	ASSERT_EQ (stored_block1->sideband ().balance, nano::amount{ 1000 });
+
+	auto stored_block2 = store.block.get (tx, block2->hash ());
+	ASSERT_NE (nullptr, stored_block2);
+	ASSERT_EQ (stored_block2->sideband ().height, 2);
+	ASSERT_TRUE (stored_block2->sideband ().details.is_send);
+
+	// Successor table should still work
+	auto successor_result = store.successor.get (tx, block1->hash ());
+	ASSERT_TRUE (successor_result.has_value ());
+	ASSERT_EQ (*successor_result, block2->hash ());
 }
 
 /*
