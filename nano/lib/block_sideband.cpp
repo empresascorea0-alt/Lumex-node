@@ -148,6 +148,7 @@ size_t nano::block_sideband::size (nano::block_type type)
 	{
 		result += sizeof (balance);
 	}
+	result += sizeof (topo_height);
 	result += sizeof (timestamp);
 	if (includes_details (type))
 	{
@@ -171,6 +172,7 @@ void nano::block_sideband::serialize (nano::stream & stream_a, nano::block_type 
 	{
 		nano::write (stream_a, balance.bytes);
 	}
+	nano::write (stream_a, boost::endian::native_to_big (topo_height));
 	nano::write (stream_a, boost::endian::native_to_big (timestamp));
 	if (includes_details (type))
 	{
@@ -209,6 +211,8 @@ bool nano::block_sideband::deserialize (nano::stream & stream_a, nano::block_typ
 		{
 			balance.clear ();
 		}
+		nano::read (stream_a, topo_height);
+		boost::endian::big_to_native_inplace (topo_height);
 		nano::read (stream_a, timestamp);
 		boost::endian::big_to_native_inplace (timestamp);
 		if (includes_details (type))
@@ -238,6 +242,7 @@ void nano::block_sideband::operator() (nano::object_stream & obs) const
 	obs.write ("balance", balance);
 	obs.write ("height", height);
 	obs.write ("timestamp", timestamp);
+	obs.write ("topo_height", topo_height);
 	obs.write ("source_epoch", source_epoch);
 	obs.write ("details", details);
 }
@@ -248,7 +253,25 @@ void nano::block_sideband::operator() (nano::object_stream & obs) const
 
 size_t nano::block_sideband_v25::size (nano::block_type type)
 {
-	return nano::block_sideband::size (type) + sizeof (nano::block_hash);
+	size_t result = sizeof (nano::block_hash); // successor
+	if (nano::block_sideband::includes_account (type))
+	{
+		result += sizeof (nano::account);
+	}
+	if (nano::block_sideband::includes_height (type))
+	{
+		result += sizeof (uint64_t);
+	}
+	if (nano::block_sideband::includes_balance (type))
+	{
+		result += sizeof (nano::amount);
+	}
+	result += sizeof (uint64_t); // timestamp
+	if (nano::block_sideband::includes_details (type))
+	{
+		result += nano::block_details::size () + sizeof (uint8_t); // details + source_epoch
+	}
+	return result;
 }
 
 void nano::block_sideband_v25::serialize (nano::stream & stream_a, nano::block_type type) const
