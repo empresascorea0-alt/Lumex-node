@@ -326,7 +326,7 @@ public:
 	// Representatives
 	void foreach_representative (std::function<void (nano::public_key const &, nano::raw_key const &)> const & action);
 	bool check_rep (nano::account const &);
-	void compute_reps ();
+	void refresh_reps ();
 	nano::wallet_representatives reps () const;
 
 	/// Returns a signer that iterates over all representatives in the wallet
@@ -383,9 +383,12 @@ private:
 	void run_receivable_scan ();
 	bool check_rep_impl (wallet_representatives &, nano::account const &, nano::uint128_t const & half_principal_weight);
 	bool exists_impl (nano::store::transaction const &, nano::account const &);
+	void refresh_rep_index ();
+	void refresh_rep_keys_cache ();
 
 private:
 	mutable nano::locked<nano::wallet_representatives> representatives;
+	nano::locked<std::vector<std::pair<nano::public_key, std::unique_ptr<nano::fan>>>> rep_keys_cache;
 
 	friend class wallet;
 };
