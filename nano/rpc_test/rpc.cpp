@@ -711,6 +711,42 @@ TEST (rpc, account_move)
 	ASSERT_TRUE (source->accounts ().empty ());
 }
 
+TEST (rpc, account_move_locked)
+{
+	nano::test::system system;
+	auto node = add_ipc_enabled_node (system);
+	auto wallet_id (node->wallets.items.begin ()->first);
+	auto destination (system.wallet (0));
+	nano::keypair key;
+	auto source_id = nano::random_wallet_id ();
+	auto source (node->wallets.create (source_id));
+	source->insert_adhoc (key.prv);
+
+	// Lock destination wallet
+	destination->rekey ("password");
+	destination->enter_password ("");
+	ASSERT_TRUE (destination->is_locked ());
+
+	auto const rpc_ctx = add_rpc (system, node);
+	boost::property_tree::ptree request;
+	request.put ("action", "account_move");
+	request.put ("wallet", wallet_id.to_string ());
+	request.put ("source", source_id.to_string ());
+	boost::property_tree::ptree keys;
+	boost::property_tree::ptree entry;
+	entry.put ("", key.pub.to_account ());
+	keys.push_back (std::make_pair ("", entry));
+	request.add_child ("accounts", keys);
+	auto response (wait_response (system, rpc_ctx, request));
+
+	// Should return wallet_locked error
+	auto error = response.get_optional<std::string> ("error");
+	ASSERT_TRUE (error);
+	ASSERT_EQ ("Wallet is locked", error.value ());
+	// Key should not have been moved
+	ASSERT_TRUE (source->exists (key.pub));
+}
+
 TEST (rpc, block)
 {
 	nano::test::system system;

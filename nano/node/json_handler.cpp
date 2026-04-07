@@ -761,8 +761,15 @@ void nano::json_handler::account_move ()
 						auto account (rpc_l->account_impl (i->second.get<std::string> ("")));
 						accounts.push_back (account);
 					}
-					auto error (wallet->move_accounts (*source_wallet, accounts));
-					rpc_l->response_l.put ("moved", error ? "0" : "1");
+					auto result = wallet->move_accounts (*source_wallet, accounts);
+					if (result)
+					{
+						rpc_l->response_l.put ("moved", result.value () ? "0" : "1");
+					}
+					else
+					{
+						rpc_l->ec = result.error ();
+					}
 				}
 				else
 				{

@@ -399,10 +399,12 @@ void nano::wallet_store::write_backup (nano::store::transaction const & transact
 	}
 }
 
-bool nano::wallet_store::move (nano::store::write_transaction const & transaction_a, nano::wallet_store & other_a, std::vector<nano::public_key> const & keys)
+nano::result<bool> nano::wallet_store::move (nano::store::write_transaction const & transaction_a, nano::wallet_store & other_a, std::vector<nano::public_key> const & keys)
 {
-	release_assert (valid_password (transaction_a), "wallet is locked or password is invalid");
-	release_assert (other_a.valid_password (transaction_a), "other wallet is locked or password is invalid");
+	if (!valid_password (transaction_a) || !other_a.valid_password (transaction_a))
+	{
+		return nano::error (nano::error_common::wallet_locked);
+	}
 
 	bool error = false;
 	for (auto i (keys.begin ()), n (keys.end ()); i != n; ++i)
@@ -421,10 +423,12 @@ bool nano::wallet_store::move (nano::store::write_transaction const & transactio
 	return error;
 }
 
-bool nano::wallet_store::import (nano::store::write_transaction const & transaction_a, nano::wallet_store & other_a)
+nano::result<bool> nano::wallet_store::import (nano::store::write_transaction const & transaction_a, nano::wallet_store & other_a)
 {
-	release_assert (valid_password (transaction_a), "wallet is locked or password is invalid");
-	release_assert (other_a.valid_password (transaction_a), "other wallet is locked or password is invalid");
+	if (!valid_password (transaction_a) || !other_a.valid_password (transaction_a))
+	{
+		return nano::error (nano::error_common::wallet_locked);
+	}
 
 	bool error = false;
 	for (auto i (other_a.begin (transaction_a)), n (other_a.end (transaction_a)); i != n; ++i)
@@ -904,7 +908,8 @@ bool nano::wallet::import (std::string const & json_a, std::string const & passw
 		auto temp = std::make_unique<nano::wallet_store> (wallets.kdf, transaction, wallets.env, 1, id.to_string (), json_a);
 		if (!temp->attempt_password (transaction, password_a))
 		{
-			error = store.import (transaction, *temp);
+			auto result = store.import (transaction, *temp);
+			error = !result || result.value ();
 		}
 		temp->destroy (transaction);
 	}
@@ -1527,15 +1532,15 @@ std::vector<nano::account> nano::wallet::accounts () const
 	return store.accounts (transaction);
 }
 
-bool nano::wallet::move_accounts (wallet & source, std::vector<nano::public_key> const & accounts_a)
+nano::result<bool> nano::wallet::move_accounts (wallet & source, std::vector<nano::public_key> const & accounts)
 {
-	bool error;
+	nano::result<bool> result{ true };
 	{
 		auto transaction = wallets.tx_begin_write ();
-		error = store.move (transaction, source.store, accounts_a);
+		result = store.move (transaction, source.store, accounts);
 	}
 	wallets.refresh_rep_keys_cache ();
-	return error;
+	return result;
 }
 
 nano::key_type nano::wallet::key_type (nano::account const & account_a) const

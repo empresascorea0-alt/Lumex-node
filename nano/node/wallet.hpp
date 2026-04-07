@@ -108,8 +108,8 @@ public:
 	void derive_key (nano::raw_key & result, nano::store::transaction const &, std::string const & password) const;
 	void serialize_json (nano::store::transaction const &, std::string & json) const;
 	void write_backup (nano::store::transaction const &, std::filesystem::path const & path) const;
-	bool move (nano::store::write_transaction const &, nano::wallet_store & source, std::vector<nano::public_key> const & keys);
-	bool import (nano::store::write_transaction const &, nano::wallet_store & source);
+	nano::result<bool> move (nano::store::write_transaction const &, nano::wallet_store & source, std::vector<nano::public_key> const & keys);
+	nano::result<bool> import (nano::store::write_transaction const &, nano::wallet_store & source);
 	std::optional<uint64_t> work_get (nano::store::transaction const &, nano::public_key const &) const;
 	void work_put (nano::store::write_transaction const &, nano::public_key const & pub, uint64_t work);
 	unsigned version (nano::store::transaction const &) const;
@@ -168,7 +168,7 @@ public:
 	void remove_account (nano::account const & account);
 	std::vector<nano::account> accounts () const;
 	bool exists (nano::public_key const & pub);
-	bool move_accounts (wallet & source, std::vector<nano::public_key> const & accounts);
+	nano::result<bool> move_accounts (wallet & source, std::vector<nano::public_key> const & accounts);
 	nano::key_type key_type (nano::account const & account) const;
 
 	// Seed management
