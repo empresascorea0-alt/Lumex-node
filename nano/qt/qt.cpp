@@ -2274,7 +2274,7 @@ void nano_qt::block_creation::create_send ()
 				else
 				{
 					show_label_error (*status);
-					status->setText ("Account is not in wallet");
+					status->setText (key_result.error ().get_message ().c_str ());
 				}
 			}
 			else
@@ -2349,7 +2349,7 @@ void nano_qt::block_creation::create_receive ()
 						else
 						{
 							show_label_error (*status);
-							status->setText ("Account is not in wallet");
+							status->setText (key_result.error ().get_message ().c_str ());
 						}
 					}
 					else
@@ -2430,7 +2430,7 @@ void nano_qt::block_creation::create_change ()
 				else
 				{
 					show_label_error (*status);
-					status->setText ("Account is not in wallet");
+					status->setText (key_result.error ().get_message ().c_str ());
 				}
 			}
 			else
@@ -2509,7 +2509,7 @@ void nano_qt::block_creation::create_open ()
 							else
 							{
 								show_label_error (*status);
-								status->setText ("Account is not in wallet");
+								status->setText (key_result.error ().get_message ().c_str ());
 							}
 						}
 						else
