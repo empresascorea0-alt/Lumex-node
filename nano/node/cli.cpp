@@ -307,13 +307,21 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 					password = vm["password"].as<std::string> ();
 				}
 				auto inactive_node = nano::default_inactive_node (data_path, vm);
-				auto wallet (inactive_node->node->wallets.open (wallet_id));
+				auto wallet = inactive_node->node->wallets.open (wallet_id);
 				if (wallet != nullptr)
 				{
 					if (!wallet->enter_password (password))
 					{
-						auto pub (wallet->deterministic_insert ());
-						std::cout << boost::str (boost::format ("Account: %1%\n") % pub.to_account ());
+						auto pub_result = wallet->deterministic_insert ();
+						if (pub_result)
+						{
+							std::cout << boost::str (boost::format ("Account: %1%\n") % pub_result.value ().to_account ());
+						}
+						else
+						{
+							std::cerr << "Failed to create account\n";
+							ec = pub_result.error ();
+						}
 					}
 					else
 					{
@@ -891,7 +899,7 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 					password = vm["password"].as<std::string> ();
 				}
 				auto inactive_node = nano::default_inactive_node (data_path, vm);
-				auto wallet (inactive_node->node->wallets.open (wallet_id));
+				auto wallet = inactive_node->node->wallets.open (wallet_id);
 				if (wallet != nullptr)
 				{
 					if (!wallet->enter_password (password))
@@ -899,7 +907,12 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 						nano::raw_key key;
 						if (!key.decode_hex (vm["key"].as<std::string> ()))
 						{
-							wallet->insert_adhoc (key);
+							auto result = wallet->insert_adhoc (key);
+							if (!result)
+							{
+								std::cerr << "Failed to add key\n";
+								ec = result.error ();
+							}
 						}
 						else
 						{
@@ -1071,20 +1084,32 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 				{
 					if (!existing->second->enter_password (password))
 					{
-						nano::raw_key seed;
-						existing->second->get_seed (seed);
-						std::cout << boost::str (boost::format ("Seed: %1%\n") % seed.to_string ());
-						for (auto const & account : existing->second->accounts ())
+						auto seed_result = existing->second->get_seed ();
+						if (seed_result)
 						{
-							nano::raw_key key;
-							auto error (existing->second->fetch_prv (account, key));
-							(void)error;
-							debug_assert (!error);
-							std::cout << boost::str (boost::format ("Pub: %1% Prv: %2%\n") % account.to_account () % key.to_string ());
-							if (nano::pub_key (key) != account)
+							std::cout << boost::str (boost::format ("Seed: %1%\n") % seed_result.value ().to_string ());
+							for (auto const & account : existing->second->accounts ())
 							{
-								std::cerr << boost::str (boost::format ("Invalid private key %1%\n") % key.to_string ());
+								auto key_result = existing->second->fetch_prv (account);
+								debug_assert (key_result);
+								if (key_result)
+								{
+									std::cout << boost::str (boost::format ("Pub: %1% Prv: %2%\n") % account.to_account () % key_result.value ().to_string ());
+									if (nano::pub_key (key_result.value ()) != account)
+									{
+										std::cerr << boost::str (boost::format ("Invalid private key %1%\n") % key_result.value ().to_string ());
+									}
+								}
+								else
+								{
+									std::cerr << boost::str (boost::format ("Unable to fetch private key for account %1% (%2%)\n") % account.to_account () % key_result.error ());
+								}
 							}
+						}
+						else
+						{
+							std::cerr << boost::str (boost::format ("Unable to retrieve seed: %1%\n") % seed_result.error ());
+							ec = seed_result.error ();
 						}
 					}
 					else

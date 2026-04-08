@@ -4,6 +4,7 @@
 #include <nano/lib/locks.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/numbers_templ.hpp>
+#include <nano/lib/result.hpp>
 #include <nano/lib/thread_pool.hpp>
 #include <nano/lib/work.hpp>
 #include <nano/node/fwd.hpp>
@@ -15,6 +16,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <unordered_set>
 
@@ -78,7 +80,7 @@ public:
 	bool valid_public_key (nano::public_key const &) const;
 	bool attempt_password (nano::store::transaction const &, std::string const & password);
 	void wallet_key (nano::raw_key & result, nano::store::transaction const &) const;
-	void seed (nano::raw_key & result, nano::store::transaction const &) const;
+	nano::raw_key seed (nano::store::transaction const &) const;
 	void seed_set (nano::store::write_transaction const &, nano::raw_key const & seed);
 	nano::key_type key_type (nano::wallet_value const &) const;
 	nano::public_key deterministic_insert (nano::store::write_transaction const &);
@@ -96,7 +98,7 @@ public:
 	void erase (nano::store::write_transaction const &, nano::account const & pub);
 	nano::wallet_value entry_get_raw (nano::store::transaction const &, nano::account const & pub) const;
 	void entry_put_raw (nano::store::write_transaction const &, nano::account const & pub, nano::wallet_value const & entry);
-	bool fetch (nano::store::transaction const &, nano::account const & pub, nano::raw_key & result) const;
+	nano::result<nano::raw_key> fetch (nano::store::transaction const &, nano::account const & pub) const;
 	bool exists (nano::store::transaction const &, nano::account const & pub) const;
 	void destroy (nano::store::write_transaction const &);
 	iterator find (nano::store::transaction const &, nano::account const & key) const;
@@ -106,9 +108,9 @@ public:
 	void derive_key (nano::raw_key & result, nano::store::transaction const &, std::string const & password) const;
 	void serialize_json (nano::store::transaction const &, std::string & json) const;
 	void write_backup (nano::store::transaction const &, std::filesystem::path const & path) const;
-	bool move (nano::store::write_transaction const &, nano::wallet_store & source, std::vector<nano::public_key> const & keys);
-	bool import (nano::store::write_transaction const &, nano::wallet_store & source);
-	bool work_get (nano::store::transaction const &, nano::public_key const & pub, uint64_t & work) const;
+	nano::result<bool> move (nano::store::write_transaction const &, nano::wallet_store & source, std::vector<nano::public_key> const & keys);
+	nano::result<bool> import (nano::store::write_transaction const &, nano::wallet_store & source);
+	std::optional<uint64_t> work_get (nano::store::transaction const &, nano::public_key const &) const;
 	void work_put (nano::store::write_transaction const &, nano::public_key const & pub, uint64_t work);
 	unsigned version (nano::store::transaction const &) const;
 	void version_put (nano::store::write_transaction const &, unsigned version);
@@ -159,18 +161,18 @@ public:
 	void lock ();
 
 	// Account management
-	nano::public_key insert_adhoc (nano::raw_key const & prv, bool generate_work = true);
-	nano::public_key deterministic_insert (uint32_t index, bool generate_work = true);
-	nano::public_key deterministic_insert (bool generate_work = true);
+	nano::result<nano::public_key> insert_adhoc (nano::raw_key const & prv, bool generate_work = true);
+	nano::result<nano::public_key> deterministic_insert (uint32_t index, bool generate_work = true);
+	nano::result<nano::public_key> deterministic_insert (bool generate_work = true);
 	bool insert_watch (nano::public_key const & pub);
 	void remove_account (nano::account const & account);
 	std::vector<nano::account> accounts () const;
 	bool exists (nano::public_key const & pub);
-	bool move_accounts (wallet & source, std::vector<nano::public_key> const & accounts);
+	nano::result<bool> move_accounts (wallet & source, std::vector<nano::public_key> const & accounts);
 	nano::key_type key_type (nano::account const & account) const;
 
 	// Seed management
-	bool get_seed (nano::raw_key & result) const;
+	nano::result<nano::raw_key> get_seed () const;
 	nano::public_key change_seed (nano::raw_key const & seed, uint32_t count = 0);
 	void deterministic_restore ();
 	uint32_t deterministic_check (uint32_t index);
@@ -184,7 +186,7 @@ public:
 	std::unordered_set<nano::account> reps () const;
 
 	// Key retrieval
-	bool fetch_prv (nano::account const & pub, nano::raw_key & result) const;
+	nano::result<nano::raw_key> fetch_prv (nano::account const & pub) const;
 
 	// Block actions
 	std::shared_ptr<nano::block> change_action (nano::account const & source, nano::account const & representative, uint64_t work = 0, bool generate_work = true);
@@ -203,7 +205,7 @@ public:
 	// Work cache
 	void work_cache_blocking (nano::account const & account, nano::root const & root);
 	void work_ensure (nano::account const & account, nano::root const & root);
-	bool get_work (nano::public_key const & pub, uint64_t & work) const;
+	nano::result<uint64_t> get_work (nano::public_key const &) const;
 	void set_work (nano::public_key const & pub, uint64_t work);
 
 	// Receivable
@@ -229,6 +231,7 @@ private:
 	bool enter_password_impl (nano::store::transaction const &, std::string const & password);
 	bool insert_watch_impl (nano::store::write_transaction const &, nano::public_key const & pub);
 	nano::public_key deterministic_insert_impl (nano::store::write_transaction const &, bool generate_work = true);
+	nano::public_key deterministic_insert_impl (nano::store::write_transaction const &, uint32_t index, bool generate_work = true);
 	void work_update_impl (nano::store::write_transaction const &, nano::account const & account, nano::root const & root, uint64_t work);
 	bool search_receivable_impl (nano::store::transaction const &);
 	void init_free_accounts_impl (nano::store::transaction const &);

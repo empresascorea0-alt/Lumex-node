@@ -186,12 +186,19 @@ nano_qt::accounts::accounts (nano_qt::wallet & wallet_a) :
 		nano::raw_key key;
 		if (!key.decode_hex (key_text))
 		{
-			show_line_ok (*account_key_line);
-			account_key_line->clear ();
-			this->wallet.wallet_m->insert_adhoc (key);
-			this->wallet.accounts.refresh ();
-			this->wallet.accounts.refresh_wallet_balance ();
-			this->wallet.history.refresh ();
+			auto result = this->wallet.wallet_m->insert_adhoc (key);
+			if (result)
+			{
+				show_line_ok (*account_key_line);
+				account_key_line->clear ();
+				this->wallet.accounts.refresh ();
+				this->wallet.accounts.refresh_wallet_balance ();
+				this->wallet.history.refresh ();
+			}
+			else
+			{
+				show_line_error (*account_key_line);
+			}
 		}
 		else
 		{
@@ -202,30 +209,28 @@ nano_qt::accounts::accounts (nano_qt::wallet & wallet_a) :
 		this->wallet.pop_main_stack ();
 	});
 	QObject::connect (create_account, &QPushButton::released, [this] () {
+		auto result = this->wallet.wallet_m->deterministic_insert ();
+		if (result)
 		{
-			if (!this->wallet.wallet_m->is_locked ())
-			{
-				this->wallet.wallet_m->deterministic_insert ();
-				show_button_success (*create_account);
-				create_account->setText ("New account was created");
-				this->wallet.node.workers.post_delayed (std::chrono::seconds (5), [this] () {
-					this->wallet.application.postEvent (&this->wallet.processor, new eventloop_event ([this] () {
-						show_button_ok (*create_account);
-						create_account->setText ("Create account");
-					}));
-				});
-			}
-			else
-			{
-				show_button_error (*create_account);
-				create_account->setText ("Wallet is locked, unlock it to create account");
-				this->wallet.node.workers.post_delayed (std::chrono::seconds (5), [this] () {
-					this->wallet.application.postEvent (&this->wallet.processor, new eventloop_event ([this] () {
-						show_button_ok (*create_account);
-						create_account->setText ("Create account");
-					}));
-				});
-			}
+			show_button_success (*create_account);
+			create_account->setText ("New account was created");
+			this->wallet.node.workers.post_delayed (std::chrono::seconds (5), [this] () {
+				this->wallet.application.postEvent (&this->wallet.processor, new eventloop_event ([this] () {
+					show_button_ok (*create_account);
+					create_account->setText ("Create account");
+				}));
+			});
+		}
+		else
+		{
+			show_button_error (*create_account);
+			create_account->setText ("Wallet is locked, unlock it to create account");
+			this->wallet.node.workers.post_delayed (std::chrono::seconds (5), [this] () {
+				this->wallet.application.postEvent (&this->wallet.processor, new eventloop_event ([this] () {
+					show_button_ok (*create_account);
+					create_account->setText ("Create account");
+				}));
+			});
 		}
 		refresh ();
 	});
@@ -233,11 +238,10 @@ nano_qt::accounts::accounts (nano_qt::wallet & wallet_a) :
 		this->wallet.push_main_stack (this->wallet.import.window);
 	});
 	QObject::connect (backup_seed, &QPushButton::released, [this] () {
-		nano::raw_key seed;
-		if (!this->wallet.wallet_m->is_locked ())
+		auto seed_result = this->wallet.wallet_m->get_seed ();
+		if (seed_result)
 		{
-			this->wallet.wallet_m->get_seed (seed);
-			this->wallet.application.clipboard ()->setText (QString (seed.to_string ().c_str ()));
+			this->wallet.application.clipboard ()->setText (QString (seed_result.value ().to_string ().c_str ()));
 			show_button_success (*backup_seed);
 			backup_seed->setText ("Seed was copied to clipboard");
 			this->wallet.node.workers.post_delayed (std::chrono::seconds (5), [this] () {
@@ -2224,8 +2228,8 @@ void nano_qt::block_creation::create_send ()
 			if (!error)
 			{
 				auto block_transaction = wallet.node.ledger.tx_begin_read ();
-				nano::raw_key key;
-				if (!wallet.wallet_m->fetch_prv (account_l, key))
+				auto key_result = wallet.wallet_m->fetch_prv (account_l);
+				if (key_result)
 				{
 					auto balance = wallet.node.ledger.any.account_balance (block_transaction, account_l).value_or (0).number ();
 					if (amount_l.number () <= balance)
@@ -2234,7 +2238,7 @@ void nano_qt::block_creation::create_send ()
 						auto error (wallet.node.store.account.get (block_transaction, account_l, info));
 						(void)error;
 						debug_assert (!error);
-						nano::state_block send (account_l, info.head, info.representative, balance - amount_l.number (), destination_l, key, account_l, 0);
+						nano::state_block send (account_l, info.head, info.representative, balance - amount_l.number (), destination_l, key_result.value (), account_l, 0);
 						nano::block_details details;
 						details.is_send = true;
 						details.epoch = info.epoch ();
@@ -2270,7 +2274,7 @@ void nano_qt::block_creation::create_send ()
 				else
 				{
 					show_label_error (*status);
-					status->setText ("Account is not in wallet");
+					status->setText (key_result.error ().get_message ().c_str ());
 				}
 			}
 			else
@@ -2312,11 +2316,10 @@ void nano_qt::block_creation::create_receive ()
 					auto error (wallet.node.store.account.get (block_transaction, pending_key.account, info));
 					if (!error)
 					{
-						nano::raw_key key;
-						auto error (wallet.wallet_m->fetch_prv (pending_key.account, key));
-						if (!error)
+						auto key_result = wallet.wallet_m->fetch_prv (pending_key.account);
+						if (key_result)
 						{
-							nano::state_block receive (pending_key.account, info.head, info.representative, info.balance.number () + pending.value ().amount.number (), source_l, key, pending_key.account, 0);
+							nano::state_block receive (pending_key.account, info.head, info.representative, info.balance.number () + pending.value ().amount.number (), source_l, key_result.value (), pending_key.account, 0);
 							nano::block_details details;
 							details.is_receive = true;
 							details.epoch = std::max (info.epoch (), pending.value ().epoch);
@@ -2346,7 +2349,7 @@ void nano_qt::block_creation::create_receive ()
 						else
 						{
 							show_label_error (*status);
-							status->setText ("Account is not in wallet");
+							status->setText (key_result.error ().get_message ().c_str ());
 						}
 					}
 					else
@@ -2395,11 +2398,10 @@ void nano_qt::block_creation::create_change ()
 			auto error (wallet.node.store.account.get (block_transaction, account_l, info));
 			if (!error)
 			{
-				nano::raw_key key;
-				auto error (wallet.wallet_m->fetch_prv (account_l, key));
-				if (!error)
+				auto key_result = wallet.wallet_m->fetch_prv (account_l);
+				if (key_result)
 				{
-					nano::state_block change (account_l, info.head, representative_l, info.balance, 0, key, account_l, 0);
+					nano::state_block change (account_l, info.head, representative_l, info.balance, 0, key_result.value (), account_l, 0);
 					nano::block_details details;
 					details.epoch = info.epoch ();
 					auto const required_difficulty{ wallet.node.network_params.work.threshold (change.work_version (), details) };
@@ -2428,7 +2430,7 @@ void nano_qt::block_creation::create_change ()
 				else
 				{
 					show_label_error (*status);
-					status->setText ("Account is not in wallet");
+					status->setText (key_result.error ().get_message ().c_str ());
 				}
 			}
 			else
@@ -2474,11 +2476,10 @@ void nano_qt::block_creation::create_open ()
 						auto error (wallet.node.store.account.get (block_transaction, pending_key.account, info));
 						if (error)
 						{
-							nano::raw_key key;
-							auto error (wallet.wallet_m->fetch_prv (pending_key.account, key));
-							if (!error)
+							auto key_result = wallet.wallet_m->fetch_prv (pending_key.account);
+							if (key_result)
 							{
-								nano::state_block open (pending_key.account, 0, representative_l, pending.value ().amount, source_l, key, pending_key.account, 0);
+								nano::state_block open (pending_key.account, 0, representative_l, pending.value ().amount, source_l, key_result.value (), pending_key.account, 0);
 								nano::block_details details;
 								details.is_receive = true;
 								details.epoch = pending.value ().epoch;
@@ -2508,7 +2509,7 @@ void nano_qt::block_creation::create_open ()
 							else
 							{
 								show_label_error (*status);
-								status->setText ("Account is not in wallet");
+								status->setText (key_result.error ().get_message ().c_str ());
 							}
 						}
 						else
