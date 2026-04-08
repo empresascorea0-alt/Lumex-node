@@ -1,3 +1,5 @@
+#include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/peer_history.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>

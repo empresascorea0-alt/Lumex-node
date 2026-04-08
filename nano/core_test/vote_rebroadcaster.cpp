@@ -1,11 +1,13 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/vote.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/rep_tiers.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/node/vote_processor.hpp>
 #include <nano/node/vote_rebroadcaster.hpp>
 #include <nano/node/vote_router.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/test_common/chains.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>

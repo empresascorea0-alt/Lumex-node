@@ -1,7 +1,10 @@
+#include <nano/lib/blocks.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/transport/fake.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
 

@@ -1,3 +1,4 @@
+#include <nano/node/nodeconfig.hpp>
 #include <nano/rpc_test/common.hpp>
 #include <nano/store/ledger/confirmation_height.hpp>
 #include <nano/store/ledger_store.hpp>

@@ -1,4 +1,5 @@
 #include <nano/lib/stream.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/telemetry.hpp>
 #include <nano/node/transport/fake.hpp>
 #include <nano/test_common/network.hpp>

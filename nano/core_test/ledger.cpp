@@ -6,11 +6,14 @@
 #include <nano/lib/threading.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/block_processor.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/scheduler/component.hpp>
 #include <nano/node/scheduler/priority.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/node/unchecked_map.hpp>
+#include <nano/node/vote_processor.hpp>
 #include <nano/node/vote_router.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>

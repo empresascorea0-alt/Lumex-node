@@ -1,4 +1,5 @@
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/numbers_templ.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/transport/message_deserializer.hpp>
 #include <nano/test_common/random.hpp>

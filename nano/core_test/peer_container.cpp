@@ -1,5 +1,8 @@
+#include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/tcp_server.hpp>
 #include <nano/node/transport/tcp_socket.hpp>
+#include <nano/node/transport/transport.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>

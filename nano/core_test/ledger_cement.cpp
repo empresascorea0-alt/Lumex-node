@@ -3,7 +3,9 @@
 #include <nano/lib/logging.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>

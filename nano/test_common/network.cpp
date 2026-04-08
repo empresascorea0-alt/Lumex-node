@@ -1,5 +1,9 @@
 #include <nano/lib/files.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/nodeconfig.hpp>
+#include <nano/node/transport/tcp_channels.hpp>
+#include <nano/node/transport/transport.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
@@ -26,7 +30,7 @@ std::shared_ptr<nano::transport::tcp_channel> nano::test::establish_tcp (nano::t
 }
 
 // TODO: merge with make_disconnected_node
-std::shared_ptr<nano::node> nano::test::add_outer_node (nano::test::system & system_a, nano::node_config const & config_a, nano::node_flags flags_a)
+std::shared_ptr<nano::node> nano::test::add_outer_node (nano::test::system & system_a, nano::node_config const & config_a, nano::node_flags const & flags_a)
 {
 	auto outer_node = std::make_shared<nano::node> (system_a.io_ctx, nano::unique_path (), config_a, system_a.work, flags_a);
 	outer_node->start ();
@@ -34,13 +38,23 @@ std::shared_ptr<nano::node> nano::test::add_outer_node (nano::test::system & sys
 	return outer_node;
 }
 
+std::shared_ptr<nano::node> nano::test::add_outer_node (nano::test::system & system_a, nano::node_config const & config_a)
+{
+	return add_outer_node (system_a, config_a, nano::node_flags{});
+}
+
 // TODO: merge with make_disconnected_node
-std::shared_ptr<nano::node> nano::test::add_outer_node (nano::test::system & system_a, nano::node_flags flags_a)
+std::shared_ptr<nano::node> nano::test::add_outer_node (nano::test::system & system_a, nano::node_flags const & flags_a)
 {
 	auto outer_node = std::make_shared<nano::node> (system_a.io_ctx, system_a.get_available_port (), nano::unique_path (), system_a.work, flags_a);
 	outer_node->start ();
 	system_a.disconnected_nodes.push_back (outer_node);
 	return outer_node;
+}
+
+std::shared_ptr<nano::node> nano::test::add_outer_node (nano::test::system & system_a)
+{
+	return add_outer_node (system_a, nano::node_flags{});
 }
 
 // Note: this is not guaranteed to work, it is speculative

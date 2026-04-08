@@ -1,7 +1,9 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/work_version.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/inproc.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/store/ledger/account.hpp>

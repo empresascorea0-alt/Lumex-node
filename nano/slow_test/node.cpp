@@ -11,6 +11,7 @@
 #include <nano/node/election.hpp>
 #include <nano/node/epoch_upgrader.hpp>
 #include <nano/node/ledger_notifications.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/scheduler/component.hpp>
 #include <nano/node/scheduler/manual.hpp>
@@ -18,6 +19,7 @@
 #include <nano/node/telemetry.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/node/unchecked_map.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>

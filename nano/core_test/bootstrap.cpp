@@ -5,6 +5,7 @@
 #include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/bootstrap/database_scan_index.hpp>
 #include <nano/node/make_store.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/test_common/chains.hpp>

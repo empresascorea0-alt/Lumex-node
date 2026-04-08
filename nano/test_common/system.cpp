@@ -7,6 +7,7 @@
 #include <nano/node/active_elections.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/tcp_listener.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
@@ -53,7 +54,12 @@ nano::test::system::system () :
 	}
 }
 
-nano::test::system::system (uint16_t count_a, nano::transport::transport_type type_a, nano::node_flags flags_a) :
+nano::test::system::system (uint16_t count_a, nano::transport::transport_type type_a) :
+	system (count_a, type_a, nano::node_flags{})
+{
+}
+
+nano::test::system::system (uint16_t count_a, nano::transport::transport_type type_a, nano::node_flags const & flags_a) :
 	system ()
 {
 	nodes.reserve (count_a);
@@ -117,13 +123,23 @@ nano::node & nano::test::system::node (std::size_t index) const
 	return *nodes[index];
 }
 
-std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_flags node_flags_a, nano::transport::transport_type type_a)
+std::shared_ptr<nano::node> nano::test::system::add_node (nano::transport::transport_type type_a)
+{
+	return add_node (default_config (), nano::node_flags{}, type_a);
+}
+
+std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_flags const & node_flags_a, nano::transport::transport_type type_a)
 {
 	return add_node (default_config (), node_flags_a, type_a);
 }
 
+std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_config const & node_config_a, nano::transport::transport_type type_a)
+{
+	return add_node (node_config_a, nano::node_flags{}, type_a);
+}
+
 /** Returns the node added. */
-std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_config const & node_config_a, nano::node_flags node_flags_a, nano::transport::transport_type type_a, std::optional<nano::keypair> const & rep)
+std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_config const & node_config_a, nano::node_flags const & node_flags_a, nano::transport::transport_type type_a, std::optional<nano::keypair> const & rep)
 {
 	auto node (std::make_shared<nano::node> (io_ctx, nano::unique_path (), node_config_a, work, node_flags_a, node_sequence++));
 	setup_node (*node);
@@ -165,10 +181,14 @@ std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_config cons
 	return node;
 }
 
-// TODO: Merge with add_node
-std::shared_ptr<nano::node> nano::test::system::make_disconnected_node (std::optional<nano::node_config> opt_node_config, nano::node_flags flags)
+std::shared_ptr<nano::node> nano::test::system::make_disconnected_node ()
 {
-	nano::node_config node_config = opt_node_config.has_value () ? *opt_node_config : default_config ();
+	return make_disconnected_node (default_config (), nano::node_flags{});
+}
+
+// TODO: Merge with add_node
+std::shared_ptr<nano::node> nano::test::system::make_disconnected_node (nano::node_config const & node_config, nano::node_flags const & flags)
+{
 	auto node = std::make_shared<nano::node> (io_ctx, nano::unique_path (), node_config, work, flags);
 	setup_node (*node);
 	node->start ();

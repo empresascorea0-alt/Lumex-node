@@ -1,6 +1,9 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/work_version.hpp>
+#include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/qt/qt.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>

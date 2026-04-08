@@ -1,10 +1,12 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/scheduler/component.hpp>
 #include <nano/node/scheduler/priority.hpp>
 #include <nano/node/vote_router.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/test_common/chains.hpp>
 #include <nano/test_common/system.hpp>

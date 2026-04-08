@@ -5,6 +5,7 @@
 #include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/node/json_handler.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/transport.hpp>
 #include <nano/node/unchecked_map.hpp>
 #include <nano/rpc/rpc.hpp>

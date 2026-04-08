@@ -17,12 +17,14 @@
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/node/json_handler.hpp>
 #include <nano/node/node_rpc_config.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/scheduler/component.hpp>
 #include <nano/node/scheduler/manual.hpp>
 #include <nano/node/scheduler/priority.hpp>
 #include <nano/node/telemetry.hpp>
 #include <nano/node/unchecked_map.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/rpc/rpc.hpp>
 #include <nano/rpc/rpc_request_processor.hpp>
 #include <nano/rpc_test/common.hpp>

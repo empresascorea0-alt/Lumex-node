@@ -3,6 +3,7 @@
 #include <nano/lib/files.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/node/inactive_node.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/tcp_listener.hpp>
 #include <nano/node/transport/tcp_socket.hpp>
 #include <nano/test_common/system.hpp>

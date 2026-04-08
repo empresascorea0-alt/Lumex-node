@@ -3,6 +3,7 @@
 #include <nano/node/active_elections.hpp>
 #include <nano/node/confirmation_solicitor.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>

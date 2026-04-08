@@ -6,7 +6,9 @@
 #include <nano/node/election.hpp>
 #include <nano/node/ledger_notifications.hpp>
 #include <nano/node/make_store.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/unchecked_map.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/test_common/ledger_context.hpp>
