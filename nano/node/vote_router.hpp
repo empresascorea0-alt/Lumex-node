@@ -2,6 +2,7 @@
 
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/numbers_templ.hpp>
+#include <nano/lib/observer_set.hpp>
 #include <nano/node/fwd.hpp>
 
 #include <condition_variable>

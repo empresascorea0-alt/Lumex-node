@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nano/boost/asio/ip/tcp.hpp>
+#include <nano/lib/interval.hpp>
 #include <nano/lib/thread_pool.hpp>
 #include <nano/node/fwd.hpp>
 

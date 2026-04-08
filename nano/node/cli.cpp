@@ -8,6 +8,7 @@
 #include <nano/node/inactive_node.hpp>
 #include <nano/node/migrations.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/unchecked_map.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>

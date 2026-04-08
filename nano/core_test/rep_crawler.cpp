@@ -1,8 +1,10 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/online_reps.hpp>
 #include <nano/node/repcrawler.hpp>
 #include <nano/node/transport/fake.hpp>
 #include <nano/node/transport/inproc.hpp>
@@ -216,7 +218,7 @@ TEST (rep_crawler, rep_remove)
 	ASSERT_TIMELY_EQ (10s, searching_node.rep_crawler.representative_count (), 1);
 
 	// Start a node for Rep2 and wait until it is connected
-	auto node_rep2 (std::make_shared<nano::node> (system.io_ctx, nano::unique_path (), nano::node_config (system.get_available_port ()), system.work));
+	auto node_rep2 (std::make_shared<nano::node> (system.io_ctx, nano::unique_path (), nano::node_config (system.get_available_port ()), system.work, nano::node_flags{}));
 	node_rep2->start ();
 	searching_node.network.tcp_channels.start_tcp (node_rep2->network.endpoint ());
 	std::shared_ptr<nano::transport::channel> channel_rep2;

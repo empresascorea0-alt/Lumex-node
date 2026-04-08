@@ -2,6 +2,7 @@
 #include <nano/boost/asio/read.hpp>
 #include <nano/lib/enum_util.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/tcp_socket.hpp>
 #include <nano/node/transport/transport.hpp>
 

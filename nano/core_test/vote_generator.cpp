@@ -1,3 +1,4 @@
+#include <nano/node/node_observers.hpp>
 #include <nano/node/vote_generator.hpp>
 #include <nano/node/wallet.hpp>
 #include <nano/secure/voting_policy.hpp>

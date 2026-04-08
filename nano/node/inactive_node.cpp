@@ -1,6 +1,7 @@
 #include <nano/node/active_elections.hpp>
 #include <nano/node/inactive_node.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/nodeconfig.hpp>
 
 nano::inactive_node::inactive_node (std::filesystem::path const & path_a, std::filesystem::path const & config_path_a, nano::node_flags const & node_flags_a) :
 	node_wrapper (path_a, config_path_a, node_flags_a),

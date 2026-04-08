@@ -10,13 +10,17 @@
 #include <nano/node/active_elections.hpp>
 #include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/cementing_set.hpp>
+#include <nano/node/distributed_work_factory.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/endpoint.hpp>
+#include <nano/node/epoch_upgrader.hpp>
 #include <nano/node/json_handler.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/node_observers.hpp>
 #include <nano/node/node_rpc_config.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/telemetry.hpp>
+#include <nano/node/unchecked_map.hpp>
 #include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>

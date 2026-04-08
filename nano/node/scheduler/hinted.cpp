@@ -1,3 +1,4 @@
+#include <nano/lib/blocks.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/lib/tomlconfig.hpp>
 #include <nano/node/active_elections.hpp>
@@ -5,6 +6,7 @@
 #include <nano/node/node.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/scheduler/hinted.hpp>
+#include <nano/node/vote_cache.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 

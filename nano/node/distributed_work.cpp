@@ -1,5 +1,9 @@
 #include <nano/boost/asio/bind_executor.hpp>
+#include <nano/lib/logging.hpp>
+#include <nano/lib/thread_pool.hpp>
 #include <nano/node/distributed_work.hpp>
+#include <nano/node/distributed_work_factory.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/websocket.hpp>
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <nano/lib/errors.hpp>
-#include <nano/node/nodeconfig.hpp>
+#include <nano/node/fwd.hpp>
 
 #include <boost/program_options.hpp>
 

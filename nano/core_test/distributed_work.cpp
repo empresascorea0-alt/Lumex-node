@@ -1,5 +1,7 @@
 #include <nano/core_test/fakes/work_peer.hpp>
 #include <nano/lib/work_version.hpp>
+#include <nano/node/distributed_work_factory.hpp>
+#include <nano/node/node_observers.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
 

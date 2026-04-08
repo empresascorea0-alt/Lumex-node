@@ -1,5 +1,6 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/lib/work_version.hpp>
@@ -9,6 +10,7 @@
 #include <nano/node/inactive_node.hpp>
 #include <nano/node/local_vote_history.hpp>
 #include <nano/node/make_store.hpp>
+#include <nano/node/node_observers.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/portmapping.hpp>
 #include <nano/node/pruning.hpp>
@@ -18,6 +20,7 @@
 #include <nano/node/transport/fake.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/node/transport/tcp_listener.hpp>
+#include <nano/node/unchecked_map.hpp>
 #include <nano/node/vote_generator.hpp>
 #include <nano/node/vote_router.hpp>
 #include <nano/secure/ledger.hpp>
@@ -87,7 +90,7 @@ TEST (node, block_store_path_failure)
 	nano::test::system system;
 	auto path (nano::unique_path ());
 	nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
-	auto node (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), path, pool));
+	auto node (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), path, pool, nano::node_flags{}));
 	system.register_node (node);
 	ASSERT_TRUE (node->wallets.items.empty ());
 }
@@ -2596,7 +2599,7 @@ TEST (node, peers)
 	auto node1 (system.nodes[0]);
 	ASSERT_TRUE (node1->network.empty ());
 
-	auto node2 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work));
+	auto node2 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work, nano::node_flags{}));
 	system.nodes.push_back (node2);
 
 	auto endpoint = node1->network.endpoint ();
@@ -2646,7 +2649,7 @@ TEST (node, peer_history_restart)
 	nano::endpoint_key endpoint_key{ endpoint.address ().to_v6 ().to_bytes (), endpoint.port () };
 	auto path (nano::unique_path ());
 	{
-		auto node2 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), path, system.work));
+		auto node2 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), path, system.work, nano::node_flags{}));
 		system.nodes.push_back (node2);
 		auto & store = node2->store;
 		{
@@ -4005,7 +4008,7 @@ TEST (node, port_already_in_use)
 	nano::node_config config2{ node1->network.port };
 
 	// Create node in a scope so it gets destroyed if start() throws
-	auto node2 = std::make_shared<nano::node> (system.io_ctx, nano::unique_path (), config2, system.work);
+	auto node2 = std::make_shared<nano::node> (system.io_ctx, nano::unique_path (), config2, system.work, nano::node_flags{});
 
 	// This should throw boost::system::system_error indicating port is already in use
 	ASSERT_THROW (node2->start (), boost::system::system_error);

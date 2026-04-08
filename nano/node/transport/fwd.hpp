@@ -7,6 +7,7 @@ class loopback_channel;
 class message_deserializer;
 class tcp_channel;
 class tcp_channels;
+class tcp_listener;
 class tcp_server;
 class tcp_socket;
 }

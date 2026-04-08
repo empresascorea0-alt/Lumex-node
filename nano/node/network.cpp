@@ -5,6 +5,7 @@
 #include <nano/node/message_processor.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/node_observers.hpp>
 #include <nano/node/portmapping.hpp>
 #include <nano/node/telemetry.hpp>
 #include <nano/node/transport/formatting.hpp>

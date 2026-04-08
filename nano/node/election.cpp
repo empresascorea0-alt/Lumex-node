@@ -2,14 +2,20 @@
 #include <nano/lib/enum_util.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/block_processor.hpp>
+#include <nano/node/block_rebroadcaster.hpp>
+#include <nano/node/cementing_set.hpp>
 #include <nano/node/confirmation_solicitor.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/local_vote_history.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
+#include <nano/node/vote_cache.hpp>
 #include <nano/node/vote_generator.hpp>
 #include <nano/node/vote_router.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 
 using namespace std::chrono;

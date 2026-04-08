@@ -1,4 +1,5 @@
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/make_store.hpp>
 #include <nano/qt/qt.hpp>

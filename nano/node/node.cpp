@@ -1,7 +1,10 @@
 #include <nano/lib/block_type.hpp>
+#include <nano/lib/block_uniquer.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/formatting.hpp>
+#include <nano/lib/logging.hpp>
+#include <nano/lib/stats.hpp>
 #include <nano/lib/stream.hpp>
 #include <nano/lib/thread_pool.hpp>
 #include <nano/lib/thread_runner.hpp>
@@ -9,6 +12,7 @@
 #include <nano/lib/utility.hpp>
 #include <nano/lib/version.hpp>
 #include <nano/lib/vote.hpp>
+#include <nano/lib/work.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/backlog_scan.hpp>
@@ -20,9 +24,11 @@
 #include <nano/node/bucketing.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/daemonconfig.hpp>
+#include <nano/node/distributed_work_factory.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/election_status.hpp>
 #include <nano/node/endpoint.hpp>
+#include <nano/node/epoch_upgrader.hpp>
 #include <nano/node/fork_cache.hpp>
 #include <nano/node/ledger_notifications.hpp>
 #include <nano/node/local_block_broadcaster.hpp>
@@ -30,11 +36,16 @@
 #include <nano/node/make_store.hpp>
 #include <nano/node/message_processor.hpp>
 #include <nano/node/monitor.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/node_observers.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/peer_history.hpp>
 #include <nano/node/portmapping.hpp>
 #include <nano/node/pruning.hpp>
+#include <nano/node/rep_tiers.hpp>
+#include <nano/node/repcrawler.hpp>
 #include <nano/node/rpc_callbacks.hpp>
 #include <nano/node/scheduler/component.hpp>
 #include <nano/node/scheduler/hinted.hpp>
@@ -44,6 +55,7 @@
 #include <nano/node/telemetry.hpp>
 #include <nano/node/transport/loopback.hpp>
 #include <nano/node/transport/tcp_listener.hpp>
+#include <nano/node/unchecked_map.hpp>
 #include <nano/node/vote_generator.hpp>
 #include <nano/node/vote_processor.hpp>
 #include <nano/node/vote_rebroadcaster.hpp>
@@ -87,8 +99,10 @@ nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, std::filesy
 	application_path{ application_path_a },
 	node_id{ load_or_create_node_id (application_path_a) },
 	node_initialized_latch{ 1 },
-	config{ config_a },
-	flags{ flags_a },
+	config_impl{ std::make_unique<nano::node_config> (config_a) },
+	config{ *config_impl },
+	flags_impl{ std::make_unique<nano::node_flags> (flags_a) },
+	flags{ *flags_impl },
 	network_params{ config.network_params },
 	io_ctx_shared{ std::make_shared<boost::asio::io_context> () },
 	io_ctx{ *io_ctx_shared },

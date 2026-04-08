@@ -43,6 +43,9 @@ class thread_pool;
 class thread_runner;
 class tomlconfig;
 class vote;
+class work_pool;
+
+struct bootstrap_weights;
 
 template <typename Key, typename Value>
 class uniquer;

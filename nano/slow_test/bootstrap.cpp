@@ -1,3 +1,4 @@
+#include <nano/lib/files.hpp>
 #include <nano/lib/rpcconfig.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/node/bootstrap/bootstrap_server.hpp>
@@ -5,6 +6,7 @@
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/node/json_handler.hpp>
 #include <nano/node/transport/transport.hpp>
+#include <nano/node/unchecked_map.hpp>
 #include <nano/rpc/rpc.hpp>
 #include <nano/rpc/rpc_request_processor.hpp>
 #include <nano/secure/ledger.hpp>

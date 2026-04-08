@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nano/lib/numbers.hpp>
+#include <nano/lib/numbers_templ.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/endpoint_templ.hpp>
 

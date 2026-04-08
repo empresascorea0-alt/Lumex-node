@@ -1,4 +1,5 @@
 #include <nano/boost/asio/post.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/transport/fake.hpp>
 

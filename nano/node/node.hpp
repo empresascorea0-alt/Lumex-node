@@ -1,33 +1,23 @@
 #pragma once
 
-#include <nano/lib/block_uniquer.hpp>
-#include <nano/lib/config.hpp>
-#include <nano/lib/files.hpp>
-#include <nano/lib/logging.hpp>
-#include <nano/lib/stats.hpp>
-#include <nano/lib/work.hpp>
-#include <nano/node/distributed_work_factory.hpp>
-#include <nano/node/epoch_upgrader.hpp>
+#include <nano/boost/asio/fwd.hpp>
+#include <nano/lib/fwd.hpp>
+#include <nano/lib/keypair.hpp>
+#include <nano/lib/node_capabilities.hpp>
+#include <nano/messages/fwd.hpp>
 #include <nano/node/fwd.hpp>
-#include <nano/node/network.hpp>
-#include <nano/node/node_observers.hpp>
-#include <nano/node/nodeconfig.hpp>
-#include <nano/node/online_reps.hpp>
-#include <nano/node/portmapping.hpp>
-#include <nano/node/rep_tiers.hpp>
-#include <nano/node/repcrawler.hpp>
-#include <nano/node/transport/tcp_server.hpp>
-#include <nano/node/unchecked_map.hpp>
-#include <nano/node/vote_cache.hpp>
-#include <nano/node/websocket.hpp>
-#include <nano/weights/bootstrap_weights.hpp>
+#include <nano/node/transport/fwd.hpp>
+#include <nano/secure/fwd.hpp>
+#include <nano/store/fwd.hpp>
 
-#include <boost/program_options.hpp>
 #include <boost/thread/latch.hpp>
 
 #include <atomic>
+#include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace nano
@@ -35,8 +25,8 @@ namespace nano
 class node final : public std::enable_shared_from_this<node>
 {
 public:
-	node (std::shared_ptr<boost::asio::io_context>, uint16_t peering_port, std::filesystem::path const & application_path, nano::work_pool &, nano::node_flags = nano::node_flags (), unsigned seq = 0);
-	node (std::shared_ptr<boost::asio::io_context>, std::filesystem::path const & application_path, nano::node_config const &, nano::work_pool &, nano::node_flags = nano::node_flags (), unsigned seq = 0);
+	node (std::shared_ptr<boost::asio::io_context>, uint16_t peering_port, std::filesystem::path const & application_path, nano::work_pool &, nano::node_flags, unsigned seq = 0);
+	node (std::shared_ptr<boost::asio::io_context>, std::filesystem::path const & application_path, nano::node_config const &, nano::work_pool &, nano::node_flags, unsigned seq = 0);
 	~node ();
 
 public:
@@ -100,8 +90,10 @@ public:
 	const std::filesystem::path application_path; // aka: data_path
 	const nano::keypair node_id;
 	boost::latch node_initialized_latch;
-	nano::node_config config;
-	nano::node_flags flags;
+	std::unique_ptr<nano::node_config> config_impl;
+	nano::node_config & config;
+	std::unique_ptr<nano::node_flags> flags_impl;
+	nano::node_flags & flags;
 	nano::network_params & network_params;
 	std::shared_ptr<boost::asio::io_context> io_ctx_shared;
 	boost::asio::io_context & io_ctx;

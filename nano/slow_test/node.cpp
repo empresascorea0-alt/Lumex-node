@@ -1,5 +1,6 @@
 #include <nano/crypto_lib/random_pool.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/version.hpp>
@@ -8,6 +9,7 @@
 #include <nano/node/active_elections.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/epoch_upgrader.hpp>
 #include <nano/node/ledger_notifications.hpp>
 #include <nano/node/make_store.hpp>
 #include <nano/node/online_reps.hpp>
@@ -105,7 +107,7 @@ TEST (system, receive_while_synchronizing)
 		uint32_t count (1000);
 		system.generate_mass_activity (count, *system.nodes[0]);
 		nano::keypair key;
-		auto node1 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work));
+		auto node1 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work, nano::node_flags{}));
 		auto wallet (node1->wallets.create (1));
 		wallet->insert_adhoc (nano::dev::genesis_key.prv); // For voting
 		ASSERT_EQ (key.pub, wallet->insert_adhoc (key.prv));

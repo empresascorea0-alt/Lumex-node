@@ -1,3 +1,4 @@
+#include <nano/lib/files.hpp>
 #include <nano/node/node.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>

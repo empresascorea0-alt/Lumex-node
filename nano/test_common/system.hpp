@@ -3,6 +3,8 @@
 #include <nano/lib/errors.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/nodeconfig.hpp>
+#include <nano/node/transport/channel.hpp>
 
 #include <chrono>
 #include <optional>

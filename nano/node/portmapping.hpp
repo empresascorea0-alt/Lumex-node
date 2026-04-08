@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nano/boost/asio/ip/tcp.hpp>
+#include <nano/lib/common.hpp>
 #include <nano/lib/locks.hpp>
 
 #include <miniupnp/miniupnpc/include/miniupnpc.h>

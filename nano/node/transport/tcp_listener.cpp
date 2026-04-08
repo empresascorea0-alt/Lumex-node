@@ -1,7 +1,11 @@
 #include <nano/lib/enum_util.hpp>
 #include <nano/lib/interval.hpp>
+#include <nano/lib/thread_pool.hpp>
 #include <nano/messages/messages.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/node_observers.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/tcp_listener.hpp>
 #include <nano/node/transport/tcp_server.hpp>
 #include <nano/node/transport/transport.hpp>

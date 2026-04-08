@@ -1,4 +1,5 @@
 #include <nano/lib/config.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/locks.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/timer.hpp>
@@ -8,6 +9,8 @@
 #include <nano/node/cli.hpp>
 #include <nano/node/daemonconfig.hpp>
 #include <nano/node/ledger_notifications.hpp>
+#include <nano/node/nodeconfig.hpp>
+#include <nano/node/unchecked_map.hpp>
 #include <nano/store/ledger_store.hpp>
 
 #include <boost/asio/io_context.hpp>

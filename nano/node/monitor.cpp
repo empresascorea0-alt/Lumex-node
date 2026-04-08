@@ -1,8 +1,14 @@
 #include <nano/lib/formatting.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/utility.hpp>
+#include <nano/node/active_elections.hpp>
+#include <nano/node/election_behavior.hpp>
 #include <nano/node/monitor.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/online_reps.hpp>
+#include <nano/node/repcrawler.hpp>
+#include <nano/node/transport/tcp_listener.hpp>
 #include <nano/secure/ledger.hpp>
 
 nano::monitor::monitor (nano::monitor_config const & config_a, nano::node & node_a) :

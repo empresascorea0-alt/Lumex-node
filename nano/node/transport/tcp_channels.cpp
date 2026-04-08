@@ -1,7 +1,12 @@
 #include <nano/lib/formatting.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/node_observers.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/formatting.hpp>
 #include <nano/node/transport/tcp_channels.hpp>
+#include <nano/node/transport/tcp_listener.hpp>
+#include <nano/node/transport/tcp_server.hpp>
 
 #include <ranges>
 

@@ -24,6 +24,7 @@
 #include <nano/node/online_reps.hpp>
 #include <nano/node/pruning.hpp>
 #include <nano/node/transport/inproc.hpp>
+#include <nano/node/unchecked_map.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/store/ledger/account.hpp>

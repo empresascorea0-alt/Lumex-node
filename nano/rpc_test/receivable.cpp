@@ -11,6 +11,8 @@
 
 #include <gtest/gtest.h>
 
+#include <boost/property_tree/json_parser.hpp>
+
 using namespace nano::test;
 
 TEST (rpc, receivable)

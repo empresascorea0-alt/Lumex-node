@@ -2,6 +2,7 @@
 
 #include <nano/lib/locks.hpp>
 #include <nano/lib/numbers.hpp>
+#include <nano/lib/numbers_templ.hpp>
 #include <nano/lib/random.hpp>
 #include <nano/lib/rate_limiting.hpp>
 #include <nano/lib/thread_pool.hpp>
