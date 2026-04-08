@@ -1,12 +1,14 @@
 #include <nano/crypto_lib/random_pool_shuffle.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/network_formatting.hpp>
+#include <nano/lib/thread_pool.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/node/message_processor.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/node_observers.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/portmapping.hpp>
 #include <nano/node/telemetry.hpp>
 #include <nano/node/transport/formatting.hpp>

@@ -1,7 +1,6 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
 #include <nano/lib/files.hpp>
-#include <nano/lib/logging.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/active_elections.hpp>
@@ -9,7 +8,6 @@
 #include <nano/node/election.hpp>
 #include <nano/node/inactive_node.hpp>
 #include <nano/node/local_vote_history.hpp>
-#include <nano/node/make_store.hpp>
 #include <nano/node/node_observers.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/portmapping.hpp>
@@ -30,6 +28,7 @@
 #include <nano/store/ledger/peer.hpp>
 #include <nano/store/ledger/pruned.hpp>
 #include <nano/test_common/chains.hpp>
+#include <nano/test_common/make_store.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
@@ -2705,9 +2704,7 @@ TEST (node, dont_write_lock_node)
 	std::promise<void> write_lock_held_promise;
 	std::promise<void> finished_promise;
 	std::thread ([&path, &write_lock_held_promise, &finished_promise] () {
-		nano::logger logger;
-		nano::stats stats{ logger };
-		auto store = nano::make_store (logger, stats, path, nano::dev::constants, false, true);
+		auto store = nano::test::make_store (path);
 		{
 			auto transaction (store->tx_begin_write ());
 			store->initialize (transaction, nano::dev::constants);

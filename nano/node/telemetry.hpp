@@ -7,7 +7,7 @@
 #include <nano/node/endpoint.hpp>
 #include <nano/node/endpoint_templ.hpp>
 #include <nano/node/fwd.hpp>
-#include <nano/node/nodeconfig.hpp>
+#include <nano/node/transport/channel.hpp>
 #include <nano/secure/common.hpp>
 
 #include <boost/multi_index/hashed_index.hpp>
@@ -33,10 +33,7 @@ public:
 	bool enable_ongoing_broadcasts{ true };
 
 public:
-	explicit telemetry_config (nano::node_flags const & flags) :
-		enable_ongoing_broadcasts{ !flags.disable_providing_telemetry_metrics }
-	{
-	}
+	explicit telemetry_config (nano::node_flags const & flags);
 };
 
 /**

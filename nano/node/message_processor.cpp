@@ -1,8 +1,11 @@
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/vote.hpp>
+#include <nano/node/block_processor.hpp>
 #include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/message_processor.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/telemetry.hpp>
 
 nano::message_processor::message_processor (message_processor_config const & config_a, nano::node & node_a) :

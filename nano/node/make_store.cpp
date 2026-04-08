@@ -18,7 +18,7 @@ std::filesystem::path nano::database_path_for_backend (std::filesystem::path con
 	release_assert (false, "unknown database backend");
 }
 
-std::unique_ptr<nano::store::ledger_store> nano::make_store (nano::logger & logger, nano::stats & stats, std::filesystem::path const & path, nano::ledger_constants & constants, bool read_only, bool add_db_postfix, nano::node_config node_config)
+std::unique_ptr<nano::store::ledger_store> nano::make_store (nano::logger & logger, nano::stats & stats, std::filesystem::path const & path, nano::ledger_constants & constants, bool read_only, bool add_db_postfix, nano::node_config const & node_config)
 {
 	auto decide_backend = [&] () -> nano::database_backend {
 		if (node_config.rocksdb_config.enable && node_config.database_backend == nano::database_backend::lmdb)

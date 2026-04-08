@@ -4,6 +4,7 @@
 #include <nano/lib/stats.hpp>
 #include <nano/node/make_store.hpp>
 #include <nano/node/migrations.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/secure/pending_info.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
@@ -16,6 +17,7 @@
 #include <nano/store/ledger/rep_weight.hpp>
 #include <nano/store/ledger_store.hpp>
 #include <nano/store/rocksdb/backend_rocksdb.hpp>
+#include <nano/test_common/make_store.hpp>
 #include <nano/test_common/testutil.hpp>
 
 #include <gtest/gtest.h>
@@ -187,7 +189,7 @@ TEST (migrations, lmdb_to_rocksdb)
 
 	// Create and populate LMDB store
 	{
-		auto store = nano::make_store (logger, stats, data_path, nano::dev::constants);
+		auto store = nano::test::make_store (data_path);
 
 		// Initialize with genesis block
 		store->initialize (store->tx_begin_write (), nano::dev::constants);
@@ -304,12 +306,9 @@ TEST (migrations, double_migration_fails)
 		GTEST_SKIP ();
 	}
 
-	nano::logger logger;
-	nano::stats stats{ logger };
-
 	auto data_path = nano::unique_path ();
 	{
-		auto store = nano::make_store (logger, stats, data_path, nano::dev::constants);
+		auto store = nano::test::make_store (data_path);
 	}
 
 	// First migration should succeed
@@ -326,12 +325,9 @@ TEST (migrations, partial_migration_fails)
 		GTEST_SKIP ();
 	}
 
-	nano::logger logger;
-	nano::stats stats{ logger };
-
 	auto data_path = nano::unique_path ();
 	{
-		auto store = nano::make_store (logger, stats, data_path, nano::dev::constants);
+		auto store = nano::test::make_store (data_path);
 	}
 
 	// Simulate an aborted migration by creating the RocksDB directory with some files

@@ -11,7 +11,6 @@
 #include <nano/node/election.hpp>
 #include <nano/node/epoch_upgrader.hpp>
 #include <nano/node/ledger_notifications.hpp>
-#include <nano/node/make_store.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/scheduler/component.hpp>
 #include <nano/node/scheduler/manual.hpp>
@@ -26,6 +25,7 @@
 #include <nano/store/ledger/confirmation_height.hpp>
 #include <nano/store/ledger/peer.hpp>
 #include <nano/store/ledger/pruned.hpp>
+#include <nano/test_common/make_store.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
@@ -136,7 +136,7 @@ TEST (ledger, deep_account_compute)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	auto transaction = ledger.tx_begin_write ();
 	nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
@@ -550,15 +550,13 @@ TEST (store, vote_load)
  */
 TEST (store, pruned_load)
 {
-	nano::logger logger;
-	nano::stats stats{ logger };
 	auto path (nano::unique_path ());
 	constexpr auto num_pruned = 2000000;
 	auto const expected_result = num_pruned / 2;
 	constexpr auto batch_size = 20;
 	boost::unordered_set<nano::block_hash> hashes;
 	{
-		auto store = nano::make_store (logger, stats, path, nano::dev::constants);
+		auto store = nano::test::make_store (path);
 
 		for (auto i (0); i < num_pruned / batch_size; ++i)
 		{
@@ -589,7 +587,7 @@ TEST (store, pruned_load)
 
 	// Reinitialize store
 	{
-		auto store = nano::make_store (logger, stats, path, nano::dev::constants);
+		auto store = nano::test::make_store (path);
 
 		ASSERT_EQ (expected_result, manually_count_pruned_blocks (*store));
 	}
@@ -1131,7 +1129,7 @@ TEST (confirmation_height, many_accounts_send_receive_self_no_elections)
 	nano::logger logger;
 	auto path (nano::unique_path ());
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, path, nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats, path);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	nano::store::write_queue write_database_queue;
 	nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };

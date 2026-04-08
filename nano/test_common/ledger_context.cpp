@@ -1,10 +1,11 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/node/make_store.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/test_common/ledger_context.hpp>
 
 nano::test::ledger_context::ledger_context (std::deque<std::shared_ptr<nano::block>> && blocks) :
-	store_m{ nano::make_store (logger_m, stats_m, nano::unique_path (), nano::dev::constants) },
+	store_m{ nano::make_store (logger_m, stats_m, nano::unique_path (), nano::dev::constants, false, true, nano::node_config{}) },
 	ledger_m{ *store_m, nano::dev::network_params, stats_m, logger_m },
 	blocks_m{ blocks },
 	pool_m{ nano::dev::network_params.network, 1 }

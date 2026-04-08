@@ -2,6 +2,7 @@
 #include <nano/lib/logging.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/node/make_store.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/secure/common.hpp>
 #include <nano/store/ledger_store.hpp>
 #include <nano/store/lmdb/backend_lmdb.hpp>
@@ -34,7 +35,12 @@ std::unique_ptr<nano::store::backend> nano::test::make_backend (std::filesystem:
 
 std::unique_ptr<nano::store::ledger_store> nano::test::make_store (std::filesystem::path path)
 {
+	return nano::test::make_store (nano::test::default_logger (), nano::test::default_stats (), path);
+}
+
+std::unique_ptr<nano::store::ledger_store> nano::test::make_store (nano::logger & logger, nano::stats & stats, std::filesystem::path path)
+{
 	path = path.empty () ? nano::unique_path () : path;
 
-	return nano::make_store (nano::test::default_logger (), nano::test::default_stats (), path, nano::dev::constants);
+	return nano::make_store (logger, stats, path, nano::dev::constants, false, true, nano::node_config{});
 }

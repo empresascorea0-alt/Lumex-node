@@ -10,6 +10,7 @@ namespace nano
 enum class block_type : uint8_t;
 enum class epoch : uint8_t;
 enum class network_type : uint16_t;
+enum class database_backend;
 enum class work_version;
 
 class uint128_union;

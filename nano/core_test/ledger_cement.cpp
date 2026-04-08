@@ -3,12 +3,12 @@
 #include <nano/lib/logging.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/election.hpp>
-#include <nano/node/make_store.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/store/ledger/confirmation_height.hpp>
+#include <nano/test_common/make_store.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
 
@@ -760,7 +760,7 @@ TEST (ledger_cement, pruned_source)
 	nano::test::system system;
 
 	auto path (nano::unique_path ());
-	auto store = nano::make_store (system.logger, system.stats, path, nano::dev::constants);
+	auto store = nano::test::make_store (system.logger, system.stats, path);
 
 	nano::ledger ledger (*store, nano::dev::network_params, system.stats, system.logger);
 	ledger.pruning = true;
@@ -845,7 +845,7 @@ TEST (ledger_cementDeathTest, rollback_cemented_block)
 		nano::test::system system;
 
 		auto path (nano::unique_path ());
-		auto store = nano::make_store (system.logger, system.stats, path, nano::dev::constants);
+		auto store = nano::test::make_store (system.logger, system.stats, path);
 
 		nano::ledger ledger (*store, nano::dev::network_params, system.stats, system.logger);
 		nano::store::write_queue write_queue;
