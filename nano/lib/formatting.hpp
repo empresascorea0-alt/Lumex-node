@@ -1,6 +1,5 @@
 #pragma once
 
-#include <nano/lib/common.hpp>
 #include <nano/lib/numbers.hpp>
 
 #include <boost/system/error_code.hpp>
@@ -23,19 +22,6 @@ struct fmt::formatter<T> : fmt::formatter<std::string_view>
 	{
 		return fmt::formatter<std::string_view>::format (to_string (value), ctx);
 	}
-};
-
-template <>
-struct fmt::formatter<nano::endpoint> : fmt::ostream_formatter
-{
-};
-template <>
-struct fmt::formatter<nano::ip_address> : fmt::ostream_formatter
-{
-};
-template <>
-struct fmt::formatter<boost::asio::ip::address_v4> : fmt::ostream_formatter
-{
 };
 
 template <>

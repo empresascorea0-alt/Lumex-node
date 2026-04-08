@@ -1,7 +1,5 @@
 #pragma once
 
-#include <nano/lib/common.hpp>
-
 #include <string_view>
 
 namespace nano::transport

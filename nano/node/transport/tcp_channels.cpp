@@ -1,4 +1,5 @@
 #include <nano/lib/formatting.hpp>
+#include <nano/lib/network_formatting.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/node_observers.hpp>

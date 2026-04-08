@@ -1,3 +1,4 @@
+#include <nano/lib/network_formatting.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/messages/messages.hpp>
 #include <nano/node/message_processor.hpp>

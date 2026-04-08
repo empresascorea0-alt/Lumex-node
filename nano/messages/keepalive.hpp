@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nano/lib/common.hpp>
+#include <nano/lib/network_types.hpp>
 #include <nano/messages/message.hpp>
 
 #include <array>
