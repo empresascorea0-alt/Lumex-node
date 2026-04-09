@@ -1,8 +1,6 @@
 #pragma once
 
 #include <nano/store/fwd.hpp>
-#include <nano/store/lmdb/iterator.hpp>
-#include <nano/store/rocksdb/iterator.hpp>
 
 #include <cstddef>
 #include <iterator>
@@ -11,10 +9,18 @@
 #include <utility>
 #include <variant>
 
+namespace nano::store::lmdb
+{
+class iterator;
+}
+
+namespace nano::store::rocksdb
+{
+class iterator;
+}
+
 namespace nano::store
 {
-using backend_iterator = std::variant<lmdb::iterator, rocksdb::iterator>;
-
 /**
  * @class iterator
  * @brief A generic database iterator for LMDB or RocksDB.
@@ -38,14 +44,17 @@ public:
 	using const_reference = value_type const &;
 
 private:
+	struct iterator_wrapper;
+
 	nano::store::transaction const * txn;
+	std::unique_ptr<iterator_wrapper> internals;
 	size_t transaction_epoch;
-	backend_iterator internals;
+
 	std::variant<std::monostate, value_type> current;
-	void update ();
 
 public:
-	iterator (nano::store::transaction const & txn, backend_iterator && internals) noexcept;
+	iterator (nano::store::transaction const & txn, lmdb::iterator && internals);
+	iterator (nano::store::transaction const & txn, rocksdb::iterator && internals);
 	~iterator ();
 
 	iterator (iterator const &) = delete;
@@ -60,5 +69,8 @@ public:
 	auto operator* () const -> const_reference;
 	auto operator== (iterator const & other) const -> bool;
 	bool is_end () const;
+
+private:
+	void update ();
 };
 }

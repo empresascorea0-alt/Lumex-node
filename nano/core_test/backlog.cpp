@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 
 #include <numeric>
+#include <unordered_set>
 
 using namespace std::chrono_literals;
 
