@@ -5,6 +5,7 @@
 #include <nano/lib/indirect.hpp>
 #include <nano/lib/node_capabilities.hpp>
 #include <nano/lib/numbers.hpp>
+#include <nano/lib/ratios.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/node/fwd.hpp>
 #include <nano/secure/common.hpp>

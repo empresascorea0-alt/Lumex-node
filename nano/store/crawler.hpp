@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nano/lib/numbers.hpp>
+#include <nano/lib/saturate.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/store/transaction.hpp>
 

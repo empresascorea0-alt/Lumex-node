@@ -6,6 +6,7 @@
 #include <nano/lib/utility.hpp>
 
 #include <memory>
+#include <unordered_map>
 
 namespace nano
 {

@@ -4,6 +4,7 @@
 
 #include <boost/lexical_cast.hpp>
 
+#include <chrono>
 #include <deque>
 #include <sstream>
 #include <vector>

@@ -2,6 +2,7 @@
 #include <nano/lib/interval.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/numbers_templ.hpp>
+#include <nano/lib/saturate.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/network.hpp>

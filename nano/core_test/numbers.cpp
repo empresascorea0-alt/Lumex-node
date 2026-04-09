@@ -1,6 +1,8 @@
 #include <nano/lib/balance_formatting.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/numbers_templ.hpp>
+#include <nano/lib/ratios.hpp>
+#include <nano/lib/saturate.hpp>
 #include <nano/secure/common.hpp>
 #include <nano/secure/network_params.hpp>
 
@@ -192,7 +194,7 @@ TEST (numbers, hashing)
 	test_hashing<nano::qualified_root, boost::hash> ();
 }
 
-TEST (uint128_union, decode_dec)
+TEST (numbers, uint128_union_decode_dec)
 {
 	nano::uint128_union value;
 	std::string text ("16");
@@ -200,7 +202,7 @@ TEST (uint128_union, decode_dec)
 	ASSERT_EQ (16, value.bytes[15]);
 }
 
-TEST (uint128_union, decode_dec_negative)
+TEST (numbers, uint128_union_decode_dec_negative)
 {
 	nano::uint128_union value;
 	std::string text ("-1");
@@ -208,7 +210,7 @@ TEST (uint128_union, decode_dec_negative)
 	ASSERT_TRUE (error);
 }
 
-TEST (uint128_union, decode_dec_zero)
+TEST (numbers, uint128_union_decode_dec_zero)
 {
 	nano::uint128_union value;
 	std::string text ("0");
@@ -216,7 +218,7 @@ TEST (uint128_union, decode_dec_zero)
 	ASSERT_TRUE (value.is_zero ());
 }
 
-TEST (uint128_union, decode_dec_leading_zero)
+TEST (numbers, uint128_union_decode_dec_leading_zero)
 {
 	nano::uint128_union value;
 	std::string text ("010");
@@ -224,7 +226,7 @@ TEST (uint128_union, decode_dec_leading_zero)
 	ASSERT_TRUE (error);
 }
 
-TEST (uint128_union, decode_dec_overflow)
+TEST (numbers, uint128_union_decode_dec_overflow)
 {
 	nano::uint128_union value;
 	std::string text ("340282366920938463463374607431768211456");
@@ -256,7 +258,7 @@ struct test_punct : std::moneypunct<char>
 	}
 };
 
-TEST (uint128_union, format_balance)
+TEST (numbers, uint128_union_format_balance)
 {
 	ASSERT_EQ ("0", nano::amount (nano::uint128_t ("0")).format_balance (nano::nano_ratio, 0, false));
 	ASSERT_EQ ("0", nano::amount (nano::uint128_t ("0")).format_balance (nano::nano_ratio, 2, true));
@@ -280,7 +282,7 @@ TEST (uint128_union, format_balance)
 	ASSERT_EQ ("< 0.01", nano::amount (1).format_balance (nano::nano_ratio, 2, true));
 }
 
-TEST (uint128_union, encode_balance)
+TEST (numbers, uint128_union_encode_balance)
 {
 	auto encode = [] (nano::uint128_t value, nano::uint128_t scale, int precision, bool group_digits) {
 		std::ostringstream stream;
@@ -304,7 +306,7 @@ TEST (uint128_union, encode_balance)
 	ASSERT_EQ ("< 0.01", encode (1, nano::nano_ratio, 2, true));
 }
 
-TEST (uint128_union, decode_decimal)
+TEST (numbers, uint128_union_decode_decimal)
 {
 	nano::amount amount;
 	ASSERT_FALSE (amount.decode_dec ("340282366920938463463374607431768211455", nano::raw_ratio));
@@ -333,7 +335,7 @@ TEST (uint128_union, decode_decimal)
 	ASSERT_EQ (1230 * nano::Knano_ratio, amount.number ());
 }
 
-TEST (uint256_union, key_encryption)
+TEST (numbers, uint256_union_key_encryption)
 {
 	nano::keypair key1;
 	nano::raw_key secret_key;
@@ -347,7 +349,7 @@ TEST (uint256_union, key_encryption)
 	ASSERT_EQ (key1.pub, pub);
 }
 
-TEST (uint256_union, encryption)
+TEST (numbers, uint256_union_encryption)
 {
 	nano::raw_key key;
 	key.clear ();
@@ -363,14 +365,14 @@ TEST (uint256_union, encryption)
 	ASSERT_EQ (number1, number2);
 }
 
-TEST (uint256_union, decode_empty)
+TEST (numbers, uint256_union_decode_empty)
 {
 	std::string text;
 	nano::uint256_union val;
 	ASSERT_TRUE (val.decode_hex (text));
 }
 
-TEST (uint256_union, parse_zero)
+TEST (numbers, uint256_union_parse_zero)
 {
 	nano::uint256_union input (nano::uint256_t (0));
 	std::string text = input.to_string ();
@@ -381,7 +383,7 @@ TEST (uint256_union, parse_zero)
 	ASSERT_TRUE (output.number ().is_zero ());
 }
 
-TEST (uint256_union, parse_zero_short)
+TEST (numbers, uint256_union_parse_zero_short)
 {
 	std::string text ("0");
 	nano::uint256_union output;
@@ -390,7 +392,7 @@ TEST (uint256_union, parse_zero_short)
 	ASSERT_TRUE (output.number ().is_zero ());
 }
 
-TEST (uint256_union, parse_one)
+TEST (numbers, uint256_union_parse_one)
 {
 	nano::uint256_union input (nano::uint256_t (1));
 	std::string text = input.to_string ();
@@ -401,7 +403,7 @@ TEST (uint256_union, parse_one)
 	ASSERT_EQ (1, output.number ());
 }
 
-TEST (uint256_union, parse_error_symbol)
+TEST (numbers, uint256_union_parse_error_symbol)
 {
 	nano::uint256_union input (nano::uint256_t (1000));
 	std::string text = input.to_string ();
@@ -411,7 +413,7 @@ TEST (uint256_union, parse_error_symbol)
 	ASSERT_TRUE (error);
 }
 
-TEST (uint256_union, max_hex)
+TEST (numbers, uint256_union_max_hex)
 {
 	nano::uint256_union input (std::numeric_limits<nano::uint256_t>::max ());
 	std::string text = input.to_string ();
@@ -422,7 +424,7 @@ TEST (uint256_union, max_hex)
 	ASSERT_EQ (nano::uint256_t ("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), output.number ());
 }
 
-TEST (uint256_union, decode_dec)
+TEST (numbers, uint256_union_decode_dec)
 {
 	nano::uint256_union value;
 	std::string text ("16");
@@ -430,7 +432,7 @@ TEST (uint256_union, decode_dec)
 	ASSERT_EQ (16, value.bytes[31]);
 }
 
-TEST (uint256_union, max_dec)
+TEST (numbers, uint256_union_max_dec)
 {
 	nano::uint256_union input (std::numeric_limits<nano::uint256_t>::max ());
 	std::string text = input.to_string_dec ();
@@ -441,7 +443,7 @@ TEST (uint256_union, max_dec)
 	ASSERT_EQ (nano::uint256_t ("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), output.number ());
 }
 
-TEST (uint256_union, decode_dec_negative)
+TEST (numbers, uint256_union_decode_dec_negative)
 {
 	nano::uint256_union value;
 	std::string text ("-1");
@@ -449,7 +451,7 @@ TEST (uint256_union, decode_dec_negative)
 	ASSERT_TRUE (error);
 }
 
-TEST (uint256_union, decode_dec_zero)
+TEST (numbers, uint256_union_decode_dec_zero)
 {
 	nano::uint256_union value;
 	std::string text ("0");
@@ -457,7 +459,7 @@ TEST (uint256_union, decode_dec_zero)
 	ASSERT_TRUE (value.is_zero ());
 }
 
-TEST (uint256_union, decode_dec_leading_zero)
+TEST (numbers, uint256_union_decode_dec_leading_zero)
 {
 	nano::uint256_union value;
 	std::string text ("010");
@@ -465,7 +467,7 @@ TEST (uint256_union, decode_dec_leading_zero)
 	ASSERT_TRUE (error);
 }
 
-TEST (uint256_union, parse_error_overflow)
+TEST (numbers, uint256_union_parse_error_overflow)
 {
 	nano::uint256_union input (std::numeric_limits<nano::uint256_t>::max ());
 	std::string text = input.to_string ();
@@ -475,7 +477,7 @@ TEST (uint256_union, parse_error_overflow)
 	ASSERT_TRUE (error);
 }
 
-TEST (uint256_union, big_endian_union_constructor)
+TEST (numbers, uint256_union_big_endian_union_constructor)
 {
 	nano::uint256_t value1 (1);
 	nano::uint256_union bytes1 (value1);
@@ -485,7 +487,7 @@ TEST (uint256_union, big_endian_union_constructor)
 	ASSERT_EQ (1, bytes2.bytes[63]);
 }
 
-TEST (uint256_union, big_endian_union_function)
+TEST (numbers, uint256_union_big_endian_union_function)
 {
 	nano::uint256_union bytes1 ("FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210");
 	ASSERT_EQ (0xfe, bytes1.bytes[0x00]);
@@ -528,7 +530,7 @@ TEST (uint256_union, big_endian_union_function)
 	ASSERT_EQ (nano::uint512_t (1), bytes2.number ());
 }
 
-TEST (uint256_union, decode_nano_variant)
+TEST (numbers, uint256_union_decode_nano_variant)
 {
 	nano::account key;
 	ASSERT_FALSE (key.decode_account ("xrb_1111111111111111111111111111111111111111111111111111hifc8npp"));
@@ -540,7 +542,7 @@ TEST (uint256_union, decode_nano_variant)
  * then the decode_account would return error and it would also write the address with
  * fixed checksum into 'key', which is not desirable.
  */
-TEST (uint256_union, key_is_not_updated_on_checksum_error)
+TEST (numbers, uint256_union_key_is_not_updated_on_checksum_error)
 {
 	nano::account key;
 	ASSERT_EQ (key, 0);
@@ -549,7 +551,7 @@ TEST (uint256_union, key_is_not_updated_on_checksum_error)
 	ASSERT_TRUE (result);
 }
 
-TEST (uint256_union, account_transcode)
+TEST (numbers, uint256_union_account_transcode)
 {
 	nano::account value;
 	auto text (nano::dev::genesis_key.pub.to_account ());
@@ -568,7 +570,7 @@ TEST (uint256_union, account_transcode)
 	ASSERT_EQ (value, value2);
 }
 
-TEST (uint256_union, account_encode_lex)
+TEST (numbers, uint256_union_account_encode_lex)
 {
 	nano::account min ("0000000000000000000000000000000000000000000000000000000000000000");
 	nano::account max ("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
@@ -603,7 +605,7 @@ TEST (uint256_union, account_encode_lex)
 	}
 }
 
-TEST (uint256_union, bounds)
+TEST (numbers, uint256_union_bounds)
 {
 	nano::account key;
 	std::string bad1 (64, '\x000');
@@ -620,7 +622,7 @@ TEST (uint256_union, bounds)
 	ASSERT_TRUE (key.decode_account (bad2));
 }
 
-TEST (uint64_t, parse)
+TEST (numbers, uint64_t_parse)
 {
 	uint64_t value0 (1);
 	ASSERT_FALSE (nano::from_string_hex ("0", value0));
@@ -636,7 +638,7 @@ TEST (uint64_t, parse)
 	ASSERT_TRUE (nano::from_string_hex ("", value4));
 }
 
-TEST (uint256_union, hash)
+TEST (numbers, uint256_union_hash)
 {
 	ASSERT_EQ (4, nano::uint256_union{}.qwords.size ());
 	std::hash<nano::uint256_union> h{};
@@ -649,7 +651,7 @@ TEST (uint256_union, hash)
 	}
 }
 
-TEST (uint512_union, hash)
+TEST (numbers, uint512_union_hash)
 {
 	ASSERT_EQ (2, nano::uint512_union{}.uint256s.size ());
 	std::hash<nano::uint512_union> h{};
@@ -672,7 +674,7 @@ TEST (uint512_union, hash)
 	}
 }
 
-TEST (uint512_union, parse_zero)
+TEST (numbers, uint512_union_parse_zero)
 {
 	nano::uint512_union input (nano::uint512_t (0));
 	std::string text = input.to_string ();
@@ -683,7 +685,7 @@ TEST (uint512_union, parse_zero)
 	ASSERT_TRUE (output.number ().is_zero ());
 }
 
-TEST (uint512_union, parse_zero_short)
+TEST (numbers, uint512_union_parse_zero_short)
 {
 	std::string text ("0");
 	nano::uint512_union output;
@@ -692,7 +694,7 @@ TEST (uint512_union, parse_zero_short)
 	ASSERT_TRUE (output.number ().is_zero ());
 }
 
-TEST (uint512_union, parse_one)
+TEST (numbers, uint512_union_parse_one)
 {
 	nano::uint512_union input (nano::uint512_t (1));
 	std::string text = input.to_string ();
@@ -703,7 +705,7 @@ TEST (uint512_union, parse_one)
 	ASSERT_EQ (1, output.number ());
 }
 
-TEST (uint512_union, parse_error_symbol)
+TEST (numbers, uint512_union_parse_error_symbol)
 {
 	nano::uint512_union input (nano::uint512_t (1000));
 	std::string text = input.to_string ();
@@ -713,7 +715,7 @@ TEST (uint512_union, parse_error_symbol)
 	ASSERT_TRUE (error);
 }
 
-TEST (uint512_union, max)
+TEST (numbers, uint512_union_max)
 {
 	nano::uint512_union input (std::numeric_limits<nano::uint512_t>::max ());
 	std::string text = input.to_string ();
@@ -724,7 +726,7 @@ TEST (uint512_union, max)
 	ASSERT_EQ (nano::uint512_t ("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), output.number ());
 }
 
-TEST (uint512_union, parse_error_overflow)
+TEST (numbers, uint512_union_parse_error_overflow)
 {
 	nano::uint512_union input (std::numeric_limits<nano::uint512_t>::max ());
 	std::string text = input.to_string ();
@@ -734,7 +736,7 @@ TEST (uint512_union, parse_error_overflow)
 	ASSERT_TRUE (error);
 }
 
-TEST (sat_math, add_sat)
+TEST (numbers, sat_math_add_sat)
 {
 	// Test uint128_t
 	{
@@ -780,7 +782,7 @@ TEST (sat_math, add_sat)
 	}
 }
 
-TEST (sat_math, sub_sat)
+TEST (numbers, sat_math_sub_sat)
 {
 	// Test uint128_t
 	{
@@ -829,7 +831,7 @@ TEST (sat_math, sub_sat)
 	}
 }
 
-TEST (account, encode_zero)
+TEST (numbers, account_encode_zero)
 {
 	nano::account number0{};
 	std::stringstream stream;
@@ -846,7 +848,7 @@ TEST (account, encode_zero)
 	ASSERT_EQ (number0, number1);
 }
 
-TEST (account, encode_all)
+TEST (numbers, account_encode_all)
 {
 	nano::account number0;
 	number0.decode_hex ("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
@@ -863,7 +865,7 @@ TEST (account, encode_all)
 	ASSERT_EQ (number0, number1);
 }
 
-TEST (account, encode_fail)
+TEST (numbers, account_encode_fail)
 {
 	nano::account number0{};
 	std::stringstream stream;
@@ -874,7 +876,7 @@ TEST (account, encode_fail)
 	ASSERT_TRUE (number1.decode_account (str0));
 }
 
-TEST (account, known_addresses)
+TEST (numbers, account_known_addresses)
 {
 	nano::account account1{ "0000000000000000000000000000000000000000000000000000000000000000" };
 	ASSERT_EQ (account1.to_account (), "nano_1111111111111111111111111111111111111111111111111111hifc8npp");
@@ -892,7 +894,7 @@ TEST (account, known_addresses)
 	ASSERT_EQ (account5.to_account (), "nano_3zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzc3yoon41");
 }
 
-TEST (balance_formatting, encode_balance)
+TEST (numbers, balance_formatting_encode_balance)
 {
 	auto encode = [] (nano::uint128_t value, nano::uint128_t scale, int precision) {
 		std::ostringstream stream;
