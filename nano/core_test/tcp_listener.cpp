@@ -25,7 +25,7 @@ TEST (tcp_listener, max_connections)
 
 	nano::node_flags node_flags;
 	nano::node_config node_config = system.default_config ();
-	node_config.tcp.max_inbound_connections = 2;
+	node_config.tcp->max_inbound_connections = 2;
 	auto node = system.add_node (node_config, node_flags);
 
 	std::atomic<size_t> connection_attempts = 0;
@@ -57,13 +57,13 @@ TEST (tcp_listener, max_connections_per_ip)
 
 	nano::node_flags node_flags;
 	nano::node_config node_config = system.default_config ();
-	node_config.network.max_peers_per_ip = 3;
+	node_config.network->max_peers_per_ip = 3;
 	auto node = system.add_node (node_config, node_flags);
 	ASSERT_FALSE (node->flags.disable_max_peers_per_ip);
 
 	auto server_port = system.get_available_port ();
 
-	const auto max_ip_connections = node->config.network.max_peers_per_ip;
+	const auto max_ip_connections = node->config.network->max_peers_per_ip;
 	ASSERT_GE (max_ip_connections, 1);
 
 	// client side connection tracking
@@ -98,13 +98,13 @@ TEST (tcp_listener, max_connections_per_subnetwork)
 	node_flags.disable_max_peers_per_ip = true;
 	node_flags.disable_max_peers_per_subnetwork = false;
 	nano::node_config node_config = system.default_config ();
-	node_config.network.max_peers_per_subnetwork = 3;
+	node_config.network->max_peers_per_subnetwork = 3;
 	auto node = system.add_node (node_config, node_flags);
 
 	ASSERT_TRUE (node->flags.disable_max_peers_per_ip);
 	ASSERT_FALSE (node->flags.disable_max_peers_per_subnetwork);
 
-	const auto max_subnetwork_connections = node->config.network.max_peers_per_subnetwork;
+	const auto max_subnetwork_connections = node->config.network->max_peers_per_subnetwork;
 	ASSERT_GE (max_subnetwork_connections, 1);
 
 	// client side connection tracking
@@ -137,14 +137,14 @@ TEST (tcp_listener, max_peers_per_ip)
 	nano::node_flags node_flags;
 	node_flags.disable_max_peers_per_ip = true;
 	nano::node_config node_config = system.default_config ();
-	node_config.network.max_peers_per_ip = 3;
+	node_config.network->max_peers_per_ip = 3;
 	auto node = system.add_node (node_config, node_flags);
 
 	ASSERT_TRUE (node->flags.disable_max_peers_per_ip);
 
 	auto server_port = system.get_available_port ();
 
-	const auto max_ip_connections = node->config.network.max_peers_per_ip;
+	const auto max_ip_connections = node->config.network->max_peers_per_ip;
 	ASSERT_GE (max_ip_connections, 1);
 
 	// client side connection tracking
@@ -208,7 +208,7 @@ TEST (tcp_listener, timeout_empty)
 {
 	nano::test::system system;
 	nano::node_config config;
-	config.tcp.handshake_timeout = 2s;
+	config.tcp->handshake_timeout = 2s;
 	auto node0 = system.add_node (config);
 	auto socket (std::make_shared<nano::transport::tcp_socket> (*node0));
 	socket->async_connect (node0->tcp_listener.endpoint (), [] (boost::system::error_code const & ec) {
@@ -222,7 +222,7 @@ TEST (tcp_listener, timeout_node_id_handshake)
 {
 	nano::test::system system;
 	nano::node_config config;
-	config.tcp.handshake_timeout = 2s;
+	config.tcp->handshake_timeout = 2s;
 	auto node0 = system.add_node (config);
 	auto socket (std::make_shared<nano::transport::tcp_socket> (*node0));
 	auto cookie (node0->network.syn_cookies.assign (nano::transport::map_tcp_to_endpoint (node0->tcp_listener.endpoint ())));

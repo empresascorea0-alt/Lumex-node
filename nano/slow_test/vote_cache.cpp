@@ -1,6 +1,8 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
 #include <nano/node/nodeconfig.hpp>
+#include <nano/node/vote_cache.hpp>
 #include <nano/node/vote_router.hpp>
 #include <nano/test_common/rate_observer.hpp>
 #include <nano/test_common/system.hpp>
@@ -135,7 +137,7 @@ TEST (vote_cache, perf_singlethreaded)
 	nano::test::system system;
 	nano::node_flags flags;
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto & node = *system.add_node (config, flags);
 
 	const int rep_count = 50;
@@ -186,7 +188,7 @@ TEST (vote_cache, perf_singlethreaded)
 	ASSERT_EQ (node.stats.count (nano::stat::type::vote_cache, nano::stat::detail::vote_processed, nano::stat::dir::in), vote_count * single_vote_size * single_vote_reps);
 
 	// Ensure vote cache size is at max capacity
-	ASSERT_EQ (node.vote_cache.size (), config.vote_cache.max_size);
+	ASSERT_EQ (node.vote_cache.size (), config.vote_cache->max_size);
 }
 
 TEST (vote_cache, perf_multithreaded)
@@ -194,7 +196,7 @@ TEST (vote_cache, perf_multithreaded)
 	nano::test::system system;
 	nano::node_flags flags;
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto & node = *system.add_node (config, flags);
 
 	const int thread_count = 12;
@@ -249,5 +251,5 @@ TEST (vote_cache, perf_multithreaded)
 	std::cout << "total votes processed: " << node.stats.count (nano::stat::type::vote_cache, nano::stat::detail::vote_processed, nano::stat::dir::in) << std::endl;
 
 	// Ensure vote cache size is at max capacity
-	ASSERT_EQ (node.vote_cache.size (), config.vote_cache.max_size);
+	ASSERT_EQ (node.vote_cache.size (), config.vote_cache->max_size);
 }

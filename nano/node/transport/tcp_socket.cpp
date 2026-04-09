@@ -4,6 +4,7 @@
 #include <nano/lib/network_formatting.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/nodeconfig.hpp>
+#include <nano/node/transport/tcp_config.hpp>
 #include <nano/node/transport/tcp_socket.hpp>
 #include <nano/node/transport/transport.hpp>
 
@@ -139,7 +140,7 @@ auto nano::transport::tcp_socket::ongoing_checkup () -> asio::awaitable<void>
 			}
 			else
 			{
-				std::chrono::seconds sleep_duration = node.config.tcp.checkup_interval;
+				std::chrono::seconds sleep_duration = node.config.tcp->checkup_interval;
 				co_await nano::async::sleep_for (sleep_duration);
 				timestamp += sleep_duration.count ();
 			}
@@ -173,8 +174,8 @@ bool nano::transport::tcp_socket::checkup ()
 		debug_assert (timestamp >= last_receive);
 		debug_assert (timestamp >= last_send);
 
-		std::chrono::seconds const io_threshold = node.config.tcp.io_timeout;
-		std::chrono::seconds const silence_threshold = node.config.tcp.silent_timeout;
+		std::chrono::seconds const io_threshold = node.config.tcp->io_timeout;
+		std::chrono::seconds const silence_threshold = node.config.tcp->silent_timeout;
 
 		// Timeout threshold of 0 indicates no timeout
 		if (io_threshold.count () > 0)
@@ -214,7 +215,7 @@ bool nano::transport::tcp_socket::checkup ()
 	else // Not connected yet
 	{
 		auto const now = std::chrono::steady_clock::now ();
-		auto const cutoff = now - node.config.tcp.connect_timeout;
+		auto const cutoff = now - node.config.tcp->connect_timeout;
 
 		if (time_created < cutoff)
 		{

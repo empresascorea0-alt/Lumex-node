@@ -4,15 +4,24 @@
 #include <nano/lib/locks.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/timer.hpp>
+#include <nano/lib/work.hpp>
 #include <nano/nano_node/benchmarks/benchmarks.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
+#include <nano/node/block_processor.hpp>
+#include <nano/node/cementing_set.hpp>
 #include <nano/node/cli.hpp>
 #include <nano/node/daemonconfig.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/ledger_notifications.hpp>
 #include <nano/node/node_observers.hpp>
 #include <nano/node/scheduler/component.hpp>
+#include <nano/node/scheduler/hinted.hpp>
 #include <nano/node/scheduler/manual.hpp>
+#include <nano/node/scheduler/optimistic.hpp>
+#include <nano/node/scheduler/priority.hpp>
+#include <nano/node/vote_processor.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 
 #include <boost/asio/io_context.hpp>
@@ -111,15 +120,15 @@ void run_elections_benchmark (boost::program_options::variables_map const & vm, 
 	node_config.max_backlog = 0; // Disable bounded backlog
 
 	// Disable election schedulers and backlog scanning
-	node_config.hinted_scheduler.enable = false;
-	node_config.optimistic_scheduler.enable = false;
-	node_config.priority_scheduler.enable = false;
-	node_config.backlog_scan.enable = false;
+	node_config.hinted_scheduler->enable = false;
+	node_config.optimistic_scheduler->enable = false;
+	node_config.priority_scheduler->enable = false;
+	node_config.backlog_scan->enable = false;
 
-	node_config.block_processor.max_peer_queue = std::numeric_limits<size_t>::max (); // Unlimited queue size
-	node_config.block_processor.max_system_queue = std::numeric_limits<size_t>::max (); // Unlimited queue size
+	node_config.block_processor->max_peer_queue = std::numeric_limits<size_t>::max (); // Unlimited queue size
+	node_config.block_processor->max_system_queue = std::numeric_limits<size_t>::max (); // Unlimited queue size
 	node_config.max_unchecked_blocks = 1024 * 1024; // Large unchecked blocks cache to avoid dropping blocks
-	node_config.vote_processor.max_pr_queue = std::numeric_limits<size_t>::max (); // Unlimited vote processing queue
+	node_config.vote_processor->max_pr_queue = std::numeric_limits<size_t>::max (); // Unlimited vote processing queue
 
 	auto node = std::make_shared<nano::node> (io_ctx, nano::unique_path (), node_config, work_pool, node_flags);
 	node->start ();

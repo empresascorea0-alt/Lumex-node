@@ -1,14 +1,17 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/cli.hpp>
 #include <nano/lib/files.hpp>
+#include <nano/lib/stats.hpp>
 #include <nano/lib/tomlconfig.hpp>
 #include <nano/node/cli.hpp>
 #include <nano/node/daemonconfig.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/inactive_node.hpp>
 #include <nano/node/migrations.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/unchecked_map.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>
@@ -1431,7 +1434,7 @@ bool is_using_rocksdb (std::filesystem::path const & data_path, boost::program_o
 	auto error = nano::read_node_config_toml (data_path, config, config_overrides);
 	if (!error)
 	{
-		return config.node.rocksdb_config.enable;
+		return config.node.rocksdb_config->enable;
 	}
 	else
 	{

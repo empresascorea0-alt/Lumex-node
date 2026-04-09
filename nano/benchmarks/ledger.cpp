@@ -1,5 +1,6 @@
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
+#include <nano/lib/stats.hpp>
 #include <nano/node/make_store.hpp>
 #include <nano/node/nodeconfig.hpp>
 #include <nano/secure/ledger.hpp>

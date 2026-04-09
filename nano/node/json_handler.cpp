@@ -3,11 +3,14 @@
 #include <nano/lib/config.hpp>
 #include <nano/lib/json_error_response.hpp>
 #include <nano/lib/jsonconfig.hpp>
+#include <nano/lib/stats.hpp>
 #include <nano/lib/stats_sinks.hpp>
 #include <nano/lib/timer.hpp>
 #include <nano/lib/version.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
+#include <nano/node/block_processor.hpp>
 #include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/distributed_work_factory.hpp>
@@ -15,6 +18,7 @@
 #include <nano/node/endpoint.hpp>
 #include <nano/node/epoch_upgrader.hpp>
 #include <nano/node/json_handler.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/node_observers.hpp>
 #include <nano/node/node_rpc_config.hpp>
@@ -2012,7 +2016,7 @@ void nano::json_handler::election_statistics ()
 		}
 	}
 
-	auto utilization_percentage = (static_cast<double> (total_count * 100) / node.config.active_elections.size);
+	auto utilization_percentage = (static_cast<double> (total_count * 100) / node.config.active_elections->size);
 	auto max_election_age = std::chrono::duration_cast<std::chrono::milliseconds> (now - oldest_election_start).count ();
 	auto average_election_age = total_count ? std::chrono::duration_cast<std::chrono::milliseconds> (total_age).count () / total_count : 0;
 
@@ -2189,7 +2193,7 @@ void nano::json_handler::database_txn_tracker ()
 {
 	boost::property_tree::ptree json;
 
-	if (node.config.txn_tracking.enable)
+	if (node.config.txn_tracking->enable)
 	{
 		unsigned min_read_time_milliseconds = 0;
 		boost::optional<std::string> min_read_time_text (request.get_optional<std::string> ("min_read_time"));

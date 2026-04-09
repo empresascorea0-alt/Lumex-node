@@ -56,6 +56,7 @@
 #include <nano/node/transport/loopback.hpp>
 #include <nano/node/transport/tcp_listener.hpp>
 #include <nano/node/unchecked_map.hpp>
+#include <nano/node/vote_cache.hpp>
 #include <nano/node/vote_generator.hpp>
 #include <nano/node/vote_processor.hpp>
 #include <nano/node/vote_rebroadcaster.hpp>
@@ -91,7 +92,8 @@
 #include <sstream>
 
 nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, uint16_t peering_port_a, std::filesystem::path const & application_path_a, nano::work_pool & work_a, nano::node_flags flags_a, unsigned seq) :
-	node (io_ctx_a, application_path_a, nano::node_config (peering_port_a), work_a, flags_a, seq)
+	node (
+	io_ctx_a, application_path_a, [&] { nano::node_config c; c.peering_port = peering_port_a; return c; }(), work_a, flags_a, seq)
 {
 }
 

@@ -29,7 +29,7 @@ TEST (peer_history, erase_old)
 	nano::test::system system;
 
 	auto node_config = system.default_config ();
-	node_config.peer_history.erase_cutoff = 1s;
+	node_config.peer_history->erase_cutoff = 1s;
 
 	auto & node1 = *system.add_node (node_config);
 	auto & node2 = *system.add_node (node_config);

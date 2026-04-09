@@ -22,7 +22,7 @@
  */
 
 nano::block_processor::block_processor (nano::node_config const & node_config_a, nano::ledger & ledger_a, nano::ledger_notifications & ledger_notifications_a, nano::unchecked_map & unchecked_a, nano::stats & stats_a, nano::logger & logger_a) :
-	config{ node_config_a.block_processor },
+	config{ *node_config_a.block_processor },
 	node_config{ node_config_a },
 	network_params{ node_config.network_params },
 	ledger{ ledger_a },

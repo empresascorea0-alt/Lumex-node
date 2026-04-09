@@ -1,5 +1,6 @@
 #include <nano/lib/config.hpp>
 #include <nano/lib/formatting.hpp>
+#include <nano/lib/stats.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/timer.hpp>
 #include <nano/node/node.hpp>

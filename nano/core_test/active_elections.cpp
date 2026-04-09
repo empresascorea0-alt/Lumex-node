@@ -2,18 +2,26 @@
 #include <nano/lib/jsonconfig.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
+#include <nano/node/bootstrap/bootstrap_config.hpp>
+#include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/fork_cache.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
+#include <nano/node/repcrawler.hpp>
 #include <nano/node/scheduler/component.hpp>
+#include <nano/node/scheduler/hinted.hpp>
 #include <nano/node/scheduler/manual.hpp>
+#include <nano/node/scheduler/optimistic.hpp>
 #include <nano/node/scheduler/priority.hpp>
 #include <nano/node/transport/fake.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/node/vote_cache.hpp>
 #include <nano/node/vote_processor.hpp>
+#include <nano/node/vote_rebroadcaster.hpp>
 #include <nano/node/vote_router.hpp>
 #include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
@@ -45,7 +53,7 @@ TEST (active_elections, confirm_election_by_request)
 	nano::test::system system;
 	nano::node_config node_config1;
 	// Disable vote rebroadcasting to prevent node1 from actively sending votes to node2
-	node_config1.vote_rebroadcaster.enable = false;
+	node_config1.vote_rebroadcaster->enable = false;
 	auto & node1 = *system.add_node (node_config1);
 
 	nano::state_block_builder builder{};
@@ -135,7 +143,7 @@ TEST (active_elections, confirm_frontier)
 		node_flags.disable_request_loop = true;
 		node_flags.disable_ongoing_bootstrap = true;
 		nano::node_config node_config;
-		node_config.bootstrap.enable = false;
+		node_config.bootstrap->enable = false;
 		auto & node1 = *system.add_node (node_config, node_flags);
 		system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 
@@ -148,7 +156,7 @@ TEST (active_elections, confirm_frontier)
 	node_flags2.disable_ongoing_bootstrap = true;
 	node_flags2.disable_rep_crawler = true;
 	nano::node_config node_config2;
-	node_config2.bootstrap.enable = false;
+	node_config2.bootstrap->enable = false;
 	// start node2 later so that we do not get the gossip traffic
 	auto & node2 = *system.add_node (node_config2, node_flags2);
 
@@ -274,9 +282,9 @@ TEST (active_elections, DISABLED_keep_local)
 	nano::node_config node_config = system.default_config ();
 	node_config.enable_voting = false;
 	// Bound to 2, won't drop wallet created transactions, but good to test dropping remote
-	node_config.active_elections.size = 2;
+	node_config.active_elections->size = 2;
 	// Disable frontier confirmation to allow the test to finish before
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 
 	auto & node = *system.add_node (node_config);
 	auto & wallet (*system.wallet (0));
@@ -338,7 +346,7 @@ TEST (active_elections, DISABLED_keep_local)
 	node.process_active (receive3);
 
 	/// bound elections, should drop after one loop
-	ASSERT_TIMELY_EQ (5s, node.active.size (), node_config.active_elections.size);
+	ASSERT_TIMELY_EQ (5s, node.active.size (), node_config.active_elections->size);
 	// ASSERT_EQ (1, node.scheduler.size ());
 }
 
@@ -436,7 +444,7 @@ TEST (active_elections, cached_vote_existing)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto & node = *system.add_node (node_config);
 	nano::block_hash latest (node.latest (nano::dev::genesis_key.pub));
 	nano::keypair key;
@@ -490,7 +498,7 @@ TEST (active_elections, cached_vote_multiple)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto & node = *system.add_node (node_config);
 	nano::keypair key1;
 	nano::block_builder builder;
@@ -543,16 +551,16 @@ TEST (active_elections, cached_vote_election_start)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
-	node_config.priority_scheduler.enable = false;
-	node_config.optimistic_scheduler.enable = false;
+	node_config.backlog_scan->enable = false;
+	node_config.priority_scheduler->enable = false;
+	node_config.optimistic_scheduler->enable = false;
 	auto & node = *system.add_node (node_config);
 	nano::block_hash latest (node.latest (nano::dev::genesis_key.pub));
 	nano::keypair key1, key2;
 	nano::send_block_builder send_block_builder;
 	nano::state_block_builder state_block_builder;
 	// Enough weight to trigger election hinting but not enough to confirm block on its own
-	auto amount = ((node.online_reps.trended () / 100) * node.config.hinted_scheduler.hinting_threshold_percent) / 2 + 1000 * nano::Knano_ratio;
+	auto amount = ((node.online_reps.trended () / 100) * node.config.hinted_scheduler->hinting_threshold_percent) / 2 + 1000 * nano::Knano_ratio;
 	auto send1 = send_block_builder.make_block ()
 				 .previous (latest)
 				 .destination (key1.pub)
@@ -648,7 +656,7 @@ TEST (active_elections, vote_replays)
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
 	node_config.enable_voting = false;
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto & node = *system.add_node (node_config);
 	nano::keypair key;
 	nano::state_block_builder builder;
@@ -799,7 +807,7 @@ TEST (active_elections, republish_winner)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto & node1 = *system.add_node (node_config);
 	node_config.peering_port = system.get_available_port ();
 	auto & node2 = *system.add_node (node_config);
@@ -865,7 +873,7 @@ TEST (active_elections, fork_filter_cleanup)
 	nano::test::system system{};
 
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 
 	auto & node1 = *system.add_node (node_config);
 	nano::keypair key{};
@@ -946,7 +954,7 @@ TEST (active_elections, fork_replacement_tally)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto & node1 (*system.add_node (node_config));
 
 	size_t const reps_count = 20;
@@ -1104,7 +1112,7 @@ TEST (active_elections, confirmation_consistency)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto & node = *system.add_node (node_config);
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 	for (unsigned i = 0; i < 10; ++i)
@@ -1194,7 +1202,7 @@ TEST (active_elections, activate_account_chain)
 	nano::test::system system;
 	nano::node_flags flags;
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto & node = *system.add_node (config, flags);
 
 	nano::keypair key;
@@ -1286,7 +1294,7 @@ TEST (active_elections, activate_inactive)
 	nano::test::system system;
 	nano::node_flags flags;
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto & node = *system.add_node (config, flags);
 
 	nano::keypair key;
@@ -1399,7 +1407,7 @@ TEST (active_elections, vacancy)
 	std::atomic<bool> updated = false;
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.active_elections.size = 1;
+	config.active_elections->size = 1;
 	auto & node = *system.add_node (config);
 	nano::state_block_builder builder;
 	auto send = builder.make_block ()
@@ -1436,15 +1444,15 @@ TEST (active_elections, limit_vote_hinted_elections)
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
 	const int aec_limit = 10;
-	config.backlog_scan.enable = false;
-	config.optimistic_scheduler.enable = false;
-	config.active_elections.size = aec_limit;
-	config.active_elections.hinted_limit_percentage = 10; // Should give us a limit of 1 hinted election
+	config.backlog_scan->enable = false;
+	config.optimistic_scheduler->enable = false;
+	config.active_elections->size = aec_limit;
+	config.active_elections->hinted_limit_percentage = 10; // Should give us a limit of 1 hinted election
 	auto & node = *system.add_node (config);
 
 	// Setup representatives
 	// Enough weight to trigger election hinting but not enough to confirm block on its own
-	const auto amount = ((node.online_reps.trended () / 100) * node.config.hinted_scheduler.hinting_threshold_percent) + 1000 * nano::Knano_ratio;
+	const auto amount = ((node.online_reps.trended () / 100) * node.config.hinted_scheduler->hinting_threshold_percent) + 1000 * nano::Knano_ratio;
 	nano::keypair rep1 = nano::test::setup_rep (system, node, amount / 2);
 	nano::keypair rep2 = nano::test::setup_rep (system, node, amount / 2);
 
@@ -1502,9 +1510,9 @@ TEST (active_elections, bound_election_winners)
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
 	// Set election winner limit to a low value
-	config.active_elections.max_election_winners = 5;
+	config.active_elections->max_election_winners = 5;
 	// Large batch size would complicate this testcase
-	config.cementing_set.batch_size = 1;
+	config.cementing_set->batch_size = 1;
 	auto & node = *system.add_node (config);
 
 	// Start elections for a couple of blocks, number of elections is larger than the election winner set limit
@@ -1544,15 +1552,15 @@ TEST (active_elections, broadcast_block_on_activation)
 	nano::test::system system;
 	nano::node_config config1 = system.default_config ();
 	// Deactivates elections on both nodes.
-	config1.active_elections.size = 0;
-	config1.bootstrap.enable = false;
-	config1.priority_scheduler.enable = false;
-	config1.optimistic_scheduler.enable = false;
+	config1.active_elections->size = 0;
+	config1.bootstrap->enable = false;
+	config1.priority_scheduler->enable = false;
+	config1.optimistic_scheduler->enable = false;
 	nano::node_config config2 = system.default_config ();
-	config2.active_elections.size = 0;
-	config2.bootstrap.enable = false;
-	config2.priority_scheduler.enable = false;
-	config2.optimistic_scheduler.enable = false;
+	config2.active_elections->size = 0;
+	config2.bootstrap->enable = false;
+	config2.priority_scheduler->enable = false;
+	config2.optimistic_scheduler->enable = false;
 	nano::node_flags flags;
 	// Disables bootstrap listener to make sure the block won't be shared by this channel.
 	flags.disable_bootstrap_listener = true;
@@ -1588,7 +1596,7 @@ TEST (active_elections, stale_election)
 
 	// Configure node with short stale threshold for testing
 	nano::node_config node_config = system.default_config ();
-	node_config.active_elections.stale_threshold = 2s; // Short threshold for faster testing
+	node_config.active_elections->stale_threshold = 2s; // Short threshold for faster testing
 
 	auto & node = *system.add_node (node_config);
 
@@ -1634,7 +1642,7 @@ TEST (active_elections, stale_election_multiple)
 
 	// Configure node with short stale threshold for testing
 	nano::node_config node_config = system.default_config ();
-	node_config.active_elections.stale_threshold = 2s; // Short threshold for faster testing
+	node_config.active_elections->stale_threshold = 2s; // Short threshold for faster testing
 
 	auto & node = *system.add_node (node_config);
 
@@ -1762,10 +1770,10 @@ TEST (active_elections, cancel_cemented_races)
 	nano::node_config config = system.default_config ();
 
 	// Disable schedulers and backlog scan to have full control
-	config.backlog_scan.enable = false;
-	config.priority_scheduler.enable = false;
-	config.hinted_scheduler.enable = false;
-	config.optimistic_scheduler.enable = false;
+	config.backlog_scan->enable = false;
+	config.priority_scheduler->enable = false;
+	config.hinted_scheduler->enable = false;
+	config.optimistic_scheduler->enable = false;
 
 	auto & node = *system.add_node (config);
 
@@ -1845,7 +1853,7 @@ TEST (active_elections, cancel_already_cemented)
 
 	nano::node_config config;
 	// Configure checkup interval for faster test execution
-	config.active_elections.checkup_interval = 100ms;
+	config.active_elections->checkup_interval = 100ms;
 
 	auto & node = *system.add_node (config);
 

@@ -28,7 +28,7 @@
 using namespace std::chrono;
 
 nano::active_elections::active_elections (nano::node & node_a, nano::ledger_notifications & ledger_notifications_a, nano::cementing_set & cementing_set_a) :
-	config{ node_a.config.active_elections },
+	config{ *node_a.config.active_elections },
 	node{ node_a },
 	ledger_notifications{ ledger_notifications_a },
 	cementing_set{ cementing_set_a },

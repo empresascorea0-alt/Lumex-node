@@ -9,6 +9,7 @@
 #include <nano/node/network.hpp>
 #include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/tcp_listener.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/store/ledger/account.hpp>
@@ -151,7 +152,7 @@ std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_config cons
 	node->start ();
 
 	// Check that we don't start more nodes than limit for single IP address
-	debug_assert (nodes.size () < node->config.network.max_peers_per_ip || node->flags.disable_max_peers_per_ip);
+	debug_assert (nodes.size () < node->config.network->max_peers_per_ip || node->flags.disable_max_peers_per_ip);
 
 	// Connect with other nodes
 	for (auto const & other_node : nodes)
@@ -642,7 +643,8 @@ void nano::test::system::generate_mass_activity (uint32_t count_a, nano::node & 
 
 nano::node_config nano::test::system::default_config ()
 {
-	nano::node_config config{ get_available_port () };
+	nano::node_config config;
+	config.peering_port = get_available_port ();
 	config.representative_vote_weight_minimum = 0;
 	return config;
 }

@@ -1,6 +1,7 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/thread_pool.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/nodeconfig.hpp>
 #include <nano/node/scheduler/component.hpp>
@@ -36,11 +37,11 @@ TEST (priority_scheduler, activate_multiple_buckets)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	// Ensure enough room for elections to start
-	config.active_elections.size = 10;
+	config.active_elections->size = 10;
 	// Keep reserved small to allow fair activation across buckets regardless of AEC
-	config.priority_scheduler.reserved_elections = 1;
+	config.priority_scheduler->reserved_elections = 1;
 	auto & node = *system.add_node (config);
 
 	// Create two accounts with different balances so they fall into different buckets via bucketing
@@ -148,12 +149,12 @@ TEST (priority_scheduler, reserved_respected_no_vacancy)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	// Only 1 slot in AEC to force no-vacancy condition
-	config.active_elections.size = 1;
+	config.active_elections->size = 1;
 	// Allow 2 reserved elections per bucket, more than AEC capacity
-	config.priority_scheduler.reserved_elections = 2;
-	config.priority_scheduler.max_elections = 2;
+	config.priority_scheduler->reserved_elections = 2;
+	config.priority_scheduler->max_elections = 2;
 	auto & node = *system.add_node (config);
 
 	nano::state_block_builder builder;
@@ -262,12 +263,12 @@ TEST (priority_scheduler, queue_activations)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	// Only 1 slot in AEC, force contention
-	config.active_elections.size = 1;
+	config.active_elections->size = 1;
 	// Allow bucket to start 1 election regardless of vacancy, but not more
-	config.priority_scheduler.reserved_elections = 1;
-	config.priority_scheduler.max_elections = 1;
+	config.priority_scheduler->reserved_elections = 1;
+	config.priority_scheduler->max_elections = 1;
 	auto & node = *system.add_node (config);
 
 	nano::state_block_builder builder;
@@ -372,11 +373,11 @@ TEST (priority_scheduler, cancel_worst_election)
 	nano::test::system system;
 
 	nano::node_config config;
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	// Enough AEC size so vacancy does not block, we rely on bucket logic to temporarily overfill and then cleanup
-	config.active_elections.size = 10;
-	config.priority_scheduler.reserved_elections = 1;
-	config.priority_scheduler.max_elections = 1;
+	config.active_elections->size = 10;
+	config.priority_scheduler->reserved_elections = 1;
+	config.priority_scheduler->max_elections = 1;
 	auto & node = *system.add_node (config);
 
 	nano::state_block_builder builder;
@@ -489,7 +490,7 @@ TEST (priority_scheduler, activate_successors)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto & node = *system.add_node (config);
 
 	nano::state_block_builder builder;
@@ -548,7 +549,7 @@ TEST (priority_scheduler, stress_test)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false; // Disable fallback mechanisms to avoid interference
+	config.backlog_scan->enable = false; // Disable fallback mechanisms to avoid interference
 
 	nano::node_flags flags;
 	flags.disable_activate_successors = true; // Full control over activations

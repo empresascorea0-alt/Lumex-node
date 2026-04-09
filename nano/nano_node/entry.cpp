@@ -14,17 +14,23 @@
 #include <nano/nano_node/benchmarks/benchmarks.hpp>
 #include <nano/nano_node/daemon.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/block_processor.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/cli.hpp>
 #include <nano/node/daemonconfig.hpp>
 #include <nano/node/inactive_node.hpp>
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/node/json_handler.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/online_reps.hpp>
+#include <nano/node/peer_history.hpp>
 #include <nano/node/pruning.hpp>
+#include <nano/node/repcrawler.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/node/unchecked_map.hpp>
+#include <nano/node/vote_processor.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/store/ledger/account.hpp>
@@ -1276,7 +1282,7 @@ int main (int argc, char * const * argv)
 			}
 			else
 			{
-				config2.active_elections.size = daemon_config.node.active_elections.size;
+				config2.active_elections->size = daemon_config.node.active_elections->size;
 			}
 
 			auto node2 (std::make_shared<nano::node> (io_ctx2, path2, config2, work, flags, 1));

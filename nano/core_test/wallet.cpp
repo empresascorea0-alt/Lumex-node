@@ -4,6 +4,7 @@
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/nodeconfig.hpp>
 #include <nano/node/wallet.hpp>
@@ -1003,7 +1004,7 @@ TEST (wallet, search_receivable)
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
 	config.enable_voting = false;
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	nano::node_flags flags;
 	flags.disable_search_pending = true;
 	auto & node (*system.add_node (config, flags));

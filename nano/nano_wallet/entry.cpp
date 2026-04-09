@@ -4,11 +4,13 @@
 #include <nano/lib/errors.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
+#include <nano/lib/memory.hpp>
 #include <nano/lib/rpcconfig.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/tomlconfig.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/lib/walletconfig.hpp>
+#include <nano/lib/work.hpp>
 #include <nano/nano_wallet/icon.hpp>
 #include <nano/node/cli.hpp>
 #include <nano/node/daemonconfig.hpp>
@@ -16,6 +18,8 @@
 #include <nano/node/json_handler.hpp>
 #include <nano/node/node_rpc_config.hpp>
 #include <nano/node/node_scope_guard.hpp>
+#include <nano/node/openclwork.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/qt/qt.hpp>
 #include <nano/rpc/rpc.hpp>
 

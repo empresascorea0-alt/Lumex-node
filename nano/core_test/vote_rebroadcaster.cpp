@@ -1,8 +1,11 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/vote.hpp>
+#include <nano/node/backlog_scan.hpp>
 #include <nano/node/nodeconfig.hpp>
 #include <nano/node/rep_tiers.hpp>
+#include <nano/node/scheduler/hinted.hpp>
+#include <nano/node/scheduler/optimistic.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/node/vote_processor.hpp>
 #include <nano/node/vote_rebroadcaster.hpp>
@@ -294,9 +297,9 @@ TEST (vote_rebroadcaster, basic_rebroadcast)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
-	config.hinted_scheduler.enable = false;
-	config.optimistic_scheduler.enable = false;
+	config.backlog_scan->enable = false;
+	config.hinted_scheduler->enable = false;
+	config.optimistic_scheduler->enable = false;
 
 	// Node without rep key in wallet - will act as rebroadcaster
 	auto & node = *system.add_node (config);
@@ -336,9 +339,9 @@ TEST (vote_rebroadcaster, local_representative_votes_skipped)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
-	config.hinted_scheduler.enable = false;
-	config.optimistic_scheduler.enable = false;
+	config.backlog_scan->enable = false;
+	config.hinted_scheduler->enable = false;
+	config.optimistic_scheduler->enable = false;
 
 	auto & node = *system.add_node (config);
 	auto & peer_node = *system.add_node (config); // Needed to allow rebroadcasting
@@ -374,9 +377,9 @@ TEST (vote_rebroadcaster, disabled_when_principal_representative)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
-	config.hinted_scheduler.enable = false;
-	config.optimistic_scheduler.enable = false;
+	config.backlog_scan->enable = false;
+	config.hinted_scheduler->enable = false;
+	config.optimistic_scheduler->enable = false;
 
 	auto & node = *system.add_node (config);
 	auto & peer_node = *system.add_node (config); // Needed to allow rebroadcasting
@@ -441,9 +444,9 @@ TEST (vote_rebroadcaster, non_principal_rep_votes_rejected)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
-	config.hinted_scheduler.enable = false;
-	config.optimistic_scheduler.enable = false;
+	config.backlog_scan->enable = false;
+	config.hinted_scheduler->enable = false;
+	config.optimistic_scheduler->enable = false;
 
 	auto & node = *system.add_node (config);
 	auto & peer_node = *system.add_node (config); // Needed to allow rebroadcasting
@@ -477,9 +480,9 @@ TEST (vote_rebroadcaster, duplicate_vote_ignored)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
-	config.hinted_scheduler.enable = false;
-	config.optimistic_scheduler.enable = false;
+	config.backlog_scan->enable = false;
+	config.hinted_scheduler->enable = false;
+	config.optimistic_scheduler->enable = false;
 
 	auto & node = *system.add_node (config);
 	// No peer node, vote rebroadcaster should not drain the queue
@@ -517,10 +520,10 @@ TEST (vote_rebroadcaster, disabled)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.vote_rebroadcaster.enable = false; // Disable rebroadcaster
-	config.backlog_scan.enable = false;
-	config.hinted_scheduler.enable = false;
-	config.optimistic_scheduler.enable = false;
+	config.vote_rebroadcaster->enable = false; // Disable rebroadcaster
+	config.backlog_scan->enable = false;
+	config.hinted_scheduler->enable = false;
+	config.optimistic_scheduler->enable = false;
 
 	auto & node = *system.add_node (config);
 	auto & peer_node = *system.add_node (config); // Needed to allow rebroadcasting

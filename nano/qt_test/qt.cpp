@@ -1,8 +1,12 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/work_version.hpp>
+#include <nano/node/bootstrap/bootstrap_config.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/nodeconfig.hpp>
+#include <nano/node/scheduler/hinted.hpp>
+#include <nano/node/scheduler/optimistic.hpp>
+#include <nano/node/scheduler/priority.hpp>
 #include <nano/node/wallet.hpp>
 #include <nano/qt/qt.hpp>
 #include <nano/secure/ledger.hpp>
@@ -766,10 +770,10 @@ TEST (wallet, republish)
 
 	// Configure nodes to disable bootstrap, election schedulers, and other background processes for test isolation
 	nano::node_config node_config;
-	node_config.bootstrap.enable = false;
-	node_config.priority_scheduler.enable = false;
-	node_config.optimistic_scheduler.enable = false;
-	node_config.hinted_scheduler.enable = false;
+	node_config.bootstrap->enable = false;
+	node_config.priority_scheduler->enable = false;
+	node_config.optimistic_scheduler->enable = false;
+	node_config.hinted_scheduler->enable = false;
 
 	nano::test::system system;
 	auto & node1 = *system.add_node (node_config);

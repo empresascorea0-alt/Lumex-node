@@ -3,10 +3,40 @@
 #include <nano/lib/config.hpp>
 #include <nano/lib/env.hpp>
 #include <nano/lib/jsonconfig.hpp>
+#include <nano/lib/lmdbconfig.hpp>
+#include <nano/lib/rocksdbconfig.hpp>
 #include <nano/lib/rpcconfig.hpp>
+#include <nano/lib/stats.hpp>
 #include <nano/lib/tomlconfig.hpp>
+#include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
+#include <nano/node/block_processor.hpp>
+#include <nano/node/block_rebroadcaster.hpp>
+#include <nano/node/bootstrap/bootstrap_config.hpp>
+#include <nano/node/bootstrap/bootstrap_server.hpp>
+#include <nano/node/bounded_backlog.hpp>
+#include <nano/node/cementing_set.hpp>
+#include <nano/node/fork_cache.hpp>
+#include <nano/node/ipc/ipc_config.hpp>
+#include <nano/node/local_block_broadcaster.hpp>
+#include <nano/node/message_processor.hpp>
+#include <nano/node/monitor.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/nodeconfig.hpp>
+#include <nano/node/peer_history.hpp>
+#include <nano/node/repcrawler.hpp>
+#include <nano/node/scheduler/hinted.hpp>
+#include <nano/node/scheduler/optimistic.hpp>
+#include <nano/node/scheduler/priority.hpp>
+#include <nano/node/transport/tcp_config.hpp>
 #include <nano/node/transport/transport.hpp>
+#include <nano/node/vote_cache.hpp>
+#include <nano/node/vote_generator.hpp>
+#include <nano/node/vote_processor.hpp>
+#include <nano/node/vote_rebroadcaster.hpp>
+#include <nano/node/vote_replier.hpp>
+#include <nano/node/websocketconfig.hpp>
+#include <nano/store/txn_tracking.hpp>
 
 #include <boost/format.hpp>
 
@@ -22,32 +52,20 @@ std::string const default_beta_peer_network = nano::env::get ("NANO_DEFAULT_PEER
 std::string const default_test_peer_network = nano::env::get ("NANO_DEFAULT_PEER").value_or ("peering-test.nano.org");
 }
 
-nano::node_config::node_config (std::optional<uint16_t> peering_port_a, nano::network_params const & network_params) :
+nano::node_config::node_config (nano::network_params const & network_params) :
 	network_params{ network_params },
-	peering_port{ peering_port_a },
+	external_address{ boost::asio::ip::address_v6{}.to_string () },
 	hinted_scheduler{ network_params.network },
 	websocket_config{ network_params.network },
 	ipc_config{ network_params.network },
-	external_address{ boost::asio::ip::address_v6{}.to_string () },
 	rep_crawler{ network_params.network },
-	active_elections{ network_params.network },
 	block_processor{ network_params.network },
+	active_elections{ network_params.network },
 	peer_history{ network_params.network },
 	tcp{ network_params.network },
 	network{ network_params.network },
 	local_block_broadcaster{ network_params.network }
 {
-	if (peering_port == 0)
-	{
-		// comment for posterity:
-		// - we used to consider ports being 0 a sentinel that meant to use a default port for that specific purpose
-		// - the actual default value was determined based on the active network (e.g. dev network peering port = 44000)
-		// - now, the 0 value means something different instead: user wants to let the OS pick a random port
-		// - for the specific case of the peering port, after it gets picked, it can be retrieved by client code via
-		//   node.network.endpoint ().port ()
-		// - the config value does not get back-propagated because it represents the choice of the user, and that was 0
-	}
-
 	switch (network_params.network.network ())
 	{
 		case nano::network_type::nano_dev_network:
@@ -83,15 +101,9 @@ nano::node_config::node_config (std::optional<uint16_t> peering_port_a, nano::ne
 	}
 }
 
-nano::node_config::node_config (nano::network_params const & network_params) :
-	node_config{ std::nullopt, network_params }
-{
-}
-
-nano::node_config::~node_config ()
-{
-	// Keep the node_config destructor definition here to avoid incomplete type issues
-}
+nano::node_config::node_config (node_config const &) = default;
+nano::node_config::node_config (node_config &&) noexcept = default;
+nano::node_config::~node_config () = default;
 
 nano::error nano::node_config::serialize_toml (nano::tomlconfig & toml) const
 {
@@ -181,125 +193,125 @@ nano::error nano::node_config::serialize_toml (nano::tomlconfig & toml) const
 	 */
 
 	nano::tomlconfig websocket_l;
-	websocket_config.serialize_toml (websocket_l);
+	websocket_config->serialize_toml (websocket_l);
 	toml.put_child ("websocket", websocket_l);
 
 	nano::tomlconfig ipc_l;
-	ipc_config.serialize_toml (ipc_l);
+	ipc_config->serialize_toml (ipc_l);
 	toml.put_child ("ipc", ipc_l);
 
 	nano::tomlconfig diagnostics_l;
 	nano::tomlconfig txn_tracking_l;
-	txn_tracking.serialize_toml (txn_tracking_l);
+	txn_tracking->serialize_toml (txn_tracking_l);
 	diagnostics_l.put_child ("txn_tracking", txn_tracking_l);
 	toml.put_child ("diagnostics", diagnostics_l);
 
 	nano::tomlconfig stat_l;
-	stats_config.serialize_toml (stat_l);
+	stats_config->serialize_toml (stat_l);
 	toml.put_child ("statistics", stat_l);
 
 	nano::tomlconfig rocksdb_l;
-	rocksdb_config.serialize_toml (rocksdb_l);
+	rocksdb_config->serialize_toml (rocksdb_l);
 	toml.put_child ("rocksdb", rocksdb_l);
 
 	nano::tomlconfig lmdb_l;
-	lmdb_config.serialize_toml (lmdb_l);
+	lmdb_config->serialize_toml (lmdb_l);
 	toml.put_child ("lmdb", lmdb_l);
 
 	nano::tomlconfig optimistic_l;
-	optimistic_scheduler.serialize (optimistic_l);
+	optimistic_scheduler->serialize (optimistic_l);
 	toml.put_child ("optimistic_scheduler", optimistic_l);
 
 	nano::tomlconfig hinted_l;
-	hinted_scheduler.serialize (hinted_l);
+	hinted_scheduler->serialize (hinted_l);
 	toml.put_child ("hinted_scheduler", hinted_l);
 
 	nano::tomlconfig priority_l;
-	priority_scheduler.serialize (priority_l);
+	priority_scheduler->serialize (priority_l);
 	toml.put_child ("priority_scheduler", priority_l);
 
 	nano::tomlconfig bootstrap_l;
-	bootstrap.serialize (bootstrap_l);
+	bootstrap->serialize (bootstrap_l);
 	toml.put_child ("bootstrap", bootstrap_l);
 
 	nano::tomlconfig bootstrap_server_l;
-	bootstrap_server.serialize (bootstrap_server_l);
+	bootstrap_server->serialize (bootstrap_server_l);
 	toml.put_child ("bootstrap_server", bootstrap_server_l);
 
 	nano::tomlconfig vote_cache_l;
-	vote_cache.serialize (vote_cache_l);
+	vote_cache->serialize (vote_cache_l);
 	toml.put_child ("vote_cache", vote_cache_l);
 
 	nano::tomlconfig rep_crawler_l;
-	rep_crawler.serialize (rep_crawler_l);
+	rep_crawler->serialize (rep_crawler_l);
 	toml.put_child ("rep_crawler", rep_crawler_l);
 
 	nano::tomlconfig active_elections_l;
-	active_elections.serialize (active_elections_l);
+	active_elections->serialize (active_elections_l);
 	toml.put_child ("active_elections", active_elections_l);
 
 	nano::tomlconfig block_processor_l;
-	block_processor.serialize (block_processor_l);
+	block_processor->serialize (block_processor_l);
 	toml.put_child ("block_processor", block_processor_l);
 
 	nano::tomlconfig vote_generator_l;
-	vote_generator.serialize (vote_generator_l);
+	vote_generator->serialize (vote_generator_l);
 	toml.put_child ("vote_generator", vote_generator_l);
 
 	nano::tomlconfig vote_processor_l;
-	vote_processor.serialize (vote_processor_l);
+	vote_processor->serialize (vote_processor_l);
 	toml.put_child ("vote_processor", vote_processor_l);
 
 	nano::tomlconfig peer_history_l;
-	peer_history.serialize (peer_history_l);
+	peer_history->serialize (peer_history_l);
 	toml.put_child ("peer_history", peer_history_l);
 
 	nano::tomlconfig tcp_l;
-	tcp.serialize (tcp_l);
+	tcp->serialize (tcp_l);
 	toml.put_child ("tcp", tcp_l);
 
 	nano::tomlconfig network_l;
-	network.serialize (network_l);
+	network->serialize (network_l);
 	toml.put_child ("network", network_l);
 
 	nano::tomlconfig vote_replier_l;
-	vote_replier.serialize (vote_replier_l);
+	vote_replier->serialize (vote_replier_l);
 	toml.put_child ("vote_replier", vote_replier_l);
 
 	nano::tomlconfig message_processor_l;
-	message_processor.serialize (message_processor_l);
+	message_processor->serialize (message_processor_l);
 	toml.put_child ("message_processor", message_processor_l);
 
 	nano::tomlconfig monitor_l;
-	monitor.serialize (monitor_l);
+	monitor->serialize (monitor_l);
 	toml.put_child ("monitor", monitor_l);
 
 	nano::tomlconfig backlog_scan_l;
-	backlog_scan.serialize (backlog_scan_l);
+	backlog_scan->serialize (backlog_scan_l);
 	toml.put_child ("backlog_scan", backlog_scan_l);
 
 	nano::tomlconfig bounded_backlog_l;
-	bounded_backlog.serialize (bounded_backlog_l);
+	bounded_backlog->serialize (bounded_backlog_l);
 	toml.put_child ("bounded_backlog", bounded_backlog_l);
 
 	nano::tomlconfig fork_cache_l;
-	fork_cache.serialize (fork_cache_l);
+	fork_cache->serialize (fork_cache_l);
 	toml.put_child ("fork_cache", fork_cache_l);
 
 	nano::tomlconfig vote_rebroadcaster_l;
-	vote_rebroadcaster.serialize (vote_rebroadcaster_l);
+	vote_rebroadcaster->serialize (vote_rebroadcaster_l);
 	toml.put_child ("vote_rebroadcaster", vote_rebroadcaster_l);
 
 	nano::tomlconfig block_rebroadcaster_l;
-	block_rebroadcaster.serialize (block_rebroadcaster_l);
+	block_rebroadcaster->serialize (block_rebroadcaster_l);
 	toml.put_child ("block_rebroadcaster", block_rebroadcaster_l);
 
 	nano::tomlconfig cementing_set_l;
-	cementing_set.serialize (cementing_set_l);
+	cementing_set->serialize (cementing_set_l);
 	toml.put_child ("cementing_set", cementing_set_l);
 
 	nano::tomlconfig local_block_broadcaster_l;
-	local_block_broadcaster.serialize (local_block_broadcaster_l);
+	local_block_broadcaster->serialize (local_block_broadcaster_l);
 	toml.put_child ("local_block_broadcaster", local_block_broadcaster_l);
 
 	return toml.get_error ();
@@ -324,13 +336,13 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		if (toml.has_key ("websocket"))
 		{
 			auto websocket_config_l (toml.get_required_child ("websocket"));
-			websocket_config.deserialize_toml (websocket_config_l);
+			websocket_config->deserialize_toml (websocket_config_l);
 		}
 
 		if (toml.has_key ("ipc"))
 		{
 			auto ipc_config_l (toml.get_required_child ("ipc"));
-			ipc_config.deserialize_toml (ipc_config_l);
+			ipc_config->deserialize_toml (ipc_config_l);
 		}
 
 		if (toml.has_key ("diagnostics"))
@@ -339,164 +351,164 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 			auto txn_tracking_l (diagnostics_l.get_optional_child ("txn_tracking"));
 			if (txn_tracking_l)
 			{
-				txn_tracking.deserialize_toml (*txn_tracking_l);
+				txn_tracking->deserialize_toml (*txn_tracking_l);
 			}
 		}
 
 		if (toml.has_key ("statistics"))
 		{
 			auto stats_config_l (toml.get_required_child ("statistics"));
-			stats_config.deserialize_toml (stats_config_l);
+			stats_config->deserialize_toml (stats_config_l);
 		}
 
 		if (toml.has_key ("rocksdb"))
 		{
 			auto rocksdb_config_l (toml.get_required_child ("rocksdb"));
-			rocksdb_config.deserialize_toml (rocksdb_config_l);
+			rocksdb_config->deserialize_toml (rocksdb_config_l);
 		}
 
 		if (toml.has_key ("optimistic_scheduler"))
 		{
 			auto config_l = toml.get_required_child ("optimistic_scheduler");
-			optimistic_scheduler.deserialize (config_l);
+			optimistic_scheduler->deserialize (config_l);
 		}
 
 		if (toml.has_key ("hinted_scheduler"))
 		{
 			auto config_l = toml.get_required_child ("hinted_scheduler");
-			hinted_scheduler.deserialize (config_l);
+			hinted_scheduler->deserialize (config_l);
 		}
 
 		if (toml.has_key ("priority_scheduler"))
 		{
 			auto config_l = toml.get_required_child ("priority_scheduler");
-			priority_scheduler.deserialize (config_l);
+			priority_scheduler->deserialize (config_l);
 		}
 
 		if (toml.has_key ("bootstrap"))
 		{
 			auto config_l = toml.get_required_child ("bootstrap");
-			bootstrap.deserialize (config_l);
+			bootstrap->deserialize (config_l);
 		}
 
 		if (toml.has_key ("bootstrap_server"))
 		{
 			auto config_l = toml.get_required_child ("bootstrap_server");
-			bootstrap_server.deserialize (config_l);
+			bootstrap_server->deserialize (config_l);
 		}
 
 		if (toml.has_key ("vote_cache"))
 		{
 			auto config_l = toml.get_required_child ("vote_cache");
-			vote_cache.deserialize (config_l);
+			vote_cache->deserialize (config_l);
 		}
 
 		if (toml.has_key ("rep_crawler"))
 		{
 			auto config_l = toml.get_required_child ("rep_crawler");
-			rep_crawler.deserialize (config_l);
+			rep_crawler->deserialize (config_l);
 		}
 
 		if (toml.has_key ("active_elections"))
 		{
 			auto config_l = toml.get_required_child ("active_elections");
-			active_elections.deserialize (config_l);
+			active_elections->deserialize (config_l);
 		}
 
 		if (toml.has_key ("block_processor"))
 		{
 			auto config_l = toml.get_required_child ("block_processor");
-			block_processor.deserialize (config_l);
+			block_processor->deserialize (config_l);
 		}
 
 		if (toml.has_key ("vote_generator"))
 		{
 			auto config_l = toml.get_required_child ("vote_generator");
-			vote_generator.deserialize (config_l);
+			vote_generator->deserialize (config_l);
 		}
 
 		if (toml.has_key ("vote_processor"))
 		{
 			auto config_l = toml.get_required_child ("vote_processor");
-			vote_processor.deserialize (config_l);
+			vote_processor->deserialize (config_l);
 		}
 
 		if (toml.has_key ("peer_history"))
 		{
 			auto config_l = toml.get_required_child ("peer_history");
-			peer_history.deserialize (config_l);
+			peer_history->deserialize (config_l);
 		}
 
 		if (toml.has_key ("tcp"))
 		{
 			auto config_l = toml.get_required_child ("tcp");
-			tcp.deserialize (config_l);
+			tcp->deserialize (config_l);
 		}
 
 		if (toml.has_key ("network"))
 		{
 			auto config_l = toml.get_required_child ("network");
-			network.deserialize (config_l);
+			network->deserialize (config_l);
 		}
 
 		if (toml.has_key ("vote_replier"))
 		{
 			auto config_l = toml.get_required_child ("vote_replier");
-			vote_replier.deserialize (config_l);
+			vote_replier->deserialize (config_l);
 		}
 
 		if (toml.has_key ("message_processor"))
 		{
 			auto config_l = toml.get_required_child ("message_processor");
-			message_processor.deserialize (config_l);
+			message_processor->deserialize (config_l);
 		}
 
 		if (toml.has_key ("monitor"))
 		{
 			auto config_l = toml.get_required_child ("monitor");
-			monitor.deserialize (config_l);
+			monitor->deserialize (config_l);
 		}
 
 		if (toml.has_key ("backlog_scan"))
 		{
 			auto config_l = toml.get_required_child ("backlog_scan");
-			backlog_scan.deserialize (config_l);
+			backlog_scan->deserialize (config_l);
 		}
 
 		if (toml.has_key ("bounded_backlog"))
 		{
 			auto config_l = toml.get_required_child ("bounded_backlog");
-			bounded_backlog.deserialize (config_l);
+			bounded_backlog->deserialize (config_l);
 		}
 
 		if (toml.has_key ("fork_cache"))
 		{
 			auto config_l = toml.get_required_child ("fork_cache");
-			fork_cache.deserialize (config_l);
+			fork_cache->deserialize (config_l);
 		}
 
 		if (toml.has_key ("vote_rebroadcaster"))
 		{
 			auto config_l = toml.get_required_child ("vote_rebroadcaster");
-			vote_rebroadcaster.deserialize (config_l);
+			vote_rebroadcaster->deserialize (config_l);
 		}
 
 		if (toml.has_key ("block_rebroadcaster"))
 		{
 			auto config_l = toml.get_required_child ("block_rebroadcaster");
-			block_rebroadcaster.deserialize (config_l);
+			block_rebroadcaster->deserialize (config_l);
 		}
 
 		if (toml.has_key ("cementing_set"))
 		{
 			auto config_l = toml.get_required_child ("cementing_set");
-			cementing_set.deserialize (config_l);
+			cementing_set->deserialize (config_l);
 		}
 
 		if (toml.has_key ("local_block_broadcaster"))
 		{
 			auto config_l = toml.get_required_child ("local_block_broadcaster");
-			local_block_broadcaster.deserialize (config_l);
+			local_block_broadcaster->deserialize (config_l);
 		}
 
 		/*
@@ -624,7 +636,7 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		if (toml.has_key ("lmdb"))
 		{
 			auto lmdb_config_l (toml.get_required_child ("lmdb"));
-			lmdb_config.deserialize_toml (lmdb_config_l);
+			lmdb_config->deserialize_toml (lmdb_config_l);
 		}
 
 		boost::asio::ip::address_v6 external_address_l;
@@ -688,7 +700,7 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		{
 			toml.get_error ().set ("io_threads must be non-zero");
 		}
-		if (active_elections.size <= 250 && !network_params.network.is_dev_network ())
+		if (active_elections->size <= 250 && !network_params.network.is_dev_network ())
 		{
 			toml.get_error ().set ("active_elections.size must be greater than 250");
 		}
@@ -717,7 +729,7 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 	return toml.get_error ();
 }
 
-void nano::node_config::deserialize_address (std::string const & entry_a, std::vector<std::pair<std::string, uint16_t>> & container_a) const
+void nano::node_config::deserialize_address (std::string const & entry_a, std::vector<std::pair<std::string, uint16_t>> & container_a)
 {
 	auto port_position (entry_a.rfind (':'));
 	bool result = (port_position == -1);

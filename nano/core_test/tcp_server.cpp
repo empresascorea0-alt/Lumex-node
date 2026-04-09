@@ -1,8 +1,10 @@
 #include <nano/crypto_lib/random_pool.hpp>
+#include <nano/lib/blocks.hpp>
 #include <nano/lib/node_capabilities.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/nodeconfig.hpp>
+#include <nano/node/transport/tcp_listener.hpp>
 #include <nano/node/transport/tcp_server.hpp>
 #include <nano/node/transport/tcp_socket.hpp>
 #include <nano/test_common/system.hpp>

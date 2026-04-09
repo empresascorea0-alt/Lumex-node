@@ -1,12 +1,15 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
 #include <nano/lib/files.hpp>
+#include <nano/lib/interval.hpp>
 #include <nano/lib/locks.hpp>
+#include <nano/lib/stats.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/timer.hpp>
 #include <nano/lib/work.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/nano_node/benchmarks/benchmarks.hpp>
+#include <nano/node/block_processor.hpp>
 #include <nano/node/cli.hpp>
 #include <nano/node/daemonconfig.hpp>
 #include <nano/node/ledger_notifications.hpp>
@@ -100,7 +103,7 @@ void run_block_processing_benchmark (boost::program_options::variables_map const
 	node_config.network_params.work = nano::work_thresholds{ 0, 0, 0 };
 	node_config.peering_port = 0; // Use random available port
 	node_config.max_backlog = 0; // Disable bounded backlog
-	node_config.block_processor.max_system_queue = std::numeric_limits<size_t>::max (); // Unlimited queue size
+	node_config.block_processor->max_system_queue = std::numeric_limits<size_t>::max (); // Unlimited queue size
 	node_config.max_unchecked_blocks = 1024 * 1024; // Large unchecked blocks cache to avoid dropping blocks
 
 	auto node = std::make_shared<nano::node> (io_ctx, nano::unique_path (), node_config, work_pool, node_flags);
@@ -110,7 +113,7 @@ void run_block_processing_benchmark (boost::program_options::variables_map const
 	std::cout << "\nSystem Info:\n";
 	fmt::print ("  Backend: {}\n", node->store.vendor_get ());
 	fmt::print ("  Block processor threads: {}\n", 1); // TODO: Log number of block processor threads when upstreamed
-	fmt::print ("  Block processor batch size: {}\n", node->config.block_processor.batch_size);
+	fmt::print ("  Block processor batch size: {}\n", node->config.block_processor->batch_size);
 	std::cout << "\n";
 
 	// Wait for node to be ready

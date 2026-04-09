@@ -1,5 +1,6 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/stats.hpp>
+#include <nano/lib/thread_roles.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>

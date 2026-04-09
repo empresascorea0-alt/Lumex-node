@@ -1,7 +1,9 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
 #include <nano/node/block_processor.hpp>
+#include <nano/node/bootstrap/bootstrap_config.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/ledger_notifications.hpp>
@@ -25,17 +27,22 @@ namespace
 {
 struct cementing_set_context
 {
+	nano::test::ledger_context & ledger_ctx;
+
 	nano::logger & logger;
 	nano::stats & stats;
 	nano::ledger & ledger;
 
+	nano::node_config node_config;
 	nano::ledger_notifications ledger_notifications;
 	nano::cementing_set cementing_set;
 
-	explicit cementing_set_context (nano::test::ledger_context & ledger_context, nano::node_config node_config = {}) :
-		logger{ ledger_context.logger () },
-		stats{ ledger_context.stats () },
-		ledger{ ledger_context.ledger () },
+	explicit cementing_set_context (nano::test::ledger_context & ledger_context_a, nano::node_config node_config_a = {}) :
+		ledger_ctx{ ledger_context_a },
+		logger{ ledger_ctx.logger () },
+		stats{ ledger_ctx.stats () },
+		ledger{ ledger_ctx.ledger () },
+		node_config{ std::move (node_config_a) },
 		ledger_notifications{ node_config, stats, logger },
 		cementing_set{ node_config.cementing_set, ledger, ledger_notifications, stats, logger }
 	{
@@ -100,7 +107,7 @@ TEST (confirmation_callback, observer_callbacks)
 	nano::test::system system;
 	nano::node_flags node_flags;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto node = system.add_node (node_config, node_flags);
 
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
@@ -145,8 +152,8 @@ TEST (confirmation_callback, confirmed_history)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
-	node_config.bootstrap.enable = false;
+	node_config.backlog_scan->enable = false;
+	node_config.bootstrap->enable = false;
 	auto node = system.add_node (node_config);
 
 	nano::block_hash latest (node->latest (nano::dev::genesis_key.pub));
@@ -217,7 +224,7 @@ TEST (confirmation_callback, dependent_election)
 	nano::test::system system;
 	nano::node_flags node_flags;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto node = system.add_node (node_config, node_flags);
 
 	nano::block_hash latest (node->latest (nano::dev::genesis_key.pub));

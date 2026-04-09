@@ -2,6 +2,8 @@
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
+#include <nano/node/block_processor.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
@@ -63,7 +65,7 @@ TEST (ledger_cement, multiple_accounts)
 	nano::test::system system;
 	nano::node_flags node_flags;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto node = system.add_node (node_config, node_flags);
 	nano::keypair key1;
 	nano::keypair key2;
@@ -237,7 +239,7 @@ TEST (ledger_cement, send_receive_between_2_accounts)
 	nano::test::system system;
 	nano::node_flags node_flags;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto node = system.add_node (node_config, node_flags);
 	nano::keypair key1;
 	nano::block_hash latest (node->latest (nano::dev::genesis_key.pub));
@@ -366,7 +368,7 @@ TEST (ledger_cement, send_receive_self)
 	nano::test::system system;
 	nano::node_flags node_flags;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto node = system.add_node (node_config, node_flags);
 	nano::block_hash latest (node->latest (nano::dev::genesis_key.pub));
 
@@ -454,7 +456,7 @@ TEST (ledger_cement, all_block_types)
 	nano::test::system system;
 	nano::node_flags node_flags;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto node = system.add_node (node_config, node_flags);
 	nano::block_hash latest (node->latest (nano::dev::genesis_key.pub));
 	nano::keypair key1;

@@ -1,3 +1,4 @@
+#include <nano/lib/stats.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/node/ledger_notifications.hpp>
 #include <nano/node/nodeconfig.hpp>

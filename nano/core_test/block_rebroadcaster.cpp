@@ -1,7 +1,12 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/block_rebroadcaster.hpp>
+#include <nano/node/bootstrap/bootstrap_config.hpp>
+#include <nano/node/bootstrap/bootstrap_service.hpp>
+#include <nano/node/local_block_broadcaster.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/nodeconfig.hpp>
+#include <nano/node/vote_rebroadcaster.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
 
@@ -230,7 +235,7 @@ TEST (block_rebroadcaster, disabled)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.block_rebroadcaster.enable = false;
+	config.block_rebroadcaster->enable = false;
 	auto & node = *system.add_node (config);
 
 	// Create a block
@@ -256,9 +261,9 @@ TEST (block_rebroadcaster, propagates_to_peer)
 
 	// Configure nodes to isolate block_rebroadcaster as the only broadcasting mechanism
 	nano::node_config config = system.default_config ();
-	config.bootstrap.enable = false;
-	config.vote_rebroadcaster.enable = false;
-	config.local_block_broadcaster.enable = false;
+	config.bootstrap->enable = false;
+	config.vote_rebroadcaster->enable = false;
+	config.local_block_broadcaster->enable = false;
 
 	auto & node_a = *system.add_node (config);
 	auto & node_b = *system.add_node (config);
@@ -306,19 +311,19 @@ TEST (block_rebroadcaster, cooldown)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.block_rebroadcaster.rebroadcast_cooldown = 500ms;
-	config.bootstrap.enable = false;
-	config.vote_rebroadcaster.enable = false;
-	config.local_block_broadcaster.enable = false;
+	config.block_rebroadcaster->rebroadcast_cooldown = 500ms;
+	config.bootstrap->enable = false;
+	config.vote_rebroadcaster->enable = false;
+	config.local_block_broadcaster->enable = false;
 
 	auto & node = *system.add_node (config);
 
 	// Add a peer node with rebroadcaster disabled to avoid interference
 	nano::node_config peer_config = system.default_config ();
-	peer_config.block_rebroadcaster.enable = false;
-	peer_config.bootstrap.enable = false;
-	peer_config.vote_rebroadcaster.enable = false;
-	peer_config.local_block_broadcaster.enable = false;
+	peer_config.block_rebroadcaster->enable = false;
+	peer_config.bootstrap->enable = false;
+	peer_config.vote_rebroadcaster->enable = false;
+	peer_config.local_block_broadcaster->enable = false;
 	auto & peer_node = *system.add_node (peer_config);
 
 	// Create a block
@@ -363,19 +368,19 @@ TEST (block_rebroadcaster, stale_election_rebroadcasts)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.block_rebroadcaster.rebroadcast_cooldown = 100ms; // Short cooldown to allow second rebroadcast
-	config.bootstrap.enable = false;
-	config.vote_rebroadcaster.enable = false;
-	config.local_block_broadcaster.enable = false;
+	config.block_rebroadcaster->rebroadcast_cooldown = 100ms; // Short cooldown to allow second rebroadcast
+	config.bootstrap->enable = false;
+	config.vote_rebroadcaster->enable = false;
+	config.local_block_broadcaster->enable = false;
 
 	auto & node = *system.add_node (config);
 
 	// Add a peer node with rebroadcaster disabled to avoid interference
 	nano::node_config peer_config = system.default_config ();
-	peer_config.block_rebroadcaster.enable = false;
-	peer_config.bootstrap.enable = false;
-	peer_config.vote_rebroadcaster.enable = false;
-	peer_config.local_block_broadcaster.enable = false;
+	peer_config.block_rebroadcaster->enable = false;
+	peer_config.bootstrap->enable = false;
+	peer_config.vote_rebroadcaster->enable = false;
+	peer_config.local_block_broadcaster->enable = false;
 	auto & peer_node = *system.add_node (peer_config);
 
 	// Create a block

@@ -11,6 +11,7 @@
 #include <nano/node/transport/traffic_type.hpp>
 #include <nano/node/unchecked_map.hpp>
 #include <nano/node/vote_with_weight_info.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/qt/qt.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>

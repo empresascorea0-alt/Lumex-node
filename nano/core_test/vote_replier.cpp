@@ -1,8 +1,12 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/stats.hpp>
+#include <nano/lib/vote.hpp>
 #include <nano/messages/confirm.hpp>
+#include <nano/node/backlog_scan.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/nodeconfig.hpp>
+#include <nano/node/scheduler/hinted.hpp>
+#include <nano/node/scheduler/optimistic.hpp>
 #include <nano/node/transport/fake.hpp>
 #include <nano/node/transport/test_channel.hpp>
 #include <nano/node/vote_replier.hpp>
@@ -88,9 +92,9 @@ TEST (vote_replier, block_not_eligible)
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
 	config.enable_voting = true;
-	config.backlog_scan.enable = false;
-	config.hinted_scheduler.enable = false;
-	config.optimistic_scheduler.enable = false;
+	config.backlog_scan->enable = false;
+	config.hinted_scheduler->enable = false;
+	config.optimistic_scheduler->enable = false;
 	auto & node = *system.add_node (config);
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 
@@ -215,7 +219,7 @@ TEST (vote_replier, overfill)
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
 	config.enable_voting = true;
-	config.vote_replier.channel_limit = 1;
+	config.vote_replier->channel_limit = 1;
 	auto & node = *system.add_node (config);
 
 	auto channel = nano::test::fake_channel (node);
@@ -247,7 +251,7 @@ TEST (vote_replier, per_channel_fairness)
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
 	config.enable_voting = true;
-	config.vote_replier.channel_limit = 1;
+	config.vote_replier->channel_limit = 1;
 	auto & node = *system.add_node (config);
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 	node.wallets.refresh_reps ();
@@ -278,9 +282,9 @@ TEST (vote_replier, integration_confirm_req)
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
 	config.enable_voting = true;
-	config.backlog_scan.enable = false;
-	config.hinted_scheduler.enable = false;
-	config.optimistic_scheduler.enable = false;
+	config.backlog_scan->enable = false;
+	config.hinted_scheduler->enable = false;
+	config.optimistic_scheduler->enable = false;
 	auto & node = *system.add_node (config);
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 	node.wallets.refresh_reps ();
