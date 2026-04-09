@@ -1,3 +1,4 @@
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/node/backlog_scan.hpp>
 #include <nano/node/ipc/ipc_server.hpp>

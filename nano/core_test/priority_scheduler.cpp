@@ -1,3 +1,4 @@
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/thread_pool.hpp>
 #include <nano/node/active_elections.hpp>

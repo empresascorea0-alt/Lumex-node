@@ -1,3 +1,4 @@
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/numbers_templ.hpp>
 #include <nano/lib/vote.hpp>

@@ -2,6 +2,7 @@
 #include <nano/boost/stacktrace.hpp>
 #include <nano/crypto_lib/random_pool.hpp>
 #include <nano/lib/block_type.hpp>
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/cli.hpp>
 #include <nano/lib/files.hpp>

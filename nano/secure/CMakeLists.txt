@@ -7,6 +7,8 @@ add_library(
   account_iterator_impl.hpp
   common.hpp
   common.cpp
+  endpoint_key.hpp
+  endpoint_key.cpp
   fwd.hpp
   generate_cache_flags.hpp
   ledger.hpp

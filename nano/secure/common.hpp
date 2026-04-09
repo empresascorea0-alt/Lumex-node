@@ -1,54 +1,16 @@
 #pragma once
 
-#include <nano/crypto/blake2/blake2.h>
-#include <nano/lib/blockbuilders.hpp>
-#include <nano/lib/config.hpp>
 #include <nano/lib/constants.hpp>
 #include <nano/lib/epochs.hpp>
 #include <nano/lib/fwd.hpp>
 #include <nano/lib/keypair.hpp>
-#include <nano/lib/network_types.hpp>
 #include <nano/lib/numbers.hpp>
-#include <nano/lib/object_stream.hpp>
-#include <nano/lib/timer.hpp>
-#include <nano/lib/utility.hpp>
-#include <nano/store/block_w_sideband.hpp>
 
 #include <array>
-#include <unordered_map>
+#include <memory>
 
 namespace nano
 {
-class endpoint_key final
-{
-public:
-	endpoint_key () = default;
-	endpoint_key (nano::endpoint const &);
-
-	/*
-	 * @param address_a This should be in network byte order
-	 * @param port_a This should be in host byte order
-	 */
-	endpoint_key (std::array<uint8_t, 16> const & address_a, uint16_t port_a);
-
-	/*
-	 * @return The ipv6 address in network byte order
-	 */
-	std::array<uint8_t, 16> const & address_bytes () const;
-
-	/*
-	 * @return The port in host byte order
-	 */
-	uint16_t port () const;
-
-	nano::endpoint endpoint () const;
-
-private:
-	// Both stored internally in network byte order
-	std::array<uint8_t, 16> address;
-	uint16_t network_port{ 0 };
-};
-
 enum class no_value
 {
 	dummy

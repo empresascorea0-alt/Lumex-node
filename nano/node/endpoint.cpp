@@ -1,3 +1,4 @@
+#include <nano/crypto/blake2/blake2.h>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/memory.hpp>
 #include <nano/lib/stream.hpp>
