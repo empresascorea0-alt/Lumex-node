@@ -2,6 +2,7 @@
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/transport/fake.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <boost/format.hpp>
 

@@ -1,3 +1,4 @@
+#include <nano/lib/config.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/node/make_store.hpp>

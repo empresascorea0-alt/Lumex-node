@@ -5,6 +5,7 @@
 #include <nano/lib/work_version.hpp>
 #include <nano/messages/messages.hpp>
 #include <nano/node/endpoint.hpp>
+#include <nano/secure/network_params.hpp>
 #include <nano/test_common/testutil.hpp>
 
 #include <gtest/gtest.h>

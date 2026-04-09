@@ -7,6 +7,7 @@
 #include <nano/secure/common.hpp>
 #include <nano/secure/fwd.hpp>
 #include <nano/secure/generate_cache_flags.hpp>
+#include <nano/secure/network_params.hpp>
 #include <nano/secure/pending_info.hpp>
 #include <nano/secure/rep_weights.hpp>
 #include <nano/secure/transaction.hpp>

@@ -8,6 +8,7 @@
 #include <nano/node/endpoint.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/wallet.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <boost/format.hpp>
 

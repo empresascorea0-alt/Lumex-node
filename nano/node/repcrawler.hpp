@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nano/lib/constants.hpp>
 #include <nano/lib/locks.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/numbers_templ.hpp>
@@ -21,6 +22,8 @@
 #include <memory>
 #include <thread>
 #include <unordered_set>
+
+using namespace std::chrono_literals;
 
 namespace mi = boost::multi_index;
 

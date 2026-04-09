@@ -7,6 +7,7 @@
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/websocket.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <boost/algorithm/string/erase.hpp>
 #include <boost/format.hpp>

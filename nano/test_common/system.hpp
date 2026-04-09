@@ -8,6 +8,7 @@
 #include <nano/node/fwd.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/transport/channel.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <chrono>
 #include <optional>

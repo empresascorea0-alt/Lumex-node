@@ -9,6 +9,7 @@
 #include <nano/node/fwd.hpp>
 #include <nano/secure/common.hpp>
 #include <nano/secure/generate_cache_flags.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <chrono>
 #include <filesystem>

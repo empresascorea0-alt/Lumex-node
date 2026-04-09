@@ -1,6 +1,7 @@
 #include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/secure/common.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <gtest/gtest.h>
 

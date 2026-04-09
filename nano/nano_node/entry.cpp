@@ -6,6 +6,8 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/cli.hpp>
 #include <nano/lib/files.hpp>
+#include <nano/lib/logging.hpp>
+#include <nano/lib/networks.hpp>
 #include <nano/lib/runtime_files.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/utility.hpp>

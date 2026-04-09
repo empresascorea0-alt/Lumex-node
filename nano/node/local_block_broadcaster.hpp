@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/constants.hpp>
 #include <nano/lib/interval.hpp>
 #include <nano/lib/locks.hpp>
 #include <nano/lib/numbers.hpp>
@@ -18,10 +19,12 @@
 #include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index_container.hpp>
 
+#include <chrono>
 #include <memory>
 #include <thread>
 #include <unordered_set>
 
+using namespace std::chrono_literals;
 namespace mi = boost::multi_index;
 
 namespace nano

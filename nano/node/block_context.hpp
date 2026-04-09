@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nano/lib/assert.hpp>
 #include <nano/node/block_source.hpp>
 #include <nano/secure/common.hpp>
 

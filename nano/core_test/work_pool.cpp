@@ -9,6 +9,7 @@
 #include <nano/node/openclconfig.hpp>
 #include <nano/node/openclwork.hpp>
 #include <nano/secure/common.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <gtest/gtest.h>
 

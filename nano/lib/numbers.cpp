@@ -5,6 +5,7 @@
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/secure/common.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <boost/io/ios_state.hpp>
 

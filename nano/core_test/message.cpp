@@ -5,6 +5,7 @@
 #include <nano/lib/vote.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/network.hpp>
+#include <nano/secure/network_params.hpp>
 #include <nano/test_common/random.hpp>
 #include <nano/test_common/testutil.hpp>
 

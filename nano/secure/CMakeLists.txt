@@ -10,6 +10,8 @@ add_library(
   endpoint_key.hpp
   endpoint_key.cpp
   fwd.hpp
+  network_params.hpp
+  network_params.cpp
   generate_cache_flags.hpp
   ledger.hpp
   ledger.cpp
