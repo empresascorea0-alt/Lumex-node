@@ -1,18 +1,13 @@
 #pragma once
 
-#include <nano/lib/assert.hpp>
-
 #include <boost/functional/hash_fwd.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 
-#include <algorithm>
 #include <array>
 #include <compare>
+#include <iosfwd>
 #include <limits>
-#include <ostream>
 #include <string_view>
-
-#include <fmt/ostream.h>
 
 namespace nano
 {
@@ -368,11 +363,7 @@ class link final : public hash_or_account
 public:
 	using hash_or_account::hash_or_account;
 
-	explicit link (std::string_view str)
-	{
-		release_assert (str.size () <= bytes.size ());
-		std::copy_n (str.data (), str.size (), bytes.begin ());
-	}
+	explicit link (std::string_view str);
 
 public: // Keep operators inlined
 	auto operator<=> (nano::link const & other) const

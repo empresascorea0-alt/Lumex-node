@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nano/lib/container_info.hpp>
 #include <nano/lib/interval.hpp>
 #include <nano/lib/locks.hpp>
 #include <nano/lib/utility.hpp>

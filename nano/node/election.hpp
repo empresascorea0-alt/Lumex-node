@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nano/lib/id_dispenser.hpp>
+#include <nano/lib/locks.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/numbers_templ.hpp>

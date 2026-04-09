@@ -1,3 +1,4 @@
+#include <nano/lib/container_info.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/node/recently_confirmed_cache.hpp>
 

@@ -1,13 +1,10 @@
 #pragma once
 
 #include <nano/lib/assert.hpp>
-#include <nano/lib/container_info.hpp>
-#include <nano/lib/locks.hpp>
 
 #include <boost/lexical_cast.hpp>
 
 #include <deque>
-#include <functional>
 #include <sstream>
 #include <vector>
 

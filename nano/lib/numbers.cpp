@@ -8,6 +8,9 @@
 
 #include <boost/io/ios_state.hpp>
 
+#include <algorithm>
+#include <ostream>
+
 #include <crypto/ed25519-donna/ed25519.h>
 #include <cryptopp/aes.h>
 #include <cryptopp/modes.h>
@@ -598,6 +601,10 @@ std::string nano::uint128_union::format_balance (nano::uint128_t scale, int prec
 	return stream.str ();
 }
 
+/*
+ * hash_or_account
+ */
+
 bool nano::hash_or_account::decode_hex (std::string const & text_a)
 {
 	return raw.decode_hex (text_a);
@@ -616,6 +623,16 @@ std::string nano::hash_or_account::to_string () const
 std::string nano::hash_or_account::to_account () const
 {
 	return account.to_account ();
+}
+
+/*
+ * link
+ */
+
+nano::link::link (std::string_view str)
+{
+	release_assert (str.size () <= bytes.size ());
+	std::copy_n (str.data (), str.size (), bytes.begin ());
 }
 
 /*

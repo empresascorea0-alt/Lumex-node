@@ -5,6 +5,7 @@
 #include <boost/system/error_code.hpp>
 
 #include <concepts>
+#include <ostream>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>

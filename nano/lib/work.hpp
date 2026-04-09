@@ -10,6 +10,7 @@
 #include <boost/optional.hpp>
 
 #include <atomic>
+#include <list>
 #include <memory>
 #include <thread>
 
