@@ -1,4 +1,5 @@
 #include <nano/lib/object_stream.hpp>
+#include <nano/messages/messages.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/transport/channel.hpp>

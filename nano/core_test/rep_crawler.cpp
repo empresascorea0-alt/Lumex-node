@@ -4,6 +4,7 @@
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/vote.hpp>
+#include <nano/messages/confirm.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/nodeconfig.hpp>

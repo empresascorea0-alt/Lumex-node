@@ -4,7 +4,8 @@
 #include <nano/lib/fwd.hpp>
 #include <nano/lib/interval.hpp>
 #include <nano/lib/network_filter.hpp>
-#include <nano/messages/messages.hpp>
+#include <nano/messages/fwd.hpp>
+#include <nano/messages/node_id_handshake.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/peer_exclusion.hpp>
 #include <nano/node/transport/common.hpp>

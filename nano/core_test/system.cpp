@@ -2,6 +2,7 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/work_version.hpp>
+#include <nano/messages/keepalive.hpp>
 #include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/node/wallet.hpp>

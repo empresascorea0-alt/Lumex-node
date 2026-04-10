@@ -1,6 +1,7 @@
 #include <nano/lib/logging.hpp>
 #include <nano/lib/stats_enums.hpp>
 #include <nano/lib/thread_roles.hpp>
+#include <nano/messages/asc_pull.hpp>
 #include <nano/node/bootstrap/dependency_strategy.hpp>
 #include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/formatting.hpp>

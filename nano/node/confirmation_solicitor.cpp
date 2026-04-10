@@ -1,4 +1,6 @@
 #include <nano/lib/blocks.hpp>
+#include <nano/messages/confirm.hpp>
+#include <nano/messages/publish.hpp>
 #include <nano/node/confirmation_solicitor.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/nodeconfig.hpp>

@@ -5,6 +5,7 @@
 #include <nano/lib/thread_pool.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/utility.hpp>
+#include <nano/messages/messages.hpp>
 #include <nano/node/message_processor.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>

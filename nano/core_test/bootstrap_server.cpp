@@ -1,4 +1,5 @@
 #include <nano/lib/blocks.hpp>
+#include <nano/messages/asc_pull.hpp>
 #include <nano/node/bootstrap/bootstrap_server.hpp>
 #include <nano/node/transport/fake.hpp>
 #include <nano/test_common/chains.hpp>

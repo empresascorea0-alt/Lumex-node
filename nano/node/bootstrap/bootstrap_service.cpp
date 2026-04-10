@@ -1,3 +1,4 @@
+#include <nano/messages/asc_pull.hpp>
 #include <nano/node/bootstrap/bootstrap_context.hpp>
 #include <nano/node/bootstrap/bootstrap_service.hpp>
 

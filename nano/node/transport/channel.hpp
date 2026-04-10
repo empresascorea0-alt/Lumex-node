@@ -4,7 +4,8 @@
 #include <nano/lib/locks.hpp>
 #include <nano/lib/node_capabilities.hpp>
 #include <nano/lib/stats.hpp>
-#include <nano/messages/messages.hpp>
+#include <nano/messages/fwd.hpp>
+#include <nano/messages/keepalive.hpp>
 #include <nano/node/bandwidth_limiter.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/transport/tcp_socket.hpp>

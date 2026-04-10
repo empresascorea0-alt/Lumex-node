@@ -7,6 +7,7 @@
 #include <nano/lib/logging.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/lib/work.hpp>
+#include <nano/messages/telemetry.hpp>
 #include <nano/node/election_status.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/node_observers.hpp>

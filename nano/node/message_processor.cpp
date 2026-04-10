@@ -2,6 +2,7 @@
 #include <nano/lib/stats.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/vote.hpp>
+#include <nano/messages/messages.hpp>
 #include <nano/node/block_processor.hpp>
 #include <nano/node/bootstrap/bootstrap_server.hpp>
 #include <nano/node/bootstrap/bootstrap_service.hpp>

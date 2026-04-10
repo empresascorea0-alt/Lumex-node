@@ -1,3 +1,4 @@
+#include <nano/messages/keepalive.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/tcp_server.hpp>
