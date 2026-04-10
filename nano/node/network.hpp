@@ -1,8 +1,8 @@
 #pragma once
 
 #include <nano/lib/constants.hpp>
+#include <nano/lib/fwd.hpp>
 #include <nano/lib/interval.hpp>
-#include <nano/lib/logging.hpp>
 #include <nano/lib/network_filter.hpp>
 #include <nano/messages/messages.hpp>
 #include <nano/node/endpoint.hpp>

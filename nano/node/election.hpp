@@ -2,7 +2,6 @@
 
 #include <nano/lib/id_dispenser.hpp>
 #include <nano/lib/locks.hpp>
-#include <nano/lib/logging.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/numbers_templ.hpp>
 #include <nano/lib/stats_enums.hpp>
@@ -12,6 +11,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <map>
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>

@@ -4,6 +4,8 @@
 #include <nano/lib/lmdbconfig.hpp>
 #include <nano/store/lmdb/transaction_lmdb.hpp>
 
+#include <filesystem>
+
 namespace nano::store::lmdb
 {
 /**

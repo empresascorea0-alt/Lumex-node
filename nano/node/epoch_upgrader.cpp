@@ -1,5 +1,6 @@
 #include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/thread_pool.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/work_version.hpp>

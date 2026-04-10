@@ -3,6 +3,7 @@
 #include <nano/lib/block_type.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/interval.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/node/election_status.hpp>
 #include <nano/node/node.hpp>

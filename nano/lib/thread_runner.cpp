@@ -1,3 +1,4 @@
+#include <nano/lib/logging.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/timer.hpp>
 

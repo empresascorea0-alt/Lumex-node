@@ -1,4 +1,5 @@
 #include <nano/lib/formatting.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/node/active_elections.hpp>

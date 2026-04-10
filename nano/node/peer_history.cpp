@@ -1,3 +1,4 @@
+#include <nano/lib/logging.hpp>
 #include <nano/lib/network_formatting.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/node/network.hpp>

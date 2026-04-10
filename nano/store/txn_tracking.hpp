@@ -3,7 +3,6 @@
 #include <nano/lib/errors.hpp>
 #include <nano/lib/fwd.hpp>
 #include <nano/lib/locks.hpp>
-#include <nano/lib/logging.hpp>
 #include <nano/lib/timer.hpp>
 #include <nano/store/transaction.hpp>
 

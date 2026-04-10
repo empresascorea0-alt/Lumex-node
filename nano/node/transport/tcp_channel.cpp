@@ -1,3 +1,4 @@
+#include <nano/lib/object_stream.hpp>
 #include <nano/lib/stacktrace.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/lib/utility.hpp>

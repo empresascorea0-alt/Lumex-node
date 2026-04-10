@@ -4,7 +4,7 @@
 #include <nano/boost/asio/strand.hpp>
 #include <nano/boost/beast/core/flat_buffer.hpp>
 #include <nano/boost/beast/http.hpp>
-#include <nano/lib/logging.hpp>
+#include <nano/lib/fwd.hpp>
 
 #include <boost/algorithm/string/predicate.hpp>
 

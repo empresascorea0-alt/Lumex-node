@@ -1,5 +1,6 @@
 #include <nano/boost/process/child.hpp>
 #include <nano/lib/files.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/memory.hpp>
 #include <nano/lib/runtime_files.hpp>
 #include <nano/lib/signal_manager.hpp>

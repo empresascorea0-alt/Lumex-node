@@ -1,5 +1,6 @@
 #include <nano/lib/assert.hpp>
 #include <nano/lib/interval.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/numbers_templ.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/vote.hpp>

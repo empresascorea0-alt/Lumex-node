@@ -1,7 +1,6 @@
 #pragma once
 
 #include <nano/lib/lmdbconfig.hpp>
-#include <nano/lib/logging.hpp>
 #include <nano/store/backend.hpp>
 #include <nano/store/lmdb/lmdb_env.hpp>
 #include <nano/store/lmdb/transaction_lmdb.hpp>

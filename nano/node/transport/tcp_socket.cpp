@@ -1,6 +1,7 @@
 #include <nano/boost/asio/bind_executor.hpp>
 #include <nano/boost/asio/read.hpp>
 #include <nano/lib/enum_util.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/network_formatting.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/nodeconfig.hpp>

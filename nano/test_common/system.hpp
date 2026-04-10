@@ -2,6 +2,7 @@
 
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/errors.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/work.hpp>

@@ -3,6 +3,7 @@
 #include <nano/lib/files.hpp>
 #include <nano/lib/interval.hpp>
 #include <nano/lib/locks.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/timer.hpp>

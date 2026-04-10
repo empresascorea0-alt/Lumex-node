@@ -1,13 +1,9 @@
+#include <nano/lib/object_stream.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/transport/channel.hpp>
 #include <nano/node/transport/transport.hpp>
 #include <nano/secure/network_params.hpp>
-
-#include <boost/asio/ip/address.hpp>
-#include <boost/asio/ip/address_v4.hpp>
-#include <boost/asio/ip/address_v6.hpp>
-#include <boost/format.hpp>
 
 nano::transport::channel::channel (nano::node & node_a) :
 	node{ node_a }

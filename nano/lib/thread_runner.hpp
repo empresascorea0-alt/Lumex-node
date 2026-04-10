@@ -1,7 +1,7 @@
 #pragma once
 #include <nano/boost/asio/executor_work_guard.hpp>
 #include <nano/boost/asio/io_context.hpp>
-#include <nano/lib/logging.hpp>
+#include <nano/lib/fwd.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/threading.hpp>
 

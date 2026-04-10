@@ -14,6 +14,7 @@
 #include <boost/property_tree/ptree_fwd.hpp>
 
 #include <chrono>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <memory>

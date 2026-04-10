@@ -1,5 +1,6 @@
 #include <nano/lib/enum_util.hpp>
 #include <nano/lib/interval.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/network_formatting.hpp>
 #include <nano/lib/thread_pool.hpp>
 #include <nano/messages/messages.hpp>

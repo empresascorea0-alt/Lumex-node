@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nano/lib/logging.hpp>
+#include <nano/lib/fwd.hpp>
 
 #include <boost/property_tree/ptree.hpp>
 

@@ -6,6 +6,7 @@
 #include <nano/lib/config.hpp>
 #include <nano/lib/ipc.hpp>
 #include <nano/lib/locks.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/threading.hpp>

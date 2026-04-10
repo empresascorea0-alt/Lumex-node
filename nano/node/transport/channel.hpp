@@ -1,8 +1,8 @@
 #pragma once
 
+#include <nano/lib/fwd.hpp>
 #include <nano/lib/locks.hpp>
 #include <nano/lib/node_capabilities.hpp>
-#include <nano/lib/object_stream.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/messages/messages.hpp>
 #include <nano/node/bandwidth_limiter.hpp>

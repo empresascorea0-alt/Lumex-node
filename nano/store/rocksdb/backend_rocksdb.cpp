@@ -1,4 +1,5 @@
 #include <nano/lib/files.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/store/rocksdb/backend_rocksdb.hpp>
 #include <nano/store/rocksdb/iterator.hpp>
 #include <nano/store/rocksdb/transaction_rocksdb.hpp>

@@ -1,6 +1,7 @@
 #include <nano/lib/files.hpp>
 #include <nano/lib/jsonconfig.hpp>
 #include <nano/lib/lmdbconfig.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/rocksdbconfig.hpp>
 #include <nano/lib/rpcconfig.hpp>
 #include <nano/lib/tomlconfig.hpp>

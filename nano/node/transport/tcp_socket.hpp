@@ -2,7 +2,6 @@
 
 #include <nano/lib/asio.hpp>
 #include <nano/lib/async.hpp>
-#include <nano/lib/logging.hpp>
 #include <nano/lib/network_types.hpp>
 #include <nano/node/fwd.hpp>
 #include <nano/node/transport/common.hpp>

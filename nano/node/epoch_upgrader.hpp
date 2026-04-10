@@ -2,7 +2,6 @@
 
 #include <nano/lib/fwd.hpp>
 #include <nano/lib/locks.hpp>
-#include <nano/lib/logging.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/node/fwd.hpp>
 #include <nano/secure/fwd.hpp>

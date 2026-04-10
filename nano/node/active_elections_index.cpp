@@ -1,3 +1,4 @@
+#include <nano/lib/assert.hpp>
 #include <nano/node/active_elections_index.hpp>
 #include <nano/node/election.hpp>
 

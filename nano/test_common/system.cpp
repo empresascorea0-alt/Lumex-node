@@ -3,6 +3,7 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/formatting.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/active_elections.hpp>
