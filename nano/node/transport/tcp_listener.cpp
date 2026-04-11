@@ -1,7 +1,13 @@
 #include <nano/lib/enum_util.hpp>
 #include <nano/lib/interval.hpp>
+#include <nano/lib/logging.hpp>
+#include <nano/lib/network_formatting.hpp>
+#include <nano/lib/thread_pool.hpp>
 #include <nano/messages/messages.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/node_observers.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/tcp_listener.hpp>
 #include <nano/node/transport/tcp_server.hpp>
 #include <nano/node/transport/transport.hpp>
@@ -471,7 +477,7 @@ auto nano::transport::tcp_listener::check_limits (asio::ip::address const & ip, 
 
 	if (!node.flags.disable_max_peers_per_ip)
 	{
-		if (auto count = count_per_ip (ip); count >= node.config.network.max_peers_per_ip)
+		if (auto count = count_per_ip (ip); count >= node.config.network->max_peers_per_ip)
 		{
 			stats.inc (nano::stat::type::tcp_listener_rejected, nano::stat::detail::max_per_ip, to_stat_dir (type));
 			logger.debug (nano::log::type::tcp_listener, "Max connections: {} per IP: {} reached, unable to open a new connection ({})",
@@ -484,7 +490,7 @@ auto nano::transport::tcp_listener::check_limits (asio::ip::address const & ip, 
 	// If the address is IPv4 we don't check for a subnetwork limit, since its address space isn't big as IPv6/64.
 	if (!node.flags.disable_max_peers_per_subnetwork && !nano::transport::is_ipv4_or_v4_mapped_address (ip))
 	{
-		if (auto count = count_per_subnetwork (ip); count >= node.config.network.max_peers_per_subnetwork)
+		if (auto count = count_per_subnetwork (ip); count >= node.config.network->max_peers_per_subnetwork)
 		{
 			stats.inc (nano::stat::type::tcp_listener_rejected, nano::stat::detail::max_per_subnetwork, to_stat_dir (type));
 			logger.debug (nano::log::type::tcp_listener, "Max connections: {} per subnetwork of IP: {} reached, unable to open a new connection ({})",

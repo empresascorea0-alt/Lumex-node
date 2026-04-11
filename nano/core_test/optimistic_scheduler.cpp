@@ -1,6 +1,9 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/nodeconfig.hpp>
+#include <nano/node/scheduler/priority.hpp>
 #include <nano/node/vote_router.hpp>
 #include <nano/test_common/chains.hpp>
 #include <nano/test_common/system.hpp>
@@ -20,7 +23,7 @@ TEST (optimistic_scheduler, activate_one)
 	nano::test::system system;
 
 	nano::node_config config;
-	config.priority_scheduler.enable = false; // Disable priority scheduler to avoid interference
+	config.priority_scheduler->enable = false; // Disable priority scheduler to avoid interference
 	auto & node = *system.add_node (config);
 
 	// Needs to be greater than optimistic scheduler `gap_threshold`
@@ -47,7 +50,7 @@ TEST (optimistic_scheduler, activate_one_zero_conf)
 	nano::test::system system;
 
 	nano::node_config config;
-	config.priority_scheduler.enable = false; // Disable priority scheduler to avoid interference
+	config.priority_scheduler->enable = false; // Disable priority scheduler to avoid interference
 	auto & node = *system.add_node (config);
 
 	// Can be smaller than optimistic scheduler `gap_threshold`
@@ -72,7 +75,7 @@ TEST (optimistic_scheduler, activate_many)
 	nano::test::system system;
 
 	nano::node_config config;
-	config.priority_scheduler.enable = false; // Disable priority scheduler to avoid interference
+	config.priority_scheduler->enable = false; // Disable priority scheduler to avoid interference
 	auto & node = *system.add_node (config);
 
 	// Needs to be greater than optimistic scheduler `gap_threshold`
@@ -98,7 +101,7 @@ TEST (optimistic_scheduler, under_gap_threshold)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto & node = *system.add_node (config);
 
 	// Must be smaller than optimistic scheduler `gap_threshold`

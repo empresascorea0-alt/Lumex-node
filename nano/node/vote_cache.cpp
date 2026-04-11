@@ -1,4 +1,5 @@
 #include <nano/lib/numbers_templ.hpp>
+#include <nano/lib/stats.hpp>
 #include <nano/lib/tomlconfig.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/election.hpp>

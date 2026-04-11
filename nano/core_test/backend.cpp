@@ -1,5 +1,6 @@
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
+#include <nano/secure/network_params.hpp>
 #include <nano/store/backend.hpp>
 #include <nano/store/db_val.hpp>
 #include <nano/store/db_val_templ.hpp>

@@ -1,3 +1,4 @@
+#include <nano/crypto/blake2/blake2.h>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/memory.hpp>
 #include <nano/lib/stream.hpp>
@@ -7,6 +8,7 @@
 #include <nano/node/endpoint.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/wallet.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <boost/format.hpp>
 

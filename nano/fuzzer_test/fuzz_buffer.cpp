@@ -1,3 +1,4 @@
+#include <nano/messages/messages.hpp>
 #include <nano/node/common.hpp>
 #include <nano/node/testing.hpp>
 

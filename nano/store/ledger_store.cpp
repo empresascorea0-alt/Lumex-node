@@ -5,6 +5,7 @@
 #include <nano/lib/logging.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/lib/stream.hpp>
+#include <nano/secure/network_params.hpp>
 #include <nano/store/backend.hpp>
 #include <nano/store/db_val_templ.hpp>
 #include <nano/store/ledger/account.hpp>

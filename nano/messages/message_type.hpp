@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nano/lib/logging.hpp>
+#include <nano/lib/logging_enums.hpp>
 #include <nano/lib/stats_enums.hpp>
 
 #include <cstdint>

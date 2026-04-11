@@ -1,4 +1,5 @@
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/container_info.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/node/recently_cemented_cache.hpp>
 

@@ -1,15 +1,20 @@
 #pragma once
 
+#include <nano/lib/numbers.hpp>
+#include <nano/lib/numbers_templ.hpp>
 #include <nano/lib/utility.hpp>
-#include <nano/messages/messages.hpp>
+#include <nano/messages/telemetry.hpp>
 #include <nano/node/endpoint.hpp>
+#include <nano/node/endpoint_templ.hpp>
 #include <nano/node/fwd.hpp>
-#include <nano/node/nodeconfig.hpp>
+#include <nano/node/transport/channel.hpp>
 #include <nano/secure/common.hpp>
 
 #include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index_container.hpp>
 
 #include <functional>
@@ -28,10 +33,7 @@ public:
 	bool enable_ongoing_broadcasts{ true };
 
 public:
-	explicit telemetry_config (nano::node_flags const & flags) :
-		enable_ongoing_broadcasts{ !flags.disable_providing_telemetry_metrics }
-	{
-	}
+	explicit telemetry_config (nano::node_flags const & flags);
 };
 
 /**

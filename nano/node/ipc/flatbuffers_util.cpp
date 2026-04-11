@@ -1,3 +1,4 @@
+#include <nano/lib/assert.hpp>
 #include <nano/lib/block_type.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/numbers.hpp>

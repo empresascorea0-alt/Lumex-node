@@ -1,4 +1,5 @@
 #include <nano/crypto_lib/random_pool.hpp>
+#include <nano/lib/assert.hpp>
 #include <nano/lib/keypair.hpp>
 
 #include <crypto/ed25519-donna/ed25519.h>

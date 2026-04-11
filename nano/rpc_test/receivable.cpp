@@ -1,5 +1,9 @@
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/node/backlog_scan.hpp>
 #include <nano/node/ipc/ipc_server.hpp>
+#include <nano/node/nodeconfig.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/rpc/rpc_request_processor.hpp>
 #include <nano/rpc_test/common.hpp>
 #include <nano/rpc_test/rpc_context.hpp>
@@ -10,6 +14,8 @@
 #include <nano/test_common/testutil.hpp>
 
 #include <gtest/gtest.h>
+
+#include <boost/property_tree/json_parser.hpp>
 
 using namespace nano::test;
 
@@ -134,7 +140,7 @@ TEST (rpc, receivable_unconfirmed)
 {
 	nano::test::system system;
 	nano::node_config config;
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto node = add_ipc_enabled_node (system, config);
 	auto chain = nano::test::setup_chain (system, *node, 1, nano::dev::genesis_key, false);
 	auto block1 = chain[0];
@@ -531,7 +537,7 @@ TEST (rpc, accounts_receivable_confirmed)
 {
 	nano::test::system system;
 	nano::node_config config;
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto node = add_ipc_enabled_node (system, config);
 	auto chain = nano::test::setup_chain (system, *node, 1, nano::dev::genesis_key, false);
 	auto block1 = chain[0];

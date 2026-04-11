@@ -1,11 +1,11 @@
 #pragma once
 
-#include <nano/lib/common.hpp>
 #include <nano/lib/numbers.hpp>
 
 #include <boost/system/error_code.hpp>
 
 #include <concepts>
+#include <ostream>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
@@ -23,19 +23,6 @@ struct fmt::formatter<T> : fmt::formatter<std::string_view>
 	{
 		return fmt::formatter<std::string_view>::format (to_string (value), ctx);
 	}
-};
-
-template <>
-struct fmt::formatter<nano::endpoint> : fmt::ostream_formatter
-{
-};
-template <>
-struct fmt::formatter<nano::ip_address> : fmt::ostream_formatter
-{
-};
-template <>
-struct fmt::formatter<boost::asio::ip::address_v4> : fmt::ostream_formatter
-{
 };
 
 template <>
@@ -137,22 +124,14 @@ struct as_nano_formatter
 	nano::uint128_t const & value;
 	int precision{ 1 };
 
-	friend std::ostream & operator<< (std::ostream & os, as_nano_formatter const & wrapper)
-	{
-		nano::encode_balance (os, wrapper.value, nano::nano_ratio, wrapper.precision, true);
-		return os;
-	}
+	friend std::ostream & operator<< (std::ostream & os, as_nano_formatter const & wrapper);
 };
 
 struct as_raw_nano_formatter
 {
 	nano::uint128_t const & value;
 
-	friend std::ostream & operator<< (std::ostream & os, as_raw_nano_formatter const & wrapper)
-	{
-		os << wrapper.value;
-		return os;
-	}
+	friend std::ostream & operator<< (std::ostream & os, as_raw_nano_formatter const & wrapper);
 };
 
 inline auto as_account (nano::public_key const & key)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nano/lib/network_types.hpp>
 #include <nano/secure/common.hpp>
 
 #include <cstdint>

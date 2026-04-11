@@ -1,8 +1,11 @@
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/jsonconfig.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/block_rebroadcaster.hpp>
 #include <nano/node/confirmation_solicitor.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
@@ -19,10 +22,10 @@ TEST (confirmation_solicitor, batches)
 	node_flags.disable_request_loop = true;
 	node_flags.disable_rep_crawler = true;
 	nano::node_config config1 = system.default_config ();
-	config1.block_rebroadcaster.enable = false;
+	config1.block_rebroadcaster->enable = false;
 	auto & node1 = *system.add_node (config1, node_flags);
 	nano::node_config config2 = system.default_config ();
-	config2.block_rebroadcaster.enable = false;
+	config2.block_rebroadcaster->enable = false;
 	auto & node2 = *system.add_node (config2, node_flags);
 	auto channel1 = nano::test::establish_tcp (system, node2, node1.network.endpoint ());
 	// Solicitor will only solicit from this representative
@@ -70,10 +73,10 @@ TEST (confirmation_solicitor, different_hash)
 	node_flags.disable_request_loop = true;
 	node_flags.disable_rep_crawler = true;
 	nano::node_config config1 = system.default_config ();
-	config1.block_rebroadcaster.enable = false;
+	config1.block_rebroadcaster->enable = false;
 	auto & node1 = *system.add_node (config1, node_flags);
 	nano::node_config config2 = system.default_config ();
-	config2.block_rebroadcaster.enable = false;
+	config2.block_rebroadcaster->enable = false;
 	auto & node2 = *system.add_node (config2, node_flags);
 	auto channel1 = nano::test::establish_tcp (system, node2, node1.network.endpoint ());
 	// Solicitor will only solicit from this representative

@@ -1,25 +1,46 @@
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
-#include <nano/lib/logging.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/lib/work_version.hpp>
+#include <nano/messages/messages.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
+#include <nano/node/block_processor.hpp>
+#include <nano/node/block_rebroadcaster.hpp>
+#include <nano/node/bootstrap/bootstrap_config.hpp>
+#include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/inactive_node.hpp>
+#include <nano/node/local_block_broadcaster.hpp>
 #include <nano/node/local_vote_history.hpp>
-#include <nano/node/make_store.hpp>
+#include <nano/node/network.hpp>
+#include <nano/node/node_observers.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
+#include <nano/node/peer_history.hpp>
 #include <nano/node/portmapping.hpp>
 #include <nano/node/pruning.hpp>
+#include <nano/node/repcrawler.hpp>
 #include <nano/node/scheduler/component.hpp>
+#include <nano/node/scheduler/hinted.hpp>
 #include <nano/node/scheduler/manual.hpp>
+#include <nano/node/scheduler/optimistic.hpp>
 #include <nano/node/scheduler/priority.hpp>
 #include <nano/node/transport/fake.hpp>
 #include <nano/node/transport/inproc.hpp>
+#include <nano/node/transport/tcp_config.hpp>
 #include <nano/node/transport/tcp_listener.hpp>
+#include <nano/node/unchecked_map.hpp>
+#include <nano/node/vote_cache.hpp>
 #include <nano/node/vote_generator.hpp>
+#include <nano/node/vote_processor.hpp>
+#include <nano/node/vote_rebroadcaster.hpp>
+#include <nano/node/vote_replier.hpp>
 #include <nano/node/vote_router.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>
@@ -27,6 +48,7 @@
 #include <nano/store/ledger/peer.hpp>
 #include <nano/store/ledger/pruned.hpp>
 #include <nano/test_common/chains.hpp>
+#include <nano/test_common/make_store.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
@@ -87,7 +109,7 @@ TEST (node, block_store_path_failure)
 	nano::test::system system;
 	auto path (nano::unique_path ());
 	nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
-	auto node (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), path, pool));
+	auto node (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), path, pool, nano::node_flags{}));
 	system.register_node (node);
 	ASSERT_TRUE (node->wallets.items.empty ());
 }
@@ -261,8 +283,9 @@ TEST (node, node_receive_quorum)
 TEST (node, auto_bootstrap)
 {
 	nano::test::system system;
-	nano::node_config config (system.get_available_port ());
-	config.backlog_scan.enable = false;
+	nano::node_config config;
+	config.peering_port = system.get_available_port ();
+	config.backlog_scan->enable = false;
 	nano::node_flags node_flags;
 	node_flags.disable_bootstrap_bulk_push_client = true;
 	node_flags.disable_lazy_bootstrap = true;
@@ -288,8 +311,9 @@ TEST (node, auto_bootstrap)
 TEST (node, auto_bootstrap_reverse)
 {
 	nano::test::system system;
-	nano::node_config config (system.get_available_port ());
-	config.backlog_scan.enable = false;
+	nano::node_config config;
+	config.peering_port = system.get_available_port ();
+	config.backlog_scan->enable = false;
 	nano::node_flags node_flags;
 	node_flags.disable_bootstrap_bulk_push_client = true;
 	node_flags.disable_lazy_bootstrap = true;
@@ -360,8 +384,9 @@ TEST (node, search_receivable_multiple)
 TEST (node, search_receivable_confirmed)
 {
 	nano::test::system system;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.backlog_scan.enable = false;
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.backlog_scan->enable = false;
 	auto node = system.add_node (node_config);
 	nano::keypair key2;
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
@@ -386,12 +411,14 @@ TEST (node, search_receivable_confirmed)
 TEST (node, search_receivable_pruned)
 {
 	nano::test::system system;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.backlog_scan.enable = false;
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.backlog_scan->enable = false;
 	auto node1 = system.add_node (node_config);
 	nano::node_flags node_flags;
 	node_flags.enable_pruning = true;
-	nano::node_config config (system.get_available_port ());
+	nano::node_config config;
+	config.peering_port = system.get_available_port ();
 	config.enable_voting = false; // Remove after allowing pruned voting
 	auto node2 = system.add_node (config, node_flags);
 	nano::keypair key2;
@@ -467,7 +494,8 @@ TEST (node, confirm_locked)
 TEST (node_config, random_rep)
 {
 	auto path (nano::unique_path ());
-	nano::node_config config1 (100);
+	nano::node_config config1;
+	config1.peering_port = 100;
 	auto rep (config1.random_representative ());
 	ASSERT_NE (config1.preconfigured_representatives.end (), std::find (config1.preconfigured_representatives.begin (), config1.preconfigured_representatives.end (), rep));
 }
@@ -755,11 +783,12 @@ TEST (node, fork_multi_flip)
 	auto type = nano::transport::transport_type::tcp;
 	nano::test::system system;
 	nano::node_flags node_flags;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.backlog_scan.enable = false;
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.backlog_scan->enable = false;
 	auto & node1 (*system.add_node (node_config, node_flags, type));
 	node_config.peering_port = system.get_available_port ();
-	node_config.bootstrap.account_sets.cooldown = 100ms; // Reduce cooldown to speed up fork resolution
+	node_config.bootstrap->account_sets.cooldown = 100ms; // Reduce cooldown to speed up fork resolution
 	auto & node2 (*system.add_node (node_config, node_flags, type));
 	ASSERT_EQ (1, node1.network.size ());
 	nano::keypair key1;
@@ -819,15 +848,17 @@ TEST (node, fork_multi_flip)
 TEST (node, fork_bootstrap_flip)
 {
 	nano::test::system system;
-	nano::node_config config1{ system.get_available_port () };
-	config1.backlog_scan.enable = false;
+	nano::node_config config1;
+	config1.peering_port = system.get_available_port ();
+	config1.backlog_scan->enable = false;
 	nano::node_flags node_flags;
 	node_flags.disable_bootstrap_bulk_push_client = true;
 	node_flags.disable_lazy_bootstrap = true;
 	auto & node1 = *system.add_node (config1, node_flags);
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
-	nano::node_config config2 (system.get_available_port ());
-	config2.bootstrap.account_sets.cooldown = 100ms; // Reduce cooldown to speed up fork resolution
+	nano::node_config config2;
+	config2.peering_port = system.get_available_port ();
+	config2.bootstrap->account_sets.cooldown = 100ms; // Reduce cooldown to speed up fork resolution
 	auto & node2 = *system.make_disconnected_node (config2, node_flags);
 	nano::block_hash latest = node1.latest (nano::dev::genesis_key.pub);
 	nano::keypair key1;
@@ -1269,8 +1300,9 @@ TEST (node, DISABLED_broadcast_elected)
 	auto type = nano::transport::transport_type::tcp;
 	nano::node_flags node_flags;
 	nano::test::system system;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.backlog_scan.enable = false;
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.backlog_scan->enable = false;
 	auto node0 = system.add_node (node_config, node_flags, type);
 	node_config.peering_port = system.get_available_port ();
 	auto node1 = system.add_node (node_config, node_flags, type);
@@ -1401,10 +1433,10 @@ TEST (node, rep_self_vote)
 	nano::node_config node_config = system.default_config ();
 	node_config.online_weight_minimum = std::numeric_limits<nano::uint128_t>::max ();
 	// Disable automatic election activation
-	node_config.backlog_scan.enable = false;
-	node_config.priority_scheduler.enable = false;
-	node_config.hinted_scheduler.enable = false;
-	node_config.optimistic_scheduler.enable = false;
+	node_config.backlog_scan->enable = false;
+	node_config.priority_scheduler->enable = false;
+	node_config.hinted_scheduler->enable = false;
+	node_config.optimistic_scheduler->enable = false;
 	auto node0 = system.add_node (node_config, node_flags);
 
 	nano::keypair rep_big;
@@ -1498,15 +1530,16 @@ TEST (node, DISABLED_bootstrap_no_publish)
 TEST (node, bootstrap_fork_open)
 {
 	nano::test::system system;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.bootstrap.account_sets.cooldown = 100ms; // Reduce cooldown to speed up fork resolution
-	node_config.bootstrap.frontier_scan.head_parallelism = 3; // Make sure we can process the full account number range
-	node_config.bootstrap.frontier_rate_limit = 0; // Disable rate limiting to speed up the scan
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.bootstrap->account_sets.cooldown = 100ms; // Reduce cooldown to speed up fork resolution
+	node_config.bootstrap->frontier_scan.head_parallelism = 3; // Make sure we can process the full account number range
+	node_config.bootstrap->frontier_rate_limit = 0; // Disable rate limiting to speed up the scan
 	// Disable automatic election activation
-	node_config.backlog_scan.enable = false;
-	node_config.priority_scheduler.enable = false;
-	node_config.hinted_scheduler.enable = false;
-	node_config.optimistic_scheduler.enable = false;
+	node_config.backlog_scan->enable = false;
+	node_config.priority_scheduler->enable = false;
+	node_config.hinted_scheduler->enable = false;
+	node_config.optimistic_scheduler->enable = false;
 	auto node0 = system.add_node (node_config);
 	node_config.peering_port = system.get_available_port ();
 	auto node1 = system.add_node (node_config);
@@ -1633,7 +1666,8 @@ TEST (node, no_voting)
 {
 	nano::test::system system (1);
 	auto & node0 (*system.nodes[0]);
-	nano::node_config node_config (system.get_available_port ());
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
 	node_config.enable_voting = false;
 	system.add_node (node_config);
 
@@ -1760,8 +1794,9 @@ TEST (node, confirm_quorum)
 TEST (node, DISABLED_local_votes_cache)
 {
 	nano::test::system system;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.backlog_scan.enable = false;
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.backlog_scan->enable = false;
 	node_config.receive_minimum = nano::dev::constants.genesis_amount;
 	auto & node (*system.add_node (node_config));
 	nano::state_block_builder builder;
@@ -1844,8 +1879,9 @@ TEST (node, DISABLED_local_votes_cache)
 TEST (node, DISABLED_local_votes_cache_batch)
 {
 	nano::test::system system;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.backlog_scan.enable = false;
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.backlog_scan->enable = false;
 	auto & node (*system.add_node (node_config));
 	ASSERT_GE (node.network_params.voting.max_cache, 2);
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
@@ -1918,8 +1954,9 @@ TEST (node, DISABLED_local_votes_cache_batch)
 TEST (node, DISABLED_local_votes_cache_generate_new_vote)
 {
 	nano::test::system system;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.backlog_scan.enable = false;
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.backlog_scan->enable = false;
 	auto & node (*system.add_node (node_config));
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 
@@ -1972,8 +2009,9 @@ TEST (node, DISABLED_local_votes_cache_fork)
 	node_flags.disable_lazy_bootstrap = true;
 	node_flags.disable_legacy_bootstrap = true;
 	node_flags.disable_wallet_bootstrap = true;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.backlog_scan.enable = false;
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.backlog_scan->enable = false;
 	auto & node1 (*system.add_node (node_config, node_flags));
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 	auto send1 = nano::state_block_builder ()
@@ -2221,8 +2259,9 @@ TEST (node, DISABLED_vote_by_hash_epoch_block_republish)
 TEST (node, epoch_conflict_confirm)
 {
 	nano::test::system system;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.backlog_scan.enable = false;
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.backlog_scan->enable = false;
 	auto & node0 = *system.add_node (node_config);
 	node_config.peering_port = system.get_available_port ();
 	auto & node1 = *system.add_node (node_config);
@@ -2324,7 +2363,7 @@ TEST (node, DISABLED_fork_invalid_block_signature)
 	// - Block *send2* might get processed before the rollback happens, simply due to timings, with code "fork", and not be processed again. Waiting for the rollback fixes this issue.
 	// - Block *send1* might get processed again after the rollback happens, which causes *send2* to be processed with code "fork". Disabling block republishing ensures "send1" is not processed again.
 	// An alternative would be to repeatedly flood the correct vote
-	config.local_block_broadcaster.enable = false;
+	config.local_block_broadcaster->enable = false;
 	auto & node1 (*system.add_node (config));
 	auto & node2 (*system.add_node (config));
 	nano::keypair key2;
@@ -2596,7 +2635,7 @@ TEST (node, peers)
 	auto node1 (system.nodes[0]);
 	ASSERT_TRUE (node1->network.empty ());
 
-	auto node2 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work));
+	auto node2 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work, nano::node_flags{}));
 	system.nodes.push_back (node2);
 
 	auto endpoint = node1->network.endpoint ();
@@ -2646,7 +2685,7 @@ TEST (node, peer_history_restart)
 	nano::endpoint_key endpoint_key{ endpoint.address ().to_v6 ().to_bytes (), endpoint.port () };
 	auto path (nano::unique_path ());
 	{
-		auto node2 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), path, system.work));
+		auto node2 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), path, system.work, nano::node_flags{}));
 		system.nodes.push_back (node2);
 		auto & store = node2->store;
 		{
@@ -2702,9 +2741,7 @@ TEST (node, dont_write_lock_node)
 	std::promise<void> write_lock_held_promise;
 	std::promise<void> finished_promise;
 	std::thread ([&path, &write_lock_held_promise, &finished_promise] () {
-		nano::logger logger;
-		nano::stats stats{ logger };
-		auto store = nano::make_store (logger, stats, path, nano::dev::constants, false, true);
+		auto store = nano::test::make_store (path);
 		{
 			auto transaction (store->tx_begin_write ());
 			store->initialize (transaction, nano::dev::constants);
@@ -2732,11 +2769,12 @@ TEST (node, bidirectional_tcp)
 	node_flags.disable_legacy_bootstrap = true;
 	node_flags.disable_lazy_bootstrap = true;
 	node_flags.disable_wallet_bootstrap = true;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.backlog_scan.enable = false;
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.backlog_scan->enable = false;
 	auto node1 = system.add_node (node_config, node_flags);
 	node_config.peering_port = system.get_available_port ();
-	node_config.tcp.max_inbound_connections = 0; // Disable incoming TCP connections for node 2
+	node_config.tcp->max_inbound_connections = 0; // Disable incoming TCP connections for node 2
 	auto node2 = system.add_node (node_config, node_flags);
 	// Check network connections
 	ASSERT_EQ (1, node1->network.size ());
@@ -2921,8 +2959,9 @@ TEST (node, rollback_vote_self)
 TEST (node, rollback_gap_source)
 {
 	nano::test::system system;
-	nano::node_config node_config (system.get_available_port ());
-	node_config.backlog_scan.enable = false;
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
+	node_config.backlog_scan->enable = false;
 	auto & node = *system.add_node (node_config);
 	nano::state_block_builder builder;
 	nano::keypair key;
@@ -2989,8 +3028,9 @@ TEST (node, rollback_gap_source)
 TEST (node, dependency_graph)
 {
 	nano::test::system system;
-	nano::node_config config (system.get_available_port ());
-	config.backlog_scan.enable = false;
+	nano::node_config config;
+	config.peering_port = system.get_available_port ();
+	config.backlog_scan->enable = false;
 	auto & node = *system.add_node (config);
 
 	nano::state_block_builder builder;
@@ -3187,11 +3227,12 @@ TEST (node, dependency_graph)
 TEST (node, dependency_graph_frontier)
 {
 	nano::test::system system;
-	nano::node_config config (system.get_available_port ());
-	config.backlog_scan.enable = false;
+	nano::node_config config;
+	config.peering_port = system.get_available_port ();
+	config.backlog_scan->enable = false;
 	auto & node1 = *system.add_node (config);
 	config.peering_port = system.get_available_port ();
-	config.backlog_scan.enable = true;
+	config.backlog_scan->enable = true;
 	auto & node2 = *system.add_node (config);
 
 	nano::state_block_builder builder;
@@ -3352,10 +3393,12 @@ TEST (node, dependency_graph_frontier)
 TEST (node, deferred_dependent_elections)
 {
 	nano::test::system system;
-	nano::node_config node_config_1{ system.get_available_port () };
-	node_config_1.backlog_scan.enable = false;
-	nano::node_config node_config_2{ system.get_available_port () };
-	node_config_2.backlog_scan.enable = false;
+	nano::node_config node_config_1;
+	node_config_1.peering_port = system.get_available_port ();
+	node_config_1.backlog_scan->enable = false;
+	nano::node_config node_config_2;
+	node_config_2.peering_port = system.get_available_port ();
+	node_config_2.backlog_scan->enable = false;
 	nano::node_flags flags;
 	flags.disable_request_loop = true;
 	auto & node = *system.add_node (node_config_1, flags);
@@ -3477,7 +3520,8 @@ TEST (node, pruning_automatic)
 {
 	nano::test::system system{};
 
-	nano::node_config node_config{ system.get_available_port () };
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
 	// TODO: remove after allowing pruned voting
 	node_config.enable_voting = false;
 	node_config.max_pruning_age = std::chrono::seconds (1);
@@ -3530,7 +3574,8 @@ TEST (node, pruning_age)
 {
 	nano::test::system system{};
 
-	nano::node_config node_config{ system.get_available_port () };
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
 	// TODO: remove after allowing pruned voting
 	node_config.enable_voting = false;
 
@@ -3591,7 +3636,8 @@ TEST (node, pruning_depth)
 {
 	nano::test::system system{};
 
-	nano::node_config node_config{ system.get_available_port () };
+	nano::node_config node_config;
+	node_config.peering_port = system.get_available_port ();
 	// TODO: remove after allowing pruned voting
 	node_config.enable_voting = false;
 
@@ -3684,7 +3730,7 @@ TEST (node, process_local_overflow)
 {
 	nano::test::system system;
 	auto config = system.default_config ();
-	config.block_processor.max_system_queue = 0;
+	config.block_processor->max_system_queue = 0;
 	auto & node = *system.add_node (config);
 
 	nano::keypair key1;
@@ -3708,10 +3754,10 @@ TEST (node, local_block_broadcast)
 
 	// Disable active elections to prevent the block from being broadcasted by the election
 	auto node_config = system.default_config ();
-	node_config.priority_scheduler.enable = false;
-	node_config.hinted_scheduler.enable = false;
-	node_config.optimistic_scheduler.enable = false;
-	node_config.local_block_broadcaster.rebroadcast_interval = 1s;
+	node_config.priority_scheduler->enable = false;
+	node_config.hinted_scheduler->enable = false;
+	node_config.optimistic_scheduler->enable = false;
+	node_config.local_block_broadcaster->rebroadcast_interval = 1s;
 	auto & node1 = *system.add_node (node_config);
 	auto & node2 = *system.make_disconnected_node ();
 
@@ -3770,7 +3816,7 @@ TEST (node, bounded_backlog)
 
 	nano::node_config node_config;
 	node_config.max_backlog = 10;
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto & node = *system.add_node (node_config);
 
 	const int howmany_blocks = 64;
@@ -3796,24 +3842,24 @@ TEST (node, bootstrap_poison)
 
 	// Create the representative node with bootstrap serving disabled
 	nano::node_config rep_config = system.default_config ();
-	rep_config.bootstrap_server.enable = false; // Disable bootstrap serving
-	rep_config.bootstrap.enable = false; // Disable bootstrap from the network
+	rep_config.bootstrap_server->enable = false; // Disable bootstrap serving
+	rep_config.bootstrap->enable = false; // Disable bootstrap from the network
 	// Disable schedulers
-	rep_config.priority_scheduler.enable = false;
-	rep_config.hinted_scheduler.enable = false;
-	rep_config.optimistic_scheduler.enable = false;
-	rep_config.backlog_scan.enable = false;
+	rep_config.priority_scheduler->enable = false;
+	rep_config.hinted_scheduler->enable = false;
+	rep_config.optimistic_scheduler->enable = false;
+	rep_config.backlog_scan->enable = false;
 	auto & node_rep = *system.add_node (rep_config);
 
 	// Create the poisoned node with bootstrap serving enabled
 	nano::node_config poison_config = system.default_config ();
-	poison_config.bootstrap_server.enable = true; // Enable bootstrap serving
-	poison_config.bootstrap.enable = false; // Disable bootstrap from the network
+	poison_config.bootstrap_server->enable = true; // Enable bootstrap serving
+	poison_config.bootstrap->enable = false; // Disable bootstrap from the network
 	// Disable schedulers
-	poison_config.priority_scheduler.enable = false;
-	poison_config.hinted_scheduler.enable = false;
-	poison_config.optimistic_scheduler.enable = false;
-	poison_config.backlog_scan.enable = false;
+	poison_config.priority_scheduler->enable = false;
+	poison_config.hinted_scheduler->enable = false;
+	poison_config.optimistic_scheduler->enable = false;
+	poison_config.backlog_scan->enable = false;
 	auto & node_poison = *system.add_node (poison_config);
 
 	// Representative node needs to hold the genesis key to have voting weight
@@ -3867,14 +3913,14 @@ TEST (node, bootstrap_poison)
 
 	// Now create a bootstrapping node that will try to sync from both nodes
 	nano::node_config node_config = system.default_config ();
-	node_config.bootstrap.account_sets.cooldown = 100ms; // Short cooldown between requests to speed up the test
-	node_config.bootstrap.request_timeout = 250ms;
-	node_config.bootstrap.frontier_rate_limit = 100;
+	node_config.bootstrap->account_sets.cooldown = 100ms; // Short cooldown between requests to speed up the test
+	node_config.bootstrap->request_timeout = 250ms;
+	node_config.bootstrap->frontier_rate_limit = 100;
 	// Disable schedulers
-	node_config.priority_scheduler.enable = false;
-	node_config.hinted_scheduler.enable = false;
-	node_config.optimistic_scheduler.enable = false;
-	node_config.backlog_scan.enable = false;
+	node_config.priority_scheduler->enable = false;
+	node_config.hinted_scheduler->enable = false;
+	node_config.optimistic_scheduler->enable = false;
+	node_config.backlog_scan->enable = false;
 	nano::node_flags node_flags;
 	auto & node = *system.add_node (node_config, node_flags);
 	ASSERT_EQ (node.network.size (), 2);
@@ -3888,11 +3934,11 @@ TEST (node, bootstrap_poison)
 
 	// Create another non-rep node that will serve the correct side of the fork
 	nano::node_config correct_config = system.default_config ();
-	correct_config.bootstrap_server.enable = true; // Enable bootstrap serving
-	correct_config.bootstrap.enable = false; // Disable bootstrap from the network
-	correct_config.priority_scheduler.enable = false;
-	correct_config.hinted_scheduler.enable = false;
-	correct_config.optimistic_scheduler.enable = false;
+	correct_config.bootstrap_server->enable = true; // Enable bootstrap serving
+	correct_config.bootstrap->enable = false; // Disable bootstrap from the network
+	correct_config.priority_scheduler->enable = false;
+	correct_config.hinted_scheduler->enable = false;
+	correct_config.optimistic_scheduler->enable = false;
 	auto & node_correct = *system.add_node (correct_config);
 	ASSERT_EQ (node.network.size (), 3);
 
@@ -3929,17 +3975,17 @@ TEST (node, super_rebroadcaster)
 
 	// Node 1: Super rebroadcaster mode
 	nano::node_config config = system.default_config ();
-	config.bootstrap.enable = false;
-	config.local_block_broadcaster.enable = false;
+	config.bootstrap->enable = false;
+	config.local_block_broadcaster->enable = false;
 	nano::node_flags flags;
 	flags.super_rebroadcaster = true;
 	auto & node1 = *system.add_node (config, flags);
 
 	// Nodes 2, 3, 4: Normal peer nodes
 	nano::node_config peer_config = system.default_config ();
-	peer_config.block_rebroadcaster.enable = false;
-	peer_config.vote_rebroadcaster.enable = false;
-	peer_config.local_block_broadcaster.enable = false;
+	peer_config.block_rebroadcaster->enable = false;
+	peer_config.vote_rebroadcaster->enable = false;
+	peer_config.local_block_broadcaster->enable = false;
 	auto & node2 = *system.add_node (peer_config);
 	auto & node3 = *system.add_node (peer_config);
 	auto & node4 = *system.add_node (peer_config);
@@ -4002,10 +4048,11 @@ TEST (node, port_already_in_use)
 	ASSERT_NE (0, node1->network.port);
 
 	// Try to start second node on the same port
-	nano::node_config config2{ node1->network.port };
+	nano::node_config config2;
+	config2.peering_port = node1->network.port;
 
 	// Create node in a scope so it gets destroyed if start() throws
-	auto node2 = std::make_shared<nano::node> (system.io_ctx, nano::unique_path (), config2, system.work);
+	auto node2 = std::make_shared<nano::node> (system.io_ctx, nano::unique_path (), config2, system.work, nano::node_flags{});
 
 	// This should throw boost::system::system_error indicating port is already in use
 	ASSERT_THROW (node2->start (), boost::system::system_error);

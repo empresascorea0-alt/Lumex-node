@@ -1,8 +1,15 @@
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
+#include <nano/node/cementing_set.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/scheduler/component.hpp>
+#include <nano/node/scheduler/hinted.hpp>
+#include <nano/node/scheduler/optimistic.hpp>
 #include <nano/node/scheduler/priority.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/test_common/chains.hpp>
 #include <nano/test_common/system.hpp>
@@ -123,7 +130,7 @@ TEST (election_scheduler, activate_one)
 	nano::test::system system;
 
 	nano::node_config config;
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto & node = *system.add_node (config);
 
 	nano::state_block_builder builder;
@@ -156,9 +163,9 @@ TEST (election_scheduler, transition_optimistic_to_priority)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.optimistic_scheduler.gap_threshold = 1;
+	config.optimistic_scheduler->gap_threshold = 1;
 	config.enable_voting = true;
-	config.hinted_scheduler.enable = false;
+	config.hinted_scheduler->enable = false;
 	config.network_params.network.vote_broadcast_interval = 15000ms;
 	auto & node = *system.add_node (config);
 
@@ -213,9 +220,9 @@ TEST (election_scheduler, no_vacancy)
 	nano::test::system system;
 
 	nano::node_config config = system.default_config ();
-	config.active_elections.size = 1;
-	config.priority_scheduler.reserved_elections = 0;
-	config.backlog_scan.enable = false;
+	config.active_elections->size = 1;
+	config.priority_scheduler->reserved_elections = 0;
+	config.backlog_scan->enable = false;
 	auto & node = *system.add_node (config);
 
 	nano::state_block_builder builder{};

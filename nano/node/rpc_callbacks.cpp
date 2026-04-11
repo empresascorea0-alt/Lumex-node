@@ -1,8 +1,19 @@
+#include <nano/boost/beast/core/flat_buffer.hpp>
+#include <nano/boost/beast/http.hpp>
 #include <nano/lib/block_type.hpp>
+#include <nano/lib/blocks.hpp>
 #include <nano/lib/interval.hpp>
+#include <nano/lib/logging.hpp>
+#include <nano/lib/stats.hpp>
+#include <nano/node/election_status.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/node_observers.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/rpc_callbacks.hpp>
+#include <nano/node/vote_with_weight_info.hpp>
 #include <nano/secure/ledger.hpp>
+
+#include <boost/property_tree/json_parser.hpp>
 
 nano::http_callbacks::http_callbacks (nano::node & node_a) :
 	node{ node_a },

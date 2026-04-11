@@ -1,15 +1,21 @@
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
+#include <nano/node/block_processor.hpp>
 #include <nano/node/election.hpp>
-#include <nano/node/make_store.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/scheduler/component.hpp>
 #include <nano/node/scheduler/priority.hpp>
 #include <nano/node/transport/inproc.hpp>
+#include <nano/node/unchecked_map.hpp>
+#include <nano/node/vote_processor.hpp>
 #include <nano/node/vote_router.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>
@@ -882,7 +888,7 @@ TEST (ledger, double_open)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	auto transaction = ledger.tx_begin_write ();
 	nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
@@ -1028,7 +1034,7 @@ TEST (votes, add_existing)
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
 	node_config.online_weight_minimum = nano::dev::constants.genesis_amount;
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto & node1 = *system.add_node (node_config);
 	nano::keypair key1;
 	nano::block_builder builder;
@@ -4384,7 +4390,7 @@ TEST (ledger, unchecked_epoch_invalid)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto & node1 (*system.add_node (node_config));
 	nano::keypair destination;
 	nano::block_builder builder;
@@ -5080,7 +5086,7 @@ TEST (ledger, dependencies_cemented_pruning)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	ledger.pruning = true;
 	auto transaction = ledger.tx_begin_write ();
@@ -5256,7 +5262,7 @@ TEST (ledger, pruning_action)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	ledger.pruning = true;
 	auto transaction = ledger.tx_begin_write ();
@@ -5340,7 +5346,7 @@ TEST (ledger, pruning_large_chain)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	ledger.pruning = true;
 	auto transaction = ledger.tx_begin_write ();
@@ -5394,7 +5400,7 @@ TEST (ledger, pruning_source_rollback)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	ledger.pruning = true;
 	auto transaction = ledger.tx_begin_write ();
@@ -5481,7 +5487,7 @@ TEST (ledger, pruning_source_rollback_legacy)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	ledger.pruning = true;
 	auto transaction = ledger.tx_begin_write ();
@@ -5593,7 +5599,7 @@ TEST (ledger, pruning_legacy_blocks)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	ledger.pruning = true;
 	nano::keypair key1;
@@ -5678,7 +5684,7 @@ TEST (ledger, pruning_safe_functions)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	ledger.pruning = true;
 	auto transaction = ledger.tx_begin_write ();
@@ -5728,7 +5734,7 @@ TEST (ledger, random_blocks)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	ledger.pruning = true;
 	auto transaction = ledger.tx_begin_write ();
@@ -5856,7 +5862,7 @@ TEST (ledger, copy_to_rocksdb)
 	nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
 
 	// Create default backend and store
-	auto store = nano::make_store (logger, stats, path, nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats, path);
 	nano::ledger ledger{ *store, nano::dev::network_params, stats, logger };
 
 	auto send = nano::state_block_builder ()

@@ -1,7 +1,9 @@
 #include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/stats_enums.hpp>
+#include <nano/node/backlog_scan.hpp>
 #include <nano/node/block_processor.hpp>
+#include <nano/node/bounded_backlog.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/nodeconfig.hpp>
 #include <nano/secure/common.hpp>
@@ -122,7 +124,7 @@ TEST (block_processor, add_blocking_overfill)
 
 	nano::node_config node_config;
 	// Queue size 0 guarantees immediate rejection
-	node_config.block_processor.max_system_queue = 0;
+	node_config.block_processor->max_system_queue = 0;
 	auto & node = *system.add_node (node_config);
 
 	nano::keypair key;
@@ -200,7 +202,7 @@ TEST (block_processor, add_many_overfill)
 
 	nano::node_config node_config;
 	// Only 4 blocks fit in the system queue, remaining will be dropped
-	node_config.block_processor.max_system_queue = 4;
+	node_config.block_processor->max_system_queue = 4;
 	auto & node = *system.add_node (node_config);
 
 	auto latest = nano::dev::genesis->hash ();
@@ -316,11 +318,11 @@ TEST (block_processor, backlog_throttling)
 	nano::node_config node_config;
 	// Backlog won't be rolled back, as we want to test the throttling works when backlog is exceeded
 	node_config.max_backlog = 5;
-	node_config.backlog_scan.enable = false;
-	node_config.bounded_backlog.enable = false; // Disable rollbacks
+	node_config.backlog_scan->enable = false;
+	node_config.bounded_backlog->enable = false; // Disable rollbacks
 	// Allow at most 4 blocks per second when throttling
-	node_config.block_processor.batch_size = 1;
-	node_config.block_processor.backlog_throttle = 500ms;
+	node_config.block_processor->batch_size = 1;
+	node_config.block_processor->backlog_throttle = 500ms;
 	auto & node = *system.add_node (node_config);
 
 	const int howmany_blocks = 2;

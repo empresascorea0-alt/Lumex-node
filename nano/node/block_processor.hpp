@@ -16,6 +16,8 @@
 #include <optional>
 #include <thread>
 
+using namespace std::chrono_literals;
+
 namespace nano
 {
 class block_processor_config final

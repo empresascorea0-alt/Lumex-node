@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nano/lib/config.hpp>
 #include <nano/lib/interval.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/observer_set.hpp>
@@ -14,12 +15,14 @@
 #include <nano/node/vote_with_weight_info.hpp>
 #include <nano/secure/common.hpp>
 
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <memory>
 #include <thread>
 #include <unordered_map>
 
+using namespace std::chrono_literals;
 namespace nano
 {
 class active_elections_config final

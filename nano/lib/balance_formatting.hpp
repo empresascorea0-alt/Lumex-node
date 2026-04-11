@@ -2,6 +2,7 @@
 
 #include <nano/lib/numbers.hpp>
 
+#include <ostream>
 #include <string>
 
 namespace nano
@@ -24,16 +25,11 @@ void encode_balance_frac (std::ostream & stream, Value value, Value scale, int p
 template <typename Value>
 void encode_balance_int (std::ostream & stream, Value value, char group_sep, std::string const & groupings)
 {
-	auto largestPow10 = nano::uint256_t (1);
+	auto largestPow10 = Value{ 1 };
 	int dec_count = 1;
-	while (1)
+	while (largestPow10 <= value / 10)
 	{
-		auto next = largestPow10 * 10;
-		if (next > value)
-		{
-			break;
-		}
-		largestPow10 = next;
+		largestPow10 *= 10;
 		dec_count++;
 	}
 

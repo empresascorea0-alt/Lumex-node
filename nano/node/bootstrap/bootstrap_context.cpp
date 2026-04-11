@@ -1,5 +1,6 @@
 #include <nano/lib/block_type.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/stats_enums.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/messages/asc_pull.hpp>
@@ -27,7 +28,7 @@ namespace nano::bootstrap
 {
 bootstrap_context::bootstrap_context (nano::node_config const & node_config_a, nano::ledger & ledger_a,
 nano::ledger_notifications & ledger_notifications_a, nano::block_processor & block_processor_a, nano::network & network_a, nano::stats & stat_a, nano::logger & logger_a) :
-	config{ node_config_a.bootstrap },
+	config{ *node_config_a.bootstrap },
 	network_constants{ node_config_a.network_params.network },
 	ledger{ ledger_a },
 	ledger_notifications{ ledger_notifications_a },

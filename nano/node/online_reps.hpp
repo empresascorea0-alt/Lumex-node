@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nano/lib/interval.hpp>
+#include <nano/lib/locks.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/numbers_templ.hpp>
 #include <nano/lib/utility.hpp>
@@ -11,6 +12,7 @@
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index_container.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
 
 #include <memory>
 #include <thread>

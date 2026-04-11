@@ -1,22 +1,33 @@
 #include <nano/crypto_lib/random_pool.hpp>
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/version.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
+#include <nano/node/block_processor.hpp>
+#include <nano/node/bootstrap/bootstrap_config.hpp>
+#include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/epoch_upgrader.hpp>
 #include <nano/node/ledger_notifications.hpp>
-#include <nano/node/make_store.hpp>
+#include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
+#include <nano/node/repcrawler.hpp>
 #include <nano/node/scheduler/component.hpp>
 #include <nano/node/scheduler/manual.hpp>
 #include <nano/node/scheduler/priority.hpp>
 #include <nano/node/telemetry.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/node/unchecked_map.hpp>
+#include <nano/node/vote_processor.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>
@@ -24,6 +35,7 @@
 #include <nano/store/ledger/confirmation_height.hpp>
 #include <nano/store/ledger/peer.hpp>
 #include <nano/store/ledger/pruned.hpp>
+#include <nano/test_common/make_store.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
@@ -105,7 +117,7 @@ TEST (system, receive_while_synchronizing)
 		uint32_t count (1000);
 		system.generate_mass_activity (count, *system.nodes[0]);
 		nano::keypair key;
-		auto node1 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work));
+		auto node1 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work, nano::node_flags{}));
 		auto wallet (node1->wallets.create (1));
 		ASSERT_TRUE (wallet->insert_adhoc (nano::dev::genesis_key.prv)); // For voting
 		auto insert_result = wallet->insert_adhoc (key.prv);
@@ -136,7 +148,7 @@ TEST (ledger, deep_account_compute)
 {
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	auto transaction = ledger.tx_begin_write ();
 	nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
@@ -550,15 +562,13 @@ TEST (store, vote_load)
  */
 TEST (store, pruned_load)
 {
-	nano::logger logger;
-	nano::stats stats{ logger };
 	auto path (nano::unique_path ());
 	constexpr auto num_pruned = 2000000;
 	auto const expected_result = num_pruned / 2;
 	constexpr auto batch_size = 20;
 	boost::unordered_set<nano::block_hash> hashes;
 	{
-		auto store = nano::make_store (logger, stats, path, nano::dev::constants);
+		auto store = nano::test::make_store (path);
 
 		for (auto i (0); i < num_pruned / batch_size; ++i)
 		{
@@ -589,7 +599,7 @@ TEST (store, pruned_load)
 
 	// Reinitialize store
 	{
-		auto store = nano::make_store (logger, stats, path, nano::dev::constants);
+		auto store = nano::test::make_store (path);
 
 		ASSERT_EQ (expected_result, manually_count_pruned_blocks (*store));
 	}
@@ -648,7 +658,7 @@ TEST (confirmation_height, many_accounts_single_confirmation)
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
 	node_config.online_weight_minimum = 100;
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto node = system.add_node (node_config);
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 
@@ -731,7 +741,7 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
 	node_config.online_weight_minimum = 100;
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto node = system.add_node (node_config);
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 
@@ -804,7 +814,7 @@ TEST (confirmation_height, long_chains)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto node = system.add_node (node_config);
 	nano::keypair key1;
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
@@ -949,7 +959,7 @@ TEST (confirmation_height, dynamic_algorithm)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto node = system.add_node (node_config);
 	nano::keypair key;
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
@@ -997,8 +1007,8 @@ TEST (confirmation_height, many_accounts_send_receive_self)
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
 	node_config.online_weight_minimum = 100;
-	node_config.backlog_scan.enable = false;
-	node_config.active_elections.size = 400000;
+	node_config.backlog_scan->enable = false;
+	node_config.active_elections->size = 400000;
 	nano::node_flags node_flags;
 	auto node = system.add_node (node_config);
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
@@ -1131,7 +1141,7 @@ TEST (confirmation_height, many_accounts_send_receive_self_no_elections)
 	nano::logger logger;
 	auto path (nano::unique_path ());
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, path, nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats, path);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	nano::store::write_queue write_database_queue;
 	nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
@@ -1406,7 +1416,7 @@ TEST (telemetry, under_load)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	nano::node_flags node_flags;
 	auto node = system.add_node (node_config, node_flags);
 	node_config.peering_port = system.get_available_port ();
@@ -1765,7 +1775,7 @@ TEST (node, mass_block_new)
 {
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto & node = *system.add_node (node_config);
 	node.network_params.network.aec_loop_interval = 500ms;
 
@@ -1902,7 +1912,7 @@ TEST (node, aggressive_flooding)
 	node_flags.disable_legacy_bootstrap = true;
 	node_flags.disable_wallet_bootstrap = true;
 	nano::node_config node_config;
-	node_config.bootstrap.enable = false;
+	node_config.bootstrap->enable = false;
 	auto & node1 (*system.add_node (node_config, node_flags));
 	auto & wallet1 (*system.wallet (0));
 	wallet1.insert_adhoc (nano::dev::genesis_key.prv);
@@ -2024,8 +2034,9 @@ TEST (node, wallet_create_block_confirm_conflicts)
 	{
 		nano::test::system system;
 		nano::block_builder builder;
-		nano::node_config node_config (system.get_available_port ());
-		node_config.backlog_scan.enable = false;
+		nano::node_config node_config;
+		node_config.peering_port = system.get_available_port ();
+		node_config.backlog_scan->enable = false;
 		auto node = system.add_node (node_config);
 		auto const num_blocks = 10000;
 
@@ -2096,7 +2107,7 @@ TEST (system, block_sequence)
 	config.peering_port = system.get_available_port ();
 	// config.bandwidth_limit = 16 * 1024;
 	config.enable_voting = true;
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	nano::node_flags flags;
 	flags.disable_max_peers_per_ip = true;
 	flags.disable_ongoing_bootstrap = true;

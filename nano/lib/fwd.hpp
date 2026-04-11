@@ -10,6 +10,7 @@ namespace nano
 enum class block_type : uint8_t;
 enum class epoch : uint8_t;
 enum class network_type : uint16_t;
+enum class database_backend;
 enum class work_version;
 
 class uint128_union;
@@ -33,21 +34,30 @@ class block_visitor;
 class container_info;
 class error;
 class jsonconfig;
+class lmdb_config;
 class keypair;
 class logger;
 class mutable_block_visitor;
 class network_constants;
 class object_stream;
+class rocksdb_config;
 class stats;
+class stats_config;
 class thread_pool;
 class thread_runner;
 class tomlconfig;
 class vote;
+class work_pool;
+
+struct bootstrap_weights;
 
 template <typename Key, typename Value>
 class uniquer;
 
 using stream = std::basic_streambuf<uint8_t, uint8_char_traits>;
+
+using seconds_t = uint64_t;
+using millis_t = uint64_t;
 }
 
 namespace nano::stat

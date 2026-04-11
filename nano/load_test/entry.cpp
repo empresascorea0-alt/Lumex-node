@@ -12,6 +12,7 @@
 #include <nano/lib/threading.hpp>
 #include <nano/lib/tomlconfig.hpp>
 #include <nano/node/daemonconfig.hpp>
+#include <nano/node/ipc/ipc_config.hpp>
 #include <nano/test_common/testutil.hpp>
 
 #include <boost/dll/runtime_symbol_info.hpp>
@@ -45,8 +46,8 @@ void write_config_files (std::filesystem::path const & data_path, int index)
 	nano::network_params network_params{ nano::get_active_network () };
 	nano::daemon_config daemon_config{ data_path, network_params };
 	daemon_config.node.peering_port = peering_port_start + index;
-	daemon_config.node.ipc_config.transport_tcp.enabled = true;
-	daemon_config.node.ipc_config.transport_tcp.port = ipc_port_start + index;
+	daemon_config.node.ipc_config->transport_tcp.enabled = true;
+	daemon_config.node.ipc_config->transport_tcp.port = ipc_port_start + index;
 
 	// Alternate use of memory pool
 	daemon_config.node.use_memory_pools = (index % 2) == 0;

@@ -1,6 +1,10 @@
 #pragma once
 
-#include <nano/lib/utility.hpp>
+#include <nano/lib/assert.hpp>
+
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 #include <magic_enum.hpp>
 #include <magic_enum_containers.hpp>

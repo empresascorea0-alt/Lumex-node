@@ -4,6 +4,7 @@
 #include <nano/node/election.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/scheduler/bucket.hpp>
+#include <nano/node/scheduler/priority.hpp>
 
 nano::scheduler::bucket::bucket (nano::bucket_index index_a, priority_config const & config_a, nano::active_elections & active_a, nano::stats & stats_a, nano::logger & logger_a) :
 	index{ index_a },

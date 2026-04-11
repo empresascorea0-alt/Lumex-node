@@ -1,7 +1,9 @@
 #include <nano/lib/ipc_client.hpp>
 #include <nano/lib/tomlconfig.hpp>
 #include <nano/node/ipc/ipc_access_config.hpp>
+#include <nano/node/ipc/ipc_config.hpp>
 #include <nano/node/ipc/ipc_server.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/rpc/rpc.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
@@ -20,8 +22,8 @@ using namespace std::chrono_literals;
 TEST (ipc, asynchronous)
 {
 	nano::test::system system (1);
-	system.nodes[0]->config.ipc_config.transport_tcp.enabled = true;
-	system.nodes[0]->config.ipc_config.transport_tcp.port = system.get_available_port ();
+	system.nodes[0]->config.ipc_config->transport_tcp.enabled = true;
+	system.nodes[0]->config.ipc_config->transport_tcp.port = system.get_available_port ();
 	nano::node_rpc_config node_rpc_config;
 	nano::ipc::ipc_server ipc (*system.nodes[0], node_rpc_config);
 	nano::ipc::ipc_client client (system.nodes[0]->io_ctx_shared);
@@ -60,8 +62,8 @@ TEST (ipc, asynchronous)
 TEST (ipc, synchronous)
 {
 	nano::test::system system (1);
-	system.nodes[0]->config.ipc_config.transport_tcp.enabled = true;
-	system.nodes[0]->config.ipc_config.transport_tcp.port = system.get_available_port ();
+	system.nodes[0]->config.ipc_config->transport_tcp.enabled = true;
+	system.nodes[0]->config.ipc_config->transport_tcp.port = system.get_available_port ();
 	nano::node_rpc_config node_rpc_config;
 	nano::ipc::ipc_server ipc (*system.nodes[0], node_rpc_config);
 	nano::ipc::ipc_client client (system.nodes[0]->io_ctx_shared);
@@ -193,8 +195,8 @@ TEST (ipc, permissions_default_user_order)
 TEST (ipc, invalid_endpoint)
 {
 	nano::test::system system (1);
-	system.nodes[0]->config.ipc_config.transport_tcp.enabled = true;
-	system.nodes[0]->config.ipc_config.transport_tcp.port = system.get_available_port ();
+	system.nodes[0]->config.ipc_config->transport_tcp.enabled = true;
+	system.nodes[0]->config.ipc_config->transport_tcp.port = system.get_available_port ();
 	nano::node_rpc_config node_rpc_config;
 	nano::ipc::ipc_client client (system.nodes[0]->io_ctx_shared);
 

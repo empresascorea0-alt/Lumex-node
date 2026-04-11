@@ -1,7 +1,13 @@
 #include <nano/boost/asio/bind_executor.hpp>
+#include <nano/lib/logging.hpp>
+#include <nano/lib/network_formatting.hpp>
+#include <nano/lib/thread_pool.hpp>
 #include <nano/node/distributed_work.hpp>
+#include <nano/node/distributed_work_factory.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/websocket.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <boost/algorithm/string/erase.hpp>
 #include <boost/format.hpp>

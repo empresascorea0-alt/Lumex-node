@@ -1,8 +1,11 @@
 #pragma once
 
+#include <nano/lib/blocks.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/stream.hpp>
 #include <nano/secure/common.hpp>
+#include <nano/secure/endpoint_key.hpp>
+#include <nano/store/block_w_sideband.hpp>
 
 #include <cstddef>
 #include <span>

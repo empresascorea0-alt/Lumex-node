@@ -1,5 +1,7 @@
 #include <nano/boost/process/child.hpp>
 #include <nano/lib/files.hpp>
+#include <nano/lib/logging.hpp>
+#include <nano/lib/memory.hpp>
 #include <nano/lib/runtime_files.hpp>
 #include <nano/lib/signal_manager.hpp>
 #include <nano/lib/stacktrace.hpp>
@@ -7,11 +9,13 @@
 #include <nano/lib/threading.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/lib/version.hpp>
+#include <nano/lib/work.hpp>
 #include <nano/nano_node/daemon.hpp>
 #include <nano/node/cli.hpp>
 #include <nano/node/daemonconfig.hpp>
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/node/json_handler.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/node_scope_guard.hpp>
 #include <nano/node/openclwork.hpp>

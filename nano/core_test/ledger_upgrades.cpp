@@ -1,5 +1,6 @@
 #include <nano/lib/block_sideband.hpp>
 #include <nano/lib/block_type.hpp>
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
@@ -7,6 +8,7 @@
 #include <nano/node/make_store.hpp>
 #include <nano/secure/account_info.hpp>
 #include <nano/secure/common.hpp>
+#include <nano/secure/network_params.hpp>
 #include <nano/store/backend.hpp>
 #include <nano/store/db_val_templ.hpp>
 #include <nano/store/ledger/account.hpp>

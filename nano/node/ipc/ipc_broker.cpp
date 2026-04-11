@@ -1,3 +1,4 @@
+#include <nano/lib/logging.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/ipc/action_handler.hpp>
 #include <nano/node/ipc/flatbuffers_handler.hpp>
@@ -5,6 +6,9 @@
 #include <nano/node/ipc/ipc_broker.hpp>
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/node_observers.hpp>
+#include <nano/node/nodeconfig.hpp>
+#include <nano/node/wallet.hpp>
 
 nano::ipc::broker::broker (nano::node & node_a) :
 	node (node_a)

@@ -1,12 +1,20 @@
 #include <nano/core_test/fakes/websocket_client.hpp>
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/jsonconfig.hpp>
 #include <nano/lib/work_version.hpp>
+#include <nano/messages/messages.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
+#include <nano/node/scheduler/hinted.hpp>
+#include <nano/node/scheduler/optimistic.hpp>
+#include <nano/node/scheduler/priority.hpp>
 #include <nano/node/telemetry.hpp>
 #include <nano/node/transport/fake.hpp>
 #include <nano/node/vote_router.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/node/websocket.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
@@ -32,8 +40,8 @@ TEST (websocket, subscription_edge)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	ASSERT_EQ (0, node1->websocket.server->subscriber_count (nano::websocket::topic::confirmation));
@@ -63,8 +71,8 @@ TEST (websocket, confirmation)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	std::atomic<bool> ack_ready{ false };
@@ -139,8 +147,8 @@ TEST (websocket, started_election)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 = system.add_node (config);
 
 	std::atomic<bool> ack_ready{ false };
@@ -187,8 +195,8 @@ TEST (websocket, stopped_election)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	std::atomic<bool> ack_ready{ false };
@@ -237,8 +245,8 @@ TEST (websocket, confirmation_options)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	std::atomic<bool> ack_ready{ false };
@@ -380,8 +388,8 @@ TEST (websocket, confirmation_options_votes)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	std::atomic<bool> ack_ready{ false };
@@ -467,8 +475,8 @@ TEST (websocket, confirmation_options_linked_account)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	std::atomic<bool> ack_ready{ false };
@@ -638,8 +646,8 @@ TEST (websocket, confirmation_options_sideband)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	std::atomic<bool> ack_ready{ false };
@@ -708,8 +716,8 @@ TEST (websocket, confirmation_options_update)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	std::atomic<bool> added{ false };
@@ -783,8 +791,8 @@ TEST (websocket, vote)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	std::atomic<bool> ack_ready{ false };
@@ -846,8 +854,8 @@ TEST (websocket, vote_options_type)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	std::atomic<bool> ack_ready{ false };
@@ -887,8 +895,8 @@ TEST (websocket, vote_options_representatives)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	std::atomic<bool> ack_ready{ false };
@@ -962,8 +970,8 @@ TEST (websocket, work)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	ASSERT_EQ (0, node1->websocket.server->subscriber_count (nano::websocket::topic::work));
@@ -1032,8 +1040,8 @@ TEST (websocket, ws_keepalive)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	auto task = ([&node1] () {
@@ -1051,13 +1059,13 @@ TEST (websocket, telemetry)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	nano::node_flags node_flags;
 	auto node1 (system.add_node (config, node_flags));
 	config.peering_port = system.get_available_port ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node2 (system.add_node (config, node_flags));
 
 	std::atomic<bool> done{ false };
@@ -1110,8 +1118,8 @@ TEST (websocket, new_unconfirmed_block)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	std::atomic<bool> ack_ready{ false };
@@ -1164,8 +1172,8 @@ TEST (websocket, confirmation_options_independent)
 {
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
-	config.websocket_config.enabled = true;
-	config.websocket_config.port = system.get_available_port ();
+	config.websocket_config->enabled = true;
+	config.websocket_config->port = system.get_available_port ();
 	auto node1 (system.add_node (config));
 
 	// First prepare a block we'll confirm later

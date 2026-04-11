@@ -1,9 +1,12 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/stats.hpp>
+#include <nano/lib/thread_roles.hpp>
 #include <nano/lib/threading.hpp>
+#include <nano/messages/telemetry.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/node_observers.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/telemetry.hpp>
 #include <nano/node/transport/transport.hpp>
 #include <nano/secure/ledger.hpp>
@@ -17,6 +20,11 @@
 #include <set>
 
 using namespace std::chrono_literals;
+
+nano::telemetry_config::telemetry_config (nano::node_flags const & flags) :
+	enable_ongoing_broadcasts{ !flags.disable_providing_telemetry_metrics }
+{
+}
 
 nano::telemetry::telemetry (nano::node_flags const & flags_a, nano::node & node_a, nano::network & network_a, nano::node_observers & observers_a, nano::network_params & network_params_a, nano::stats & stats_a) :
 	config{ flags_a },

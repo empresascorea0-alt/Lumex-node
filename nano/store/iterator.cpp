@@ -1,28 +1,38 @@
 #include <nano/lib/utility.hpp>
 #include <nano/store/iterator.hpp>
+#include <nano/store/lmdb/iterator.hpp>
+#include <nano/store/rocksdb/iterator.hpp>
 #include <nano/store/transaction.hpp>
 
 namespace nano::store
 {
-void iterator::update ()
+struct iterator::iterator_wrapper
 {
-	std::visit ([&] (auto && arg) {
-		if (!arg.is_end ())
-		{
-			this->current = arg.span ();
-		}
-		else
-		{
-			current = std::monostate{};
-		}
-	},
-	internals);
+	using iterator_variant = std::variant<lmdb::iterator, rocksdb::iterator>;
+	iterator_variant iter;
+
+	iterator_wrapper (lmdb::iterator && i) :
+		iter{ std::move (i) }
+	{
+	}
+	iterator_wrapper (rocksdb::iterator && i) :
+		iter{ std::move (i) }
+	{
+	}
+};
+
+iterator::iterator (transaction const & txn, lmdb::iterator && internals) :
+	txn{ &txn },
+	internals{ std::make_unique<iterator_wrapper> (std::move (internals)) },
+	transaction_epoch{ txn.epoch () }
+{
+	update ();
 }
 
-iterator::iterator (transaction const & txn, backend_iterator && internals) noexcept :
+iterator::iterator (transaction const & txn, rocksdb::iterator && internals) :
 	txn{ &txn },
-	transaction_epoch{ txn.epoch () },
-	internals{ std::move (internals) }
+	internals{ std::make_unique<iterator_wrapper> (std::move (internals)) },
+	transaction_epoch{ txn.epoch () }
 {
 	update ();
 }
@@ -44,6 +54,21 @@ iterator::iterator (iterator && other) noexcept :
 	current = std::move (other.current);
 }
 
+void iterator::update ()
+{
+	std::visit ([&] (auto && arg) {
+		if (!arg.is_end ())
+		{
+			this->current = arg.span ();
+		}
+		else
+		{
+			current = std::monostate{};
+		}
+	},
+	internals->iter);
+}
+
 auto iterator::operator= (iterator && other) noexcept -> iterator &
 {
 	if (txn)
@@ -63,7 +88,7 @@ auto iterator::operator++ () -> iterator &
 	std::visit ([] (auto && arg) {
 		++arg;
 	},
-	internals);
+	internals->iter);
 	update ();
 	return *this;
 }
@@ -73,7 +98,7 @@ auto iterator::operator-- () -> iterator &
 	std::visit ([] (auto && arg) {
 		--arg;
 	},
-	internals);
+	internals->iter);
 	update ();
 	return *this;
 }
@@ -92,7 +117,7 @@ auto iterator::operator* () const -> const_reference
 
 auto iterator::operator== (iterator const & other) const -> bool
 {
-	return internals == other.internals;
+	return internals->iter == other.internals->iter;
 }
 
 bool iterator::is_end () const

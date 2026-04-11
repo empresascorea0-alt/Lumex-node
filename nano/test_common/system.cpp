@@ -1,11 +1,17 @@
 #include <nano/crypto_lib/random_pool.hpp>
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/formatting.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/endpoint.hpp>
+#include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/tcp_listener.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/store/ledger/account.hpp>
@@ -51,7 +57,12 @@ nano::test::system::system () :
 	}
 }
 
-nano::test::system::system (uint16_t count_a, nano::transport::transport_type type_a, nano::node_flags flags_a) :
+nano::test::system::system (uint16_t count_a, nano::transport::transport_type type_a) :
+	system (count_a, type_a, nano::node_flags{})
+{
+}
+
+nano::test::system::system (uint16_t count_a, nano::transport::transport_type type_a, nano::node_flags const & flags_a) :
 	system ()
 {
 	nodes.reserve (count_a);
@@ -115,13 +126,23 @@ nano::node & nano::test::system::node (std::size_t index) const
 	return *nodes[index];
 }
 
-std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_flags node_flags_a, nano::transport::transport_type type_a)
+std::shared_ptr<nano::node> nano::test::system::add_node (nano::transport::transport_type type_a)
+{
+	return add_node (default_config (), nano::node_flags{}, type_a);
+}
+
+std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_flags const & node_flags_a, nano::transport::transport_type type_a)
 {
 	return add_node (default_config (), node_flags_a, type_a);
 }
 
+std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_config const & node_config_a, nano::transport::transport_type type_a)
+{
+	return add_node (node_config_a, nano::node_flags{}, type_a);
+}
+
 /** Returns the node added. */
-std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_config const & node_config_a, nano::node_flags node_flags_a, nano::transport::transport_type type_a, std::optional<nano::keypair> const & rep)
+std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_config const & node_config_a, nano::node_flags const & node_flags_a, nano::transport::transport_type type_a, std::optional<nano::keypair> const & rep)
 {
 	auto node (std::make_shared<nano::node> (io_ctx, nano::unique_path (), node_config_a, work, node_flags_a, node_sequence++));
 	setup_node (*node);
@@ -134,7 +155,7 @@ std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_config cons
 	node->start ();
 
 	// Check that we don't start more nodes than limit for single IP address
-	debug_assert (nodes.size () < node->config.network.max_peers_per_ip || node->flags.disable_max_peers_per_ip);
+	debug_assert (nodes.size () < node->config.network->max_peers_per_ip || node->flags.disable_max_peers_per_ip);
 
 	// Connect with other nodes
 	for (auto const & other_node : nodes)
@@ -164,10 +185,14 @@ std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_config cons
 	return node;
 }
 
-// TODO: Merge with add_node
-std::shared_ptr<nano::node> nano::test::system::make_disconnected_node (std::optional<nano::node_config> opt_node_config, nano::node_flags flags)
+std::shared_ptr<nano::node> nano::test::system::make_disconnected_node ()
 {
-	nano::node_config node_config = opt_node_config.has_value () ? *opt_node_config : default_config ();
+	return make_disconnected_node (default_config (), nano::node_flags{});
+}
+
+// TODO: Merge with add_node
+std::shared_ptr<nano::node> nano::test::system::make_disconnected_node (nano::node_config const & node_config, nano::node_flags const & flags)
+{
 	auto node = std::make_shared<nano::node> (io_ctx, nano::unique_path (), node_config, work, flags);
 	setup_node (*node);
 	node->start ();
@@ -623,7 +648,8 @@ void nano::test::system::generate_mass_activity (uint32_t count_a, nano::node & 
 
 nano::node_config nano::test::system::default_config ()
 {
-	nano::node_config config{ get_available_port () };
+	nano::node_config config;
+	config.peering_port = get_available_port ();
 	config.representative_vote_weight_minimum = 0;
 	return config;
 }

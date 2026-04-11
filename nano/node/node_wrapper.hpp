@@ -2,6 +2,7 @@
 
 #include <nano/lib/work.hpp>
 #include <nano/secure/common.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <boost/asio/io_context.hpp>
 

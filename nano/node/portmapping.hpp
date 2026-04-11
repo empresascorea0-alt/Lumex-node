@@ -2,6 +2,7 @@
 
 #include <nano/boost/asio/ip/tcp.hpp>
 #include <nano/lib/locks.hpp>
+#include <nano/lib/network_types.hpp>
 
 #include <miniupnp/miniupnpc/include/miniupnpc.h>
 

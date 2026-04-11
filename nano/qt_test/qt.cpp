@@ -1,9 +1,17 @@
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/work_version.hpp>
-#include <nano/node/make_store.hpp>
+#include <nano/node/bootstrap/bootstrap_config.hpp>
+#include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
+#include <nano/node/scheduler/hinted.hpp>
+#include <nano/node/scheduler/optimistic.hpp>
+#include <nano/node/scheduler/priority.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/qt/qt.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
+#include <nano/test_common/make_store.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
@@ -465,7 +473,7 @@ TEST (history, short_text)
 	auto wallet (std::make_shared<nano_qt::wallet> (*test_application, processor, *system.nodes[0], system.wallet (0), account));
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	{
 		auto transaction (ledger.tx_begin_write ());
@@ -499,7 +507,7 @@ TEST (history, pruned_source)
 	auto wallet (std::make_shared<nano_qt::wallet> (*test_application, processor, *system.nodes[0], system.wallet (0), account));
 	nano::logger logger;
 	nano::stats stats{ logger };
-	auto store = nano::make_store (logger, stats, nano::unique_path (), nano::dev::constants);
+	auto store = nano::test::make_store (logger, stats);
 	nano::ledger ledger (*store, nano::dev::network_params, stats, logger);
 	ledger.pruning = true;
 	nano::block_hash next_pruning;
@@ -763,10 +771,10 @@ TEST (wallet, republish)
 
 	// Configure nodes to disable bootstrap, election schedulers, and other background processes for test isolation
 	nano::node_config node_config;
-	node_config.bootstrap.enable = false;
-	node_config.priority_scheduler.enable = false;
-	node_config.optimistic_scheduler.enable = false;
-	node_config.hinted_scheduler.enable = false;
+	node_config.bootstrap->enable = false;
+	node_config.priority_scheduler->enable = false;
+	node_config.optimistic_scheduler->enable = false;
+	node_config.hinted_scheduler->enable = false;
 
 	nano::test::system system;
 	auto & node1 = *system.add_node (node_config);

@@ -1,10 +1,18 @@
+#include <nano/lib/files.hpp>
+#include <nano/lib/lmdbconfig.hpp>
 #include <nano/lib/rpcconfig.hpp>
 #include <nano/lib/thread_runner.hpp>
+#include <nano/node/block_processor.hpp>
+#include <nano/node/bootstrap/bootstrap_config.hpp>
 #include <nano/node/bootstrap/bootstrap_server.hpp>
 #include <nano/node/bootstrap/bootstrap_service.hpp>
+#include <nano/node/ipc/ipc_config.hpp>
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/node/json_handler.hpp>
+#include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/transport.hpp>
+#include <nano/node/unchecked_map.hpp>
 #include <nano/rpc/rpc.hpp>
 #include <nano/rpc/rpc_request_processor.hpp>
 #include <nano/secure/ledger.hpp>
@@ -71,7 +79,7 @@ TEST (bootstrap, profile)
 	nano::node_config config_server{ network_params };
 	config_server.preconfigured_peers.clear ();
 	config_server.bandwidth_limit = 0; // Unlimited server bandwidth
-	config_server.bootstrap.enable = false;
+	config_server.bootstrap->enable = false;
 	nano::node_flags flags_server;
 	flags_server.disable_legacy_bootstrap = true;
 	flags_server.disable_wallet_bootstrap = true;
@@ -91,9 +99,9 @@ TEST (bootstrap, profile)
 	flags_client.disable_wallet_bootstrap = true;
 	flags_client.disable_add_initial_peers = true;
 	flags_client.disable_ongoing_bootstrap = true;
-	config_client.ipc_config.transport_tcp.enabled = true;
+	config_client.ipc_config->transport_tcp.enabled = true;
 	// Disable database integrity safety for higher throughput
-	config_client.lmdb_config.sync = nano::lmdb_config::sync_strategy::nosync_unsafe;
+	config_client.lmdb_config->sync = nano::lmdb_config::sync_strategy::nosync_unsafe;
 	// auto client = system.add_node (config_client, flags_client);
 
 	// macos 16GB RAM disk:  diskutil erasevolume HFS+ "RAMDisk" `hdiutil attach -nomount ram://33554432`

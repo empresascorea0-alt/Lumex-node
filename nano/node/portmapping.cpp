@@ -1,5 +1,10 @@
+#include <nano/lib/logging.hpp>
+#include <nano/lib/network_formatting.hpp>
+#include <nano/lib/stats.hpp>
 #include <nano/lib/thread_roles.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/portmapping.hpp>
 
 #include <miniupnp/miniupnpc/include/upnpcommands.h>

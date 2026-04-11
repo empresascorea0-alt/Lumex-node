@@ -1,3 +1,5 @@
+#include <nano/lib/blockbuilders.hpp>
+#include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>

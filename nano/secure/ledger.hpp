@@ -7,11 +7,14 @@
 #include <nano/secure/common.hpp>
 #include <nano/secure/fwd.hpp>
 #include <nano/secure/generate_cache_flags.hpp>
+#include <nano/secure/network_params.hpp>
 #include <nano/secure/pending_info.hpp>
 #include <nano/secure/rep_weights.hpp>
 #include <nano/secure/transaction.hpp>
 #include <nano/store/ledger_store.hpp>
 #include <nano/weights/bootstrap_weights.hpp>
+
+#include <boost/multiprecision/cpp_int.hpp>
 
 #include <deque>
 #include <map>

@@ -2,11 +2,18 @@
 #include <nano/lib/jsonconfig.hpp>
 #include <nano/lib/vote.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/nodeconfig.hpp>
+#include <nano/node/scheduler/hinted.hpp>
+#include <nano/node/scheduler/optimistic.hpp>
+#include <nano/node/scheduler/priority.hpp>
 #include <nano/node/transport/fake.hpp>
 #include <nano/node/transport/inproc.hpp>
+#include <nano/node/vote_cache.hpp>
 #include <nano/node/vote_processor.hpp>
 #include <nano/node/vote_router.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/test_common/chains.hpp>
 #include <nano/test_common/system.hpp>
@@ -21,9 +28,9 @@ TEST (vote_processor, codes)
 	nano::test::system system;
 	auto node_config = system.default_config ();
 	// Disable all election schedulers
-	node_config.backlog_scan.enable = false;
-	node_config.hinted_scheduler.enable = false;
-	node_config.optimistic_scheduler.enable = false;
+	node_config.backlog_scan->enable = false;
+	node_config.hinted_scheduler->enable = false;
+	node_config.optimistic_scheduler->enable = false;
 	auto & node = *system.add_node (node_config);
 
 	auto blocks = nano::test::setup_chain (system, node, 1, nano::dev::genesis_key, false);
@@ -152,10 +159,10 @@ TEST (vote_processor, election)
 {
 	nano::test::system system;
 	auto node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
-	node_config.priority_scheduler.enable = false;
-	node_config.hinted_scheduler.enable = false;
-	node_config.optimistic_scheduler.enable = false;
+	node_config.backlog_scan->enable = false;
+	node_config.priority_scheduler->enable = false;
+	node_config.hinted_scheduler->enable = false;
+	node_config.optimistic_scheduler->enable = false;
 	auto & node = *system.add_node (node_config);
 
 	auto blocks = nano::test::setup_chain (system, node, 1, nano::dev::genesis_key, false);
@@ -195,10 +202,10 @@ TEST (vote_processor, multiple_elections)
 {
 	nano::test::system system;
 	auto node_config = system.default_config ();
-	node_config.backlog_scan.enable = false;
-	node_config.priority_scheduler.enable = false;
-	node_config.hinted_scheduler.enable = false;
-	node_config.optimistic_scheduler.enable = false;
+	node_config.backlog_scan->enable = false;
+	node_config.priority_scheduler->enable = false;
+	node_config.hinted_scheduler->enable = false;
+	node_config.optimistic_scheduler->enable = false;
 	auto & node = *system.add_node (node_config);
 
 	auto blocks = nano::test::setup_chain (system, node, 4, nano::dev::genesis_key, false);

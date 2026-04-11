@@ -3,6 +3,7 @@
 #include <nano/lib/numbers.hpp>
 
 #include <memory>
+#include <system_error>
 
 namespace nano
 {

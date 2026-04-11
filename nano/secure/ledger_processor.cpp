@@ -8,11 +8,14 @@
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_processor.hpp>
 #include <nano/secure/ledger_set_any.hpp>
+#include <nano/secure/network_params.hpp>
 #include <nano/secure/rep_weights.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
 #include <nano/store/ledger/pending.hpp>
 #include <nano/store/ledger_store.hpp>
+
+#include <boost/multiprecision/cpp_int.hpp>
 
 nano::ledger_processor::ledger_processor (nano::secure::write_transaction const & transaction_a, nano::ledger & ledger_a) :
 	transaction (transaction_a),

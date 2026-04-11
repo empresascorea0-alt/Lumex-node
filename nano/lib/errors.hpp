@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <functional>
 #include <memory>
 #include <string>
@@ -221,13 +220,15 @@ public:
 	template <typename... ErrorCode>
 	error & accept (ErrorCode... err)
 	{
-		// Convert variadic arguments to std::error_code
 		auto codes = { std::error_code (err)... };
-		if (std::any_of (codes.begin (), codes.end (), [this, &codes] (auto & code_a) { return code == code_a; }))
+		for (auto const & code_a : codes)
 		{
-			code.clear ();
+			if (code == code_a)
+			{
+				code.clear ();
+				break;
+			}
 		}
-
 		return *this;
 	}
 

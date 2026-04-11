@@ -1,6 +1,5 @@
 #pragma once
 
-#include <nano/lib/blocks.hpp>
 #include <nano/lib/locks.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/numbers_templ.hpp>
@@ -15,6 +14,7 @@
 #include <boost/multi_index_container.hpp>
 
 #include <cstddef>
+#include <deque>
 #include <map>
 #include <memory>
 #include <optional>

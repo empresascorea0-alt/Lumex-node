@@ -2,7 +2,6 @@
 
 #include <nano/lib/interval.hpp>
 #include <nano/lib/locks.hpp>
-#include <nano/lib/logging.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/numbers_templ.hpp>
 #include <nano/lib/thread_roles.hpp>
@@ -11,6 +10,7 @@
 #include <nano/node/fwd.hpp>
 #include <nano/node/transport/traffic_type.hpp>
 #include <nano/secure/common.hpp>
+#include <nano/secure/network_params.hpp>
 #include <nano/secure/voting_policy.hpp>
 
 #include <boost/multi_index/hashed_index.hpp>

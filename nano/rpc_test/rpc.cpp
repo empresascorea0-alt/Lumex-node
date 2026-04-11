@@ -2,7 +2,9 @@
 #include <nano/boost/beast/http.hpp>
 #include <nano/crypto_lib/random_pool.hpp>
 #include <nano/lib/block_type.hpp>
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/jsonconfig.hpp>
 #include <nano/lib/rpcconfig.hpp>
 #include <nano/lib/thread_runner.hpp>
@@ -11,16 +13,25 @@
 #include <nano/lib/vote.hpp>
 #include <nano/lib/work_version.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
+#include <nano/node/bootstrap/bootstrap_config.hpp>
+#include <nano/node/bootstrap/bootstrap_service.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/election.hpp>
+#include <nano/node/ipc/ipc_config.hpp>
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/node/json_handler.hpp>
+#include <nano/node/network.hpp>
 #include <nano/node/node_rpc_config.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/online_reps.hpp>
 #include <nano/node/scheduler/component.hpp>
 #include <nano/node/scheduler/manual.hpp>
 #include <nano/node/scheduler/priority.hpp>
 #include <nano/node/telemetry.hpp>
+#include <nano/node/unchecked_map.hpp>
+#include <nano/node/vote_processor.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/rpc/rpc.hpp>
 #include <nano/rpc/rpc_request_processor.hpp>
 #include <nano/rpc_test/common.hpp>
@@ -1749,7 +1760,7 @@ TEST (rpc, keepalive)
 {
 	nano::test::system system;
 	auto node0 = add_ipc_enabled_node (system);
-	auto node1 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work));
+	auto node1 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work, nano::node_flags{}));
 	node1->start ();
 	system.nodes.push_back (node1);
 	auto const rpc_ctx = add_rpc (system, node0);
@@ -3014,7 +3025,7 @@ TEST (rpc, accounts_balances_unopened_account_with_receivables)
 {
 	nano::test::system system;
 	nano::node_config config;
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto node = add_ipc_enabled_node (system, config);
 
 	// send a 1 raw to the unopened account which will have receivables
@@ -3315,7 +3326,7 @@ TEST (rpc, pending_exists)
 {
 	nano::test::system system;
 	nano::node_config config;
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto node = add_ipc_enabled_node (system, config);
 	nano::keypair key1;
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
@@ -3374,7 +3385,7 @@ TEST (rpc, wallet_receivable)
 {
 	nano::test::system system;
 	nano::node_config config;
-	config.backlog_scan.enable = false;
+	config.backlog_scan->enable = false;
 	auto node = add_ipc_enabled_node (system, config);
 	nano::keypair key1;
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
@@ -4479,7 +4490,7 @@ TEST (rpc, populate_backlog)
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
 	// Disable automatic backlog population
-	node_config.backlog_scan.enable = false;
+	node_config.backlog_scan->enable = false;
 	auto node = add_ipc_enabled_node (system, node_config);
 
 	// Create and process a block that won't get automatically scheduled for confirmation
@@ -6007,7 +6018,7 @@ TEST (rpc, database_txn_tracker)
 	// Now try enabling it but with invalid amounts
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
-	node_config.txn_tracking.enable = true;
+	node_config.txn_tracking->enable = true;
 	auto node = add_ipc_enabled_node (system, node_config);
 	auto const rpc_ctx = add_rpc (system, node);
 
@@ -6927,8 +6938,8 @@ TEST (rpc, confirmation_active)
 {
 	nano::test::system system;
 	nano::node_config node_config;
-	node_config.ipc_config.transport_tcp.enabled = true;
-	node_config.ipc_config.transport_tcp.port = system.get_available_port ();
+	node_config.ipc_config->transport_tcp.enabled = true;
+	node_config.ipc_config->transport_tcp.port = system.get_available_port ();
 	nano::node_flags node_flags;
 	node_flags.disable_request_loop = true;
 	auto node1 (system.add_node (node_config, node_flags));
@@ -6975,7 +6986,7 @@ TEST (rpc, confirmation_info)
 {
 	nano::test::system system;
 	nano::node_config node_config;
-	node_config.backlog_scan.enable = false; // Disable backlog scan to avoid unwanted elections
+	node_config.backlog_scan->enable = false; // Disable backlog scan to avoid unwanted elections
 	auto node = add_ipc_enabled_node (system, node_config);
 	auto const rpc_ctx = add_rpc (system, node);
 
@@ -7142,7 +7153,7 @@ TEST (rpc, bootstrap_priorities)
 	int const blocks_per_chain = 4;
 
 	nano::node_config config;
-	config.bootstrap.rate_limit = 10; // Add request limits to slow down bootstrap
+	config.bootstrap->rate_limit = 10; // Add request limits to slow down bootstrap
 
 	// Start server node
 	auto & node_server = *system.add_node (config);
@@ -7179,7 +7190,7 @@ TEST (rpc, bootstrap_reset)
 	int const blocks_per_chain = 4;
 
 	nano::node_config config;
-	config.bootstrap.rate_limit = 5; // Add request limits to slow down bootstrap
+	config.bootstrap->rate_limit = 5; // Add request limits to slow down bootstrap
 
 	// Start server node
 	auto & node_server = *system.add_node (config);
@@ -7214,7 +7225,7 @@ TEST (rpc, bootstrap_status)
 	int const blocks_per_chain = 4;
 
 	nano::node_config config;
-	config.bootstrap.rate_limit = 5; // Add request limits to slow down bootstrap
+	config.bootstrap->rate_limit = 5; // Add request limits to slow down bootstrap
 
 	// Start server node
 	auto & node_server = *system.add_node (config);

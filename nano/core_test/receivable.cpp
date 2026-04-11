@@ -1,3 +1,4 @@
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/secure/common.hpp>
 #include <nano/store/ledger/pending.hpp>
 #include <nano/store/ledger_store.hpp>

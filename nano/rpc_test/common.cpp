@@ -1,3 +1,5 @@
+#include <nano/node/ipc/ipc_config.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/rpc_test/common.hpp>
 #include <nano/store/ledger/confirmation_height.hpp>
 #include <nano/store/ledger_store.hpp>
@@ -6,8 +8,8 @@
 
 std::shared_ptr<nano::node> nano::test::add_ipc_enabled_node (nano::test::system & system, nano::node_config & node_config, nano::node_flags const & node_flags)
 {
-	node_config.ipc_config.transport_tcp.enabled = true;
-	node_config.ipc_config.transport_tcp.port = system.get_available_port ();
+	node_config.ipc_config->transport_tcp.enabled = true;
+	node_config.ipc_config->transport_tcp.port = system.get_available_port ();
 	return system.add_node (node_config, node_flags);
 }
 

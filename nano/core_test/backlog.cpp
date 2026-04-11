@@ -1,5 +1,8 @@
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/backlog_scan.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/test_common/chains.hpp>
 #include <nano/test_common/system.hpp>
@@ -8,6 +11,7 @@
 #include <gtest/gtest.h>
 
 #include <numeric>
+#include <unordered_set>
 
 using namespace std::chrono_literals;
 

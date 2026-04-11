@@ -18,10 +18,10 @@ std::filesystem::path nano::database_path_for_backend (std::filesystem::path con
 	release_assert (false, "unknown database backend");
 }
 
-std::unique_ptr<nano::store::ledger_store> nano::make_store (nano::logger & logger, nano::stats & stats, std::filesystem::path const & path, nano::ledger_constants & constants, bool read_only, bool add_db_postfix, nano::node_config node_config)
+std::unique_ptr<nano::store::ledger_store> nano::make_store (nano::logger & logger, nano::stats & stats, std::filesystem::path const & path, nano::ledger_constants & constants, bool read_only, bool add_db_postfix, nano::node_config const & node_config)
 {
 	auto decide_backend = [&] () -> nano::database_backend {
-		if (node_config.rocksdb_config.enable && node_config.database_backend == nano::database_backend::lmdb)
+		if (node_config.rocksdb_config->enable && node_config.database_backend == nano::database_backend::lmdb)
 		{
 			logger.warn (nano::log::type::config, "Use of deprecated `[node.rocksdb].enable` setting detected in config file, defaulting to RocksDB backend.\nPlease edit config-node.toml and use the new '[node].database_backend' for future compatibility.");
 			return nano::database_backend::rocksdb;
@@ -39,13 +39,13 @@ std::unique_ptr<nano::store::ledger_store> nano::make_store (nano::logger & logg
 		case nano::database_backend::lmdb:
 		{
 			auto db_path = add_db_postfix ? database_path_for_backend (path, backend_type) : path;
-			backend = std::make_unique<nano::store::lmdb::backend_lmdb> (db_path, node_config.lmdb_config, logger, node_config.txn_tracking);
+			backend = std::make_unique<nano::store::lmdb::backend_lmdb> (db_path, *node_config.lmdb_config, logger, *node_config.txn_tracking);
 			break;
 		}
 		case nano::database_backend::rocksdb:
 		{
 			auto db_path = add_db_postfix ? database_path_for_backend (path, backend_type) : path;
-			backend = std::make_unique<nano::store::rocksdb::backend_rocksdb> (db_path, node_config.rocksdb_config, logger, node_config.txn_tracking);
+			backend = std::make_unique<nano::store::rocksdb::backend_rocksdb> (db_path, *node_config.rocksdb_config, logger, *node_config.txn_tracking);
 			break;
 		}
 	}

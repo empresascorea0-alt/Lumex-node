@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nano/lib/fwd.hpp>
+#include <nano/lib/locks.hpp>
 #include <nano/lib/relaxed_atomic.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/threading.hpp>
@@ -119,13 +121,7 @@ public:
 		return num_delayed;
 	}
 
-	nano::container_info container_info () const
-	{
-		nano::container_info info;
-		info.put ("tasks", num_tasks);
-		info.put ("delayed", num_delayed);
-		return info;
-	}
+	nano::container_info container_info () const;
 
 private:
 	void set_thread_names ()

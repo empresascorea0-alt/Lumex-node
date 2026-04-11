@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nano/lib/ipc_client.hpp>
+#include <nano/lib/locks.hpp>
 #include <nano/lib/rpc_handler_interface.hpp>
 #include <nano/lib/rpcconfig.hpp>
 #include <nano/rpc/rpc.hpp>

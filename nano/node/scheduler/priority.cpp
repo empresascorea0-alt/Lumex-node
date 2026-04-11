@@ -1,9 +1,12 @@
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/node/active_elections.hpp>
 #include <nano/node/bucketing.hpp>
+#include <nano/node/cementing_set.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/ledger_notifications.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/scheduler/priority.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
@@ -11,7 +14,7 @@
 #include <nano/store/ledger/confirmation_height.hpp>
 
 nano::scheduler::priority::priority (nano::node_config & node_config, nano::node & node_a, nano::ledger & ledger_a, nano::ledger_notifications & ledger_notifications_a, nano::bucketing & bucketing_a, nano::active_elections & active_a, nano::cementing_set & cementing_set_a, nano::stats & stats_a, nano::logger & logger_a) :
-	config{ node_config.priority_scheduler },
+	config{ *node_config.priority_scheduler },
 	node{ node_a },
 	ledger{ ledger_a },
 	ledger_notifications{ ledger_notifications_a },

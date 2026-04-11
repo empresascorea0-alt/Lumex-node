@@ -1,4 +1,5 @@
 #include <nano/crypto_lib/random_pool.hpp>
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
@@ -8,6 +9,7 @@
 #include <nano/node/openclconfig.hpp>
 #include <nano/node/openclwork.hpp>
 #include <nano/secure/common.hpp>
+#include <nano/secure/network_params.hpp>
 
 #include <gtest/gtest.h>
 

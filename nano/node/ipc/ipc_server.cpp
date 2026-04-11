@@ -2,17 +2,22 @@
 #include <nano/boost/asio/local/stream_protocol.hpp>
 #include <nano/boost/asio/read.hpp>
 #include <nano/boost/asio/strand.hpp>
+#include <nano/lib/asio.hpp>
 #include <nano/lib/config.hpp>
 #include <nano/lib/ipc.hpp>
 #include <nano/lib/locks.hpp>
+#include <nano/lib/logging.hpp>
+#include <nano/lib/stats.hpp>
 #include <nano/lib/thread_runner.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/timer.hpp>
 #include <nano/node/ipc/action_handler.hpp>
 #include <nano/node/ipc/flatbuffers_handler.hpp>
+#include <nano/node/ipc/ipc_config.hpp>
 #include <nano/node/ipc/ipc_server.hpp>
 #include <nano/node/json_handler.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/nodeconfig.hpp>
 
 #include <boost/array.hpp>
 #include <boost/endian/conversion.hpp>
@@ -340,7 +345,7 @@ public:
 						// Lazily create one Flatbuffers handler instance per session
 						if (!this_l->flatbuffers_handler)
 						{
-							this_l->flatbuffers_handler = std::make_shared<nano::ipc::flatbuffers_handler> (this_l->node, this_l->server, this_l->get_subscriber (), this_l->node.config.ipc_config);
+							this_l->flatbuffers_handler = std::make_shared<nano::ipc::flatbuffers_handler> (this_l->node, this_l->server, this_l->get_subscriber (), *this_l->node.config.ipc_config);
 						}
 
 						if (encoding == static_cast<uint8_t> (nano::ipc::payload_encoding::flatbuffers_json))
@@ -598,22 +603,22 @@ nano::ipc::ipc_server::ipc_server (nano::node & node_a, nano::node_rpc_config co
 		{
 			std::exit (1);
 		}
-		if (node_a.config.ipc_config.transport_domain.enabled)
+		if (node_a.config.ipc_config->transport_domain.enabled)
 		{
 #if defined(BOOST_ASIO_HAS_LOCAL_SOCKETS)
-			auto threads = node_a.config.ipc_config.transport_domain.io_threads;
-			file_remover = std::make_unique<dsock_file_remover> (node_a.config.ipc_config.transport_domain.path);
-			boost::asio::local::stream_protocol::endpoint ep{ node_a.config.ipc_config.transport_domain.path };
-			transports.push_back (std::make_shared<domain_socket_transport> (*this, ep, node_a.config.ipc_config.transport_domain, threads));
+			auto threads = node_a.config.ipc_config->transport_domain.io_threads;
+			file_remover = std::make_unique<dsock_file_remover> (node_a.config.ipc_config->transport_domain.path);
+			boost::asio::local::stream_protocol::endpoint ep{ node_a.config.ipc_config->transport_domain.path };
+			transports.push_back (std::make_shared<domain_socket_transport> (*this, ep, node_a.config.ipc_config->transport_domain, threads));
 #else
 			node.logger.error (nano::log::type::ipc_server, "Domain sockets are not supported on this platform");
 #endif
 		}
 
-		if (node_a.config.ipc_config.transport_tcp.enabled)
+		if (node_a.config.ipc_config->transport_tcp.enabled)
 		{
-			auto threads = node_a.config.ipc_config.transport_tcp.io_threads;
-			transports.push_back (std::make_shared<tcp_socket_transport> (*this, boost::asio::ip::tcp::endpoint (boost::asio::ip::tcp::v6 (), node_a.config.ipc_config.transport_tcp.port), node_a.config.ipc_config.transport_tcp, threads));
+			auto threads = node_a.config.ipc_config->transport_tcp.io_threads;
+			transports.push_back (std::make_shared<tcp_socket_transport> (*this, boost::asio::ip::tcp::endpoint (boost::asio::ip::tcp::v6 (), node_a.config.ipc_config->transport_tcp.port), node_a.config.ipc_config->transport_tcp, threads));
 		}
 
 		node.logger.debug (nano::log::type::ipc_server, "Server started");

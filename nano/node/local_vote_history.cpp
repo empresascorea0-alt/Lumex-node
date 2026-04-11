@@ -1,6 +1,7 @@
 #include <nano/lib/vote.hpp>
 #include <nano/node/local_vote_history.hpp>
 #include <nano/secure/common.hpp>
+#include <nano/secure/network_params.hpp>
 
 bool nano::local_vote_history::consistency_check (nano::root const & root_a) const
 {

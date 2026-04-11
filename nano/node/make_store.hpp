@@ -1,10 +1,16 @@
 #pragma once
 
+#include <nano/lib/fwd.hpp>
 #include <nano/node/fwd.hpp>
-#include <nano/node/nodeconfig.hpp>
+#include <nano/secure/fwd.hpp>
+#include <nano/store/fwd.hpp>
+
+#include <filesystem>
+#include <memory>
 
 namespace nano
 {
+
 // Returns the database path for the given backend type
 std::filesystem::path database_path_for_backend (std::filesystem::path const & base_path, database_backend backend_type);
 
@@ -13,7 +19,7 @@ nano::logger &,
 nano::stats &,
 std::filesystem::path const & path,
 nano::ledger_constants & constants,
-bool read_only = false,
-bool add_db_postfix = true,
-nano::node_config node_config = nano::node_config{});
+bool read_only,
+bool add_db_postfix,
+nano::node_config const & node_config);
 }

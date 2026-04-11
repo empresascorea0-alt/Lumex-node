@@ -2,6 +2,7 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
 #include <nano/lib/enum_util.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/timer.hpp>
 #include <nano/node/active_elections.hpp>
@@ -9,6 +10,7 @@
 #include <nano/node/ledger_notifications.hpp>
 #include <nano/node/local_vote_history.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/formatting.hpp>
 #include <nano/node/unchecked_map.hpp>
 #include <nano/secure/ledger.hpp>
@@ -21,7 +23,7 @@
  */
 
 nano::block_processor::block_processor (nano::node_config const & node_config_a, nano::ledger & ledger_a, nano::ledger_notifications & ledger_notifications_a, nano::unchecked_map & unchecked_a, nano::stats & stats_a, nano::logger & logger_a) :
-	config{ node_config_a.block_processor },
+	config{ *node_config_a.block_processor },
 	node_config{ node_config_a },
 	network_params{ node_config.network_params },
 	ledger{ ledger_a },

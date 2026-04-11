@@ -1,19 +1,23 @@
 #pragma once
 
+#include <nano/lib/constants.hpp>
+#include <nano/lib/fwd.hpp>
 #include <nano/lib/interval.hpp>
-#include <nano/lib/logging.hpp>
 #include <nano/lib/network_filter.hpp>
-#include <nano/messages/messages.hpp>
+#include <nano/messages/fwd.hpp>
+#include <nano/messages/node_id_handshake.hpp>
 #include <nano/node/endpoint.hpp>
 #include <nano/node/peer_exclusion.hpp>
 #include <nano/node/transport/common.hpp>
 #include <nano/node/transport/fwd.hpp>
 #include <nano/node/transport/tcp_channels.hpp>
 
+#include <chrono>
 #include <deque>
 #include <memory>
 #include <unordered_set>
 
+using namespace std::chrono_literals;
 namespace nano
 {
 class node;

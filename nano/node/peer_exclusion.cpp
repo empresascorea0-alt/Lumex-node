@@ -1,3 +1,5 @@
+#include <nano/lib/assert.hpp>
+#include <nano/lib/container_info.hpp>
 #include <nano/node/peer_exclusion.hpp>
 
 nano::peer_exclusion::peer_exclusion (std::size_t max_size_a) :

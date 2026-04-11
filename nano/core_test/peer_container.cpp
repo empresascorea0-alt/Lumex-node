@@ -1,5 +1,9 @@
+#include <nano/messages/keepalive.hpp>
+#include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/transport/tcp_server.hpp>
 #include <nano/node/transport/tcp_socket.hpp>
+#include <nano/node/transport/transport.hpp>
 #include <nano/test_common/network.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
@@ -214,8 +218,8 @@ TEST (peer_container, reachout)
 	nano::test::system system;
 	nano::node_config node_config = system.default_config ();
 	// Disable automatic reachout
-	node_config.network.cached_peer_reachout = 0s;
-	node_config.network.peer_reachout = 0s;
+	node_config.network->cached_peer_reachout = 0s;
+	node_config.network->peer_reachout = 0s;
 	nano::node_flags node_flags;
 	auto & node1 = *system.add_node (node_flags);
 	auto outer_node1 = nano::test::add_outer_node (system);

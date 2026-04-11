@@ -1,13 +1,19 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
+#include <nano/lib/logging.hpp>
 #include <nano/lib/thread_roles.hpp>
+#include <nano/node/active_elections.hpp>
 #include <nano/node/backlog_scan.hpp>
 #include <nano/node/block_processor.hpp>
 #include <nano/node/bounded_backlog.hpp>
 #include <nano/node/cementing_set.hpp>
 #include <nano/node/ledger_notifications.hpp>
+#include <nano/node/local_block_broadcaster.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/nodeconfig.hpp>
 #include <nano/node/scheduler/component.hpp>
+#include <nano/node/vote_cache.hpp>
+#include <nano/node/vote_router.hpp>
 #include <nano/secure/common.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
@@ -24,9 +30,9 @@ nano::bounded_backlog::bounded_backlog (nano::node_config const & config_a, nano
 	cementing_set{ cementing_set_a },
 	stats{ stats_a },
 	logger{ logger_a },
-	scan_limiter{ config.bounded_backlog.scan_rate }
+	scan_limiter{ config.bounded_backlog->scan_rate }
 {
-	if (!config.bounded_backlog.enable || ledger.max_backlog () == 0)
+	if (!config.bounded_backlog->enable || ledger.max_backlog () == 0)
 	{
 		return;
 	}
@@ -95,7 +101,7 @@ void nano::bounded_backlog::start ()
 {
 	debug_assert (!thread.joinable ());
 
-	if (!config.bounded_backlog.enable || ledger.max_backlog () == 0)
+	if (!config.bounded_backlog->enable || ledger.max_backlog () == 0)
 	{
 		return;
 	}
@@ -237,7 +243,7 @@ void nano::bounded_backlog::run ()
 		}
 
 		auto const bucket_threshold = max_backlog / bucketing.size ();
-		auto targets = gather_targets (std::min (target_count, static_cast<uint64_t> (config.bounded_backlog.batch_size)), bucket_threshold);
+		auto targets = gather_targets (std::min (target_count, static_cast<uint64_t> (config.bounded_backlog->batch_size)), bucket_threshold);
 		if (!targets.empty ())
 		{
 			lock.unlock ();
@@ -371,7 +377,7 @@ std::deque<nano::block_hash> nano::bounded_backlog::gather_targets (size_t max_c
 		// Only start rolling back if the bucket is over the threshold of unconfirmed blocks
 		if (index.size (bucket) > bucket_threshold)
 		{
-			auto const count = std::min (max_count, config.bounded_backlog.batch_size);
+			auto const count = std::min (max_count, config.bounded_backlog->batch_size);
 
 			auto const top = index.top (bucket, count, [this] (auto const & hash) {
 				// Only rollback if the block is not being used by the node
@@ -407,11 +413,11 @@ void nano::bounded_backlog::run_scan ()
 		nano::block_hash last = 0;
 		while (!stopped)
 		{
-			wait (config.bounded_backlog.batch_size);
+			wait (config.bounded_backlog->batch_size);
 
 			stats.inc (nano::stat::type::bounded_backlog, nano::stat::detail::loop_scan);
 
-			auto batch = index.next (last, config.bounded_backlog.batch_size);
+			auto batch = index.next (last, config.bounded_backlog->batch_size);
 			if (batch.empty ()) // If batch is empty, we iterated over all accounts in the index
 			{
 				break;

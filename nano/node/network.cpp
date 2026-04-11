@@ -1,11 +1,19 @@
 #include <nano/crypto_lib/random_pool_shuffle.hpp>
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/logging.hpp>
+#include <nano/lib/network_formatting.hpp>
+#include <nano/lib/thread_pool.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/utility.hpp>
+#include <nano/messages/messages.hpp>
 #include <nano/node/message_processor.hpp>
 #include <nano/node/network.hpp>
 #include <nano/node/node.hpp>
+#include <nano/node/node_observers.hpp>
+#include <nano/node/nodeconfig.hpp>
+#include <nano/node/peer_history.hpp>
 #include <nano/node/portmapping.hpp>
+#include <nano/node/repcrawler.hpp>
 #include <nano/node/telemetry.hpp>
 #include <nano/node/transport/formatting.hpp>
 
@@ -20,12 +28,12 @@ std::size_t nano::network::confirm_ack_hashes_max{ 255 };
  */
 
 nano::network::network (nano::node & node_a, uint16_t port_a) :
-	config{ node_a.config.network },
+	config{ *node_a.config.network },
 	node{ node_a },
 	id{ node.network_params.network.network () },
-	syn_cookies{ node.config.network.max_peers_per_ip, node.logger },
+	syn_cookies{ node.config.network->max_peers_per_ip, node.logger },
 	resolver{ node.io_ctx },
-	filter{ node.config.network.duplicate_filter_size, node.config.network.duplicate_filter_cutoff },
+	filter{ node.config.network->duplicate_filter_size, node.config.network->duplicate_filter_cutoff },
 	tcp_channels{ node },
 	port{ port_a }
 {

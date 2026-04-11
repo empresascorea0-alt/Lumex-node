@@ -1,6 +1,5 @@
 #pragma once
 
-#include <nano/lib/logging.hpp>
 #include <nano/lib/rocksdbconfig.hpp>
 #include <nano/store/backend.hpp>
 #include <nano/store/txn_tracking.hpp>

@@ -1,11 +1,18 @@
+#include <nano/lib/blockbuilders.hpp>
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/config.hpp>
+#include <nano/lib/files.hpp>
 #include <nano/lib/logging.hpp>
 #include <nano/lib/vote.hpp>
+#include <nano/messages/confirm.hpp>
 #include <nano/node/active_elections.hpp>
+#include <nano/node/network.hpp>
+#include <nano/node/nodeconfig.hpp>
+#include <nano/node/online_reps.hpp>
 #include <nano/node/repcrawler.hpp>
 #include <nano/node/transport/fake.hpp>
 #include <nano/node/transport/inproc.hpp>
+#include <nano/node/wallet.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/test_common/chains.hpp>
 #include <nano/test_common/network.hpp>
@@ -205,7 +212,7 @@ TEST (rep_crawler, rep_remove)
 	ASSERT_TIMELY_EQ (5s, searching_node.rep_crawler.representative_count (), 0);
 
 	// Add working node for genesis representative
-	auto node_genesis_rep = system.add_node (nano::node_config (system.get_available_port ()));
+	auto node_genesis_rep = system.add_node ([&] { nano::node_config c; c.peering_port = system.get_available_port (); return c; }());
 	system.wallet (1)->insert_adhoc (nano::dev::genesis_key.prv);
 	auto channel_genesis_rep (searching_node.network.find_node_id (node_genesis_rep->get_node_id ()));
 	ASSERT_NE (nullptr, channel_genesis_rep);
@@ -216,7 +223,8 @@ TEST (rep_crawler, rep_remove)
 	ASSERT_TIMELY_EQ (10s, searching_node.rep_crawler.representative_count (), 1);
 
 	// Start a node for Rep2 and wait until it is connected
-	auto node_rep2 (std::make_shared<nano::node> (system.io_ctx, nano::unique_path (), nano::node_config (system.get_available_port ()), system.work));
+	auto node_rep2 (std::make_shared<nano::node> (
+	system.io_ctx, nano::unique_path (), [&] { nano::node_config c; c.peering_port = system.get_available_port (); return c; }(), system.work, nano::node_flags{}));
 	node_rep2->start ();
 	searching_node.network.tcp_channels.start_tcp (node_rep2->network.endpoint ());
 	std::shared_ptr<nano::transport::channel> channel_rep2;

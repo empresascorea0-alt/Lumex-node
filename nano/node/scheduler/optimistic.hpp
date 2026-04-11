@@ -1,7 +1,13 @@
 #pragma once
 
 #include <nano/lib/locks.hpp>
+
+#include <chrono>
+
+using namespace std::chrono_literals;
+
 #include <nano/lib/numbers.hpp>
+#include <nano/lib/numbers_templ.hpp>
 #include <nano/lib/timer.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/node/fwd.hpp>
