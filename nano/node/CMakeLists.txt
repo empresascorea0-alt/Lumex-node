@@ -235,6 +235,7 @@ target_link_libraries(
   nano_lib
   nano_messages
   nano_store
+  wallet
   secure
   weights
   rpc

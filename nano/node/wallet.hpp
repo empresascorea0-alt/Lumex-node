@@ -13,8 +13,8 @@
 #include <nano/node/openclwork.hpp>
 #include <nano/secure/common.hpp>
 #include <nano/store/lmdb/lmdb_env.hpp>
-#include <nano/store/lmdb/wallet_value.hpp>
 #include <nano/store/typed_iterator.hpp>
+#include <nano/wallet/wallet_value.hpp>
 
 #include <atomic>
 #include <mutex>
@@ -35,7 +35,7 @@ enum class key_type
 class wallet_store final
 {
 public:
-	using iterator = store::typed_iterator<nano::account, nano::wallet_value>;
+	using iterator = store::typed_iterator<nano::account, nano::wallet::wallet_value>;
 
 public:
 	wallet_store (nano::kdf &, nano::store::write_transaction &, store::lmdb::env &, nano::account representative, unsigned fanout, std::string const & wallet_path);
@@ -65,8 +65,8 @@ public:
 	nano::public_key insert_adhoc (nano::store::write_transaction const &, nano::raw_key const & prv);
 	bool insert_watch (nano::store::write_transaction const &, nano::account const & pub);
 	void erase (nano::store::write_transaction const &, nano::account const & pub);
-	nano::wallet_value entry_get_raw (nano::store::transaction const &, nano::account const & pub) const;
-	void entry_put_raw (nano::store::write_transaction const &, nano::account const & pub, nano::wallet_value const & entry);
+	nano::wallet::wallet_value entry_get_raw (nano::store::transaction const &, nano::account const & pub) const;
+	void entry_put_raw (nano::store::write_transaction const &, nano::account const & pub, nano::wallet::wallet_value const & entry);
 	nano::result<nano::raw_key> fetch (nano::store::transaction const &, nano::account const & pub) const;
 	bool exists (nano::store::transaction const &, nano::account const & pub) const;
 	void destroy (nano::store::write_transaction const &);
