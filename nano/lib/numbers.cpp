@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <ostream>
+#include <stdexcept>
 
 #include <crypto/ed25519-donna/ed25519.h>
 #include <cryptopp/aes.h>
@@ -856,6 +857,29 @@ std::ostream & nano::operator<< (std::ostream & os, const nano::account & val)
 {
 	val.encode_account (os);
 	return os;
+}
+
+/*
+ * wallet_id parsing
+ */
+
+std::optional<nano::wallet_id> nano::try_parse_wallet_id (std::string const & text)
+{
+	nano::wallet_id id;
+	if (id.decode_hex (text))
+	{
+		return std::nullopt;
+	}
+	return id;
+}
+
+nano::wallet_id nano::parse_wallet_id (std::string const & text)
+{
+	if (auto id = try_parse_wallet_id (text))
+	{
+		return *id;
+	}
+	throw std::invalid_argument{ "Invalid wallet id: " + text };
 }
 
 /*

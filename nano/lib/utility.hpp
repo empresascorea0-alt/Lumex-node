@@ -6,7 +6,9 @@
 
 #include <chrono>
 #include <deque>
+#include <span>
 #include <sstream>
+#include <string>
 #include <vector>
 
 namespace boost
@@ -35,6 +37,14 @@ overloaded (Ts...) -> overloaded<Ts...>;
 
 // Lower priority of calling work generating thread
 void work_thread_reprioritize ();
+
+/**
+ * Reinterpret a byte view as a std::string
+ */
+inline std::string bytes_to_string (std::span<uint8_t const> const & bytes)
+{
+	return std::string{ reinterpret_cast<char const *> (bytes.data ()), bytes.size () };
+}
 
 template <class InputIt, class OutputIt, class Pred, class Func>
 void transform_if (InputIt first, InputIt last, OutputIt dest, Pred pred, Func transform)

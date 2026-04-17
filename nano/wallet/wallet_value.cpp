@@ -17,5 +17,10 @@ nano::wallet::wallet_value::wallet_value (nano::raw_key const & key_a, uint64_t 
 nano::store::db_val nano::wallet::wallet_value::val () const
 {
 	static_assert (sizeof (*this) == sizeof (key) + sizeof (work), "Class not packed");
-	return nano::store::db_val (sizeof (*this), const_cast<nano::wallet::wallet_value *> (this));
+	return nano::store::db_val (sizeof (*this), this);
+}
+
+nano::wallet::wallet_value::operator nano::store::db_val () const
+{
+	return val ();
 }

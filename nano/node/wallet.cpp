@@ -18,25 +18,21 @@
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/secure/ledger_set_cemented.hpp>
 #include <nano/store/ledger/pending.hpp>
-#include <nano/store/lmdb/common.hpp>
-#include <nano/store/lmdb/db_val.hpp>
-#include <nano/store/lmdb/iterator.hpp>
-#include <nano/store/lmdb/utility.hpp>
 #include <nano/store/typed_iterator_templ.hpp>
 #include <nano/wallet/wallet_value.hpp>
+#include <nano/wallet/wallets_backend.hpp>
 
 #include <boost/format.hpp>
-#include <boost/polymorphic_cast.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
 #include <future>
 #include <stdexcept>
+#include <type_traits>
 
 template class nano::store::typed_iterator<nano::account, nano::wallet::wallet_value>;
 
 namespace nano::wallet
 {
-
 /*
  * wallet_store
  */
@@ -60,19 +56,16 @@ std::string const wallet_store::default_password{ "" };
 std::size_t const wallet_store::check_iv_index (0);
 std::size_t const wallet_store::seed_iv_index (1);
 
-wallet_store::wallet_store (nano::kdf & kdf_a, nano::store::write_transaction & transaction_a, store::lmdb::env & env_a, unsigned fanout_a, std::string const & wallet_a, std::string const & json_a) :
+wallet_store::wallet_store (nano::kdf & kdf_a, nano::store::write_transaction & transaction_a, nano::wallet::wallets_backend & backend_a, unsigned fanout_a, std::string const & wallet_a, std::string const & json_a) :
 	password (0, fanout_a),
 	wallet_key_mem (0, fanout_a),
 	kdf (kdf_a),
-	env{ env_a }
+	backend{ backend_a }
 {
-	initialize (transaction_a, wallet_a);
+	handle = backend.wallet_open_or_create (transaction_a, wallet_a);
 	try
 	{
-		MDB_val junk;
-		nano::store::lmdb::db_val version_key (version_special);
-		auto mdb_version_key = nano::store::lmdb::to_mdb_val (version_key);
-		debug_assert (mdb_get (env.tx (transaction_a), handle, &mdb_version_key, &junk) == MDB_NOTFOUND);
+		release_assert (!backend.entry_exists (transaction_a, handle, version_special), "wallet already exists before import");
 		boost::property_tree::ptree wallet_l;
 		std::stringstream istream (json_a);
 		try
@@ -97,21 +90,12 @@ wallet_store::wallet_store (nano::kdf & kdf_a, nano::store::write_transaction & 
 			}
 			entry_put_raw (transaction_a, key, nano::wallet::wallet_value (value, 0));
 		}
-		nano::store::lmdb::db_val wallet_key_key (wallet_key_special);
-		nano::store::lmdb::db_val salt_key (salt_special);
-		nano::store::lmdb::db_val check_key (check_special);
-		auto mdb_version_key2 = nano::store::lmdb::to_mdb_val (version_key);
-		auto mdb_wallet_key_key = nano::store::lmdb::to_mdb_val (wallet_key_key);
-		auto mdb_salt_key = nano::store::lmdb::to_mdb_val (salt_key);
-		auto mdb_check_key = nano::store::lmdb::to_mdb_val (check_key);
 		bool missing = false;
-		missing |= mdb_get (env.tx (transaction_a), handle, &mdb_version_key2, &junk) != 0;
-		missing |= mdb_get (env.tx (transaction_a), handle, &mdb_wallet_key_key, &junk) != 0;
-		missing |= mdb_get (env.tx (transaction_a), handle, &mdb_salt_key, &junk) != 0;
-		missing |= mdb_get (env.tx (transaction_a), handle, &mdb_check_key, &junk) != 0;
-		nano::store::lmdb::db_val rep_key (representative_special);
-		auto mdb_rep_key = nano::store::lmdb::to_mdb_val (rep_key);
-		missing |= mdb_get (env.tx (transaction_a), handle, &mdb_rep_key, &junk) != 0;
+		missing |= !backend.entry_exists (transaction_a, handle, version_special);
+		missing |= !backend.entry_exists (transaction_a, handle, wallet_key_special);
+		missing |= !backend.entry_exists (transaction_a, handle, salt_special);
+		missing |= !backend.entry_exists (transaction_a, handle, check_special);
+		missing |= !backend.entry_exists (transaction_a, handle, representative_special);
 		if (missing)
 		{
 			throw std::runtime_error ("Wallet is missing required entries");
@@ -130,21 +114,16 @@ wallet_store::wallet_store (nano::kdf & kdf_a, nano::store::write_transaction & 
 	}
 }
 
-wallet_store::wallet_store (nano::kdf & kdf_a, nano::store::write_transaction & transaction_a, store::lmdb::env & env_a, nano::account representative_a, unsigned fanout_a, std::string const & wallet_a) :
+wallet_store::wallet_store (nano::kdf & kdf_a, nano::store::write_transaction & transaction_a, nano::wallet::wallets_backend & backend_a, nano::account representative_a, unsigned fanout_a, std::string const & wallet_a) :
 	password (0, fanout_a),
 	wallet_key_mem (0, fanout_a),
 	kdf (kdf_a),
-	env{ env_a }
+	backend{ backend_a }
 {
-	initialize (transaction_a, wallet_a);
+	handle = backend.wallet_open_or_create (transaction_a, wallet_a);
 	try
 	{
-		int version_status;
-		MDB_val version_value;
-		nano::store::lmdb::db_val version_lookup_key (version_special);
-		auto mdb_version_lookup_key = nano::store::lmdb::to_mdb_val (version_lookup_key);
-		version_status = mdb_get (env.tx (transaction_a), handle, &mdb_version_lookup_key, &version_value);
-		if (version_status == MDB_NOTFOUND)
+		if (!backend.entry_exists (transaction_a, handle, version_special))
 		{
 			version_put (transaction_a, version_current);
 			nano::raw_key salt_l;
@@ -199,23 +178,9 @@ std::vector<nano::account> wallet_store::accounts (nano::store::transaction cons
 	return result;
 }
 
-void wallet_store::initialize (nano::store::write_transaction const & transaction_a, std::string const & path_a)
-{
-	debug_assert (strlen (path_a.c_str ()) == path_a.size ());
-	MDB_dbi handle_l;
-	auto error = mdb_dbi_open (env.tx (transaction_a), path_a.c_str (), MDB_CREATE, &handle_l);
-	if (error != 0)
-	{
-		throw std::runtime_error ("Failed to open wallet database '" + path_a + "': " + nano::store::lmdb::error_string (error));
-	}
-	handle = handle_l;
-}
-
 void wallet_store::destroy (nano::store::write_transaction const & transaction_a)
 {
-	auto status (mdb_drop (env.tx (transaction_a), handle, /* delete from database */ 1));
-	release_assert (nano::store::lmdb::success (status), nano::store::lmdb::error_string (status));
-	handle = 0;
+	backend.wallet_drop (transaction_a, handle.lock ().get ());
 }
 
 bool wallet_store::is_representative (nano::store::transaction const & transaction_a) const
@@ -260,41 +225,25 @@ bool wallet_store::insert_watch (nano::store::write_transaction const & transact
 
 void wallet_store::erase (nano::store::write_transaction const & transaction_a, nano::account const & pub)
 {
-	nano::store::lmdb::db_val pub_key (pub);
-	MDB_val mdb_pub_key{ pub_key.size (), pub_key.data () };
-	auto status (mdb_del (env.tx (transaction_a), handle, &mdb_pub_key, nullptr));
-	release_assert (nano::store::lmdb::success (status), nano::store::lmdb::error_string (status));
+	backend.entry_del (transaction_a, handle, pub);
 }
 
 nano::wallet::wallet_value wallet_store::entry_get_raw (nano::store::transaction const & transaction_a, nano::account const & pub_a) const
 {
+	auto value = backend.entry_get (transaction_a, handle, pub_a);
+	if (value)
+	{
+		return nano::wallet::wallet_value{ *value };
+	}
 	nano::wallet::wallet_value result;
-	nano::store::lmdb::db_val value;
-	nano::store::lmdb::db_val pub_key (pub_a);
-	auto mdb_pub_key = nano::store::lmdb::to_mdb_val (pub_key);
-	MDB_val mdb_value{};
-	auto status (mdb_get (env.tx (transaction_a), handle, &mdb_pub_key, &mdb_value));
-	if (status == 0)
-	{
-		value = nano::store::lmdb::from_mdb_val (mdb_value);
-		result = nano::wallet::wallet_value (value);
-	}
-	else
-	{
-		result.key.clear ();
-		result.work = 0;
-	}
+	result.key.clear ();
+	result.work = 0;
 	return result;
 }
 
 void wallet_store::entry_put_raw (nano::store::write_transaction const & transaction_a, nano::account const & pub_a, nano::wallet::wallet_value const & entry_a)
 {
-	nano::store::lmdb::db_val pub_key (pub_a);
-	nano::store::lmdb::db_val entry_val (sizeof (entry_a), const_cast<nano::wallet::wallet_value *> (&entry_a));
-	auto mdb_pub_key = nano::store::lmdb::to_mdb_val (pub_key);
-	auto mdb_entry_val = nano::store::lmdb::to_mdb_val (entry_val);
-	auto status (mdb_put (env.tx (transaction_a), handle, &mdb_pub_key, &mdb_entry_val, 0));
-	release_assert (nano::store::lmdb::success (status), nano::store::lmdb::error_string (status));
+	backend.entry_put (transaction_a, handle, pub_a, entry_a);
 }
 
 nano::wallet::key_type wallet_store::key_type (nano::wallet::wallet_value const & value_a) const
@@ -379,8 +328,8 @@ bool wallet_store::exists (nano::store::transaction const & transaction_a, nano:
 void wallet_store::serialize_json (nano::store::transaction const & transaction_a, std::string & string_a) const
 {
 	boost::property_tree::ptree tree;
-	using iterator = store::typed_iterator<nano::uint256_union, nano::wallet::wallet_value>;
-	for (iterator i{ store::iterator{ transaction_a, store::lmdb::iterator::begin (env.tx (transaction_a), handle) } }, n{ store::iterator{ transaction_a, store::lmdb::iterator::end (env.tx (transaction_a), handle) } }; i != n; ++i)
+	// Iterate from account 0 to include the specials slots in the serialized output.
+	for (iterator i{ backend.entries_begin (transaction_a, handle) }, n{ backend.entries_end (transaction_a, handle) }; i != n; ++i)
 	{
 		tree.put (i->first.to_string (), i->second.key.to_string ());
 	}
@@ -680,19 +629,17 @@ void wallet_store::derive_key (nano::raw_key & prv_a, nano::store::transaction c
 
 auto wallet_store::begin (nano::store::transaction const & txn) const -> iterator
 {
-	nano::account account{ special_count };
-	return iterator{ nano::store::iterator{ txn, nano::store::lmdb::iterator::lower_bound (env.tx (txn), handle, nano::store::lmdb::to_mdb_val (account)) } };
+	return iterator{ backend.entries_begin (txn, handle, nano::account{ special_count }) };
 }
 
 auto wallet_store::begin (nano::store::transaction const & txn, nano::account const & key) const -> iterator
 {
-	nano::account account (key);
-	return iterator{ nano::store::iterator{ txn, nano::store::lmdb::iterator::lower_bound (env.tx (txn), handle, nano::store::lmdb::to_mdb_val (account)) } };
+	return iterator{ backend.entries_begin (txn, handle, key) };
 }
 
 auto wallet_store::end (nano::store::transaction const & txn) const -> iterator
 {
-	return iterator{ nano::store::iterator{ txn, nano::store::lmdb::iterator::end (env.tx (txn), handle) } };
+	return iterator{ backend.entries_end (txn, handle) };
 }
 
 auto wallet_store::find (nano::store::transaction const & txn, nano::account const & key) const -> iterator
@@ -710,18 +657,13 @@ auto wallet_store::find (nano::store::transaction const & txn, nano::account con
 	return end_it;
 }
 
-mdb_wallets_store::mdb_wallets_store (std::filesystem::path const & path_a, nano::lmdb_config const & lmdb_config_a) :
-	environment (path_a, nano::store::lmdb::env::options::make ().set_config (lmdb_config_a).override_config_sync (nano::lmdb_config::sync_strategy::always).override_config_map_size (1ULL * 1024 * 1024 * 1024))
-{
-}
-
 /*
  * wallet
  */
 
 wallet::wallet (nano::store::write_transaction & transaction_a, nano::wallet::wallets & wallets_a, std::string const & wallet_a) :
 	lock_observer ([] (bool, bool) {}),
-	store (wallets_a.kdf, transaction_a, wallets_a.env, wallets_a.config.random_representative (), wallets_a.config.password_fanout, wallet_a),
+	store (wallets_a.kdf, transaction_a, wallets_a.backend, wallets_a.config.random_representative (), wallets_a.config.password_fanout, wallet_a),
 	wallets (wallets_a),
 	logger (wallets_a.logger)
 {
@@ -729,7 +671,7 @@ wallet::wallet (nano::store::write_transaction & transaction_a, nano::wallet::wa
 
 wallet::wallet (nano::store::write_transaction & transaction_a, nano::wallet::wallets & wallets_a, std::string const & wallet_a, std::string const & json) :
 	lock_observer ([] (bool, bool) {}),
-	store (wallets_a.kdf, transaction_a, wallets_a.env, wallets_a.config.password_fanout, wallet_a, json),
+	store (wallets_a.kdf, transaction_a, wallets_a.backend, wallets_a.config.password_fanout, wallet_a, json),
 	wallets (wallets_a),
 	logger (wallets_a.logger)
 {
@@ -911,7 +853,7 @@ bool wallet::import (std::string const & json_a, std::string const & password_a)
 	random_pool::generate_block (id.bytes.data (), id.bytes.size ());
 	try
 	{
-		auto temp = std::make_unique<wallet_store> (wallets.kdf, transaction, wallets.env, 1, id.to_string (), json_a);
+		auto temp = std::make_unique<wallet_store> (wallets.kdf, transaction, wallets.backend, 1, id.to_string (), json_a);
 		if (!temp->attempt_password (transaction, password_a))
 		{
 			auto result = store.import (transaction, *temp);
@@ -1061,35 +1003,25 @@ std::shared_ptr<nano::block> wallet::change_action (nano::account const & source
 
 std::shared_ptr<nano::block> wallet::send_action (nano::account const & source_a, nano::account const & account_a, nano::uint128_t const & amount_a, uint64_t work_a, bool generate_work_a, boost::optional<std::string> id_a)
 {
-	boost::optional<nano::store::lmdb::db_val> id_mdb_val;
-	if (id_a)
-	{
-		id_mdb_val = nano::store::lmdb::db_val (id_a->size (), const_cast<char *> (id_a->data ()));
-	}
-
-	auto prepare_send = [this, &id_mdb_val, &wallets = this->wallets, &store = this->store, &source_a, &amount_a, &work_a, &account_a, &id_a] (auto const & transaction) {
+	auto prepare_send = [this, &wallets = this->wallets, &store = this->store, &source_a, &amount_a, &work_a, &account_a, &id_a] (auto const & transaction) {
 		auto ledger_txn = wallets.ledger.tx_begin_read ();
 		auto error (false);
 		auto cached_block (false);
 		std::shared_ptr<nano::block> block;
 		nano::block_details details;
 		details.is_send = true;
-		if (id_mdb_val)
+		if (id_a)
 		{
-			nano::store::lmdb::db_val result;
-			MDB_val mdb_id_key{ id_mdb_val->size (), id_mdb_val->data () };
-			MDB_val mdb_result{};
-			auto status (mdb_get (wallets.env.tx (transaction), wallets.send_action_ids, &mdb_id_key, &mdb_result));
-			if (status == 0)
+			auto existing_value = wallets.backend.send_action_id_get (transaction, *id_a);
+			if (existing_value)
 			{
-				result = nano::store::lmdb::from_mdb_val (mdb_result);
-				nano::block_hash hash (result);
-				block = wallets.ledger.any.block_get (ledger_txn, hash);
+				auto existing_hash = static_cast<nano::block_hash> (*existing_value);
+				block = wallets.ledger.any.block_get (ledger_txn, existing_hash);
 				if (block != nullptr)
 				{
 					logger.warn (nano::log::type::wallet, "Block already exists for send action with id: {}, existing hash: {}",
 					id_a.value (),
-					hash);
+					existing_hash);
 
 					cached_block = true;
 					wallets.network.flood_block (block, nano::transport::traffic_type::block_broadcast_initial);
@@ -1098,12 +1030,8 @@ std::shared_ptr<nano::block> wallet::send_action (nano::account const & source_a
 				{
 					logger.warn (nano::log::type::wallet, "Block was not found in ledger for send action with id: {}, hash: {}",
 					id_a.value (),
-					hash);
+					existing_hash);
 				}
-			}
-			else if (status != MDB_NOTFOUND)
-			{
-				error = true;
 			}
 		}
 		if (!error && block == nullptr)
@@ -1131,16 +1059,21 @@ std::shared_ptr<nano::block> wallet::send_action (nano::account const & source_a
 						}
 						block = std::make_shared<nano::state_block> (source_a, info->head, info->representative, balance.value ().number () - amount_a, account_a, prv_result.value (), source_a, work_a);
 						details.epoch = info->epoch ();
-						if (id_mdb_val && block != nullptr)
+						if (id_a && block != nullptr)
 						{
-							nano::store::lmdb::db_val hash_val (block->hash ());
-							auto mdb_id_key = nano::store::lmdb::to_mdb_val (*id_mdb_val);
-							auto mdb_hash_val = nano::store::lmdb::to_mdb_val (hash_val);
-							auto status (mdb_put (wallets.env.tx (transaction), wallets.send_action_ids, &mdb_id_key, &mdb_hash_val, 0));
-							if (status != 0)
+							// `id_a` being set implies the caller passed a write transaction (see below).
+							// `if constexpr` keeps the put out of the read-txn instantiation of this lambda.
+							if constexpr (std::is_same_v<std::decay_t<decltype (transaction)>, nano::store::write_transaction>)
 							{
-								block = nullptr;
-								error = true;
+								if (!wallets.backend.send_action_id_put (transaction, *id_a, block->hash ()))
+								{
+									block = nullptr;
+									error = true;
+								}
+							}
+							else
+							{
+								release_assert (false, "send_action with id requires a write transaction");
 							}
 						}
 					}
@@ -1168,7 +1101,7 @@ std::shared_ptr<nano::block> wallet::send_action (nano::account const & source_a
 
 	std::tuple<std::shared_ptr<nano::block>, bool, bool, nano::block_details> result;
 	{
-		if (id_mdb_val)
+		if (id_a)
 		{
 			result = prepare_send (wallets.tx_begin_write ());
 		}
@@ -1609,7 +1542,7 @@ nano::result<nano::raw_key> wallet::fetch_prv (nano::account const & pub_a) cons
 
 bool wallet::live ()
 {
-	return store.handle != 0;
+	return store.handle->valid ();
 }
 
 std::unordered_set<nano::account> wallet::reps () const
@@ -1650,7 +1583,7 @@ nano::uint128_t const wallets::high_priority = std::numeric_limits<nano::uint128
 
 wallets::wallets (
 nano::node & node_a,
-nano::wallet::wallets_store & wallets_store_a,
+nano::wallet::wallets_backend & backend_a,
 nano::ledger & ledger_a,
 nano::node_config const & config_a,
 nano::network_params const & network_params_a,
@@ -1659,7 +1592,7 @@ nano::network & network_a,
 nano::stats & stats_a,
 nano::logger & logger_a) :
 	node{ node_a },
-	wallets_store{ wallets_store_a },
+	backend{ backend_a },
 	ledger{ ledger_a },
 	config{ config_a },
 	network_params{ network_params_a },
@@ -1669,36 +1602,28 @@ nano::logger & logger_a) :
 	logger{ logger_a },
 	observer{ [] (bool) {} },
 	kdf{ network_params.kdf_work },
-	env{ boost::polymorphic_downcast<mdb_wallets_store *> (&wallets_store)->environment },
 	workers{ config.wallet_threads, nano::thread_role::name::wallet_worker, /* auto_start */ true }
 {
-	logger.info (nano::log::type::wallet, "Loading wallets from: {}", env.database_path.string ());
+	logger.info (nano::log::type::wallet, "Loading wallets from: {}", backend.database_path ().string ());
 
 	nano::unique_lock<nano::mutex> lock{ mutex };
 	{
 		auto transaction (tx_begin_write ());
-		auto status (mdb_dbi_open (env.tx (transaction), nullptr, MDB_CREATE, &handle));
-		status |= mdb_dbi_open (env.tx (transaction), "send_action_ids", MDB_CREATE, &send_action_ids);
-		release_assert (nano::store::lmdb::success (status), nano::store::lmdb::error_string (status));
-		std::string beginning (nano::uint256_union (0).to_string ());
-		nano::store::lmdb::db_val beginning_val{ beginning.size (), const_cast<char *> (beginning.c_str ()) };
-		std::string end ((nano::uint256_union (nano::uint256_t (0) - nano::uint256_t (1))).to_string ());
-		nano::store::lmdb::db_val end_val{ end.size (), const_cast<char *> (end.c_str ()) };
-		auto mdb_beginning_val = nano::store::lmdb::to_mdb_val (beginning_val);
-		auto mdb_end_val = nano::store::lmdb::to_mdb_val (end_val);
-		store::iterator i{ transaction, store::lmdb::iterator::lower_bound (env.tx (transaction), handle, mdb_beginning_val) };
-		store::iterator n{ transaction, store::lmdb::iterator::lower_bound (env.tx (transaction), handle, mdb_end_val) };
-		for (; i != n; ++i)
+		for (auto it = backend.index_begin (transaction), end = backend.index_end (transaction); it != end; ++it)
 		{
-			nano::wallet_id id;
-			std::string text (reinterpret_cast<char const *> (i->first.data ()), i->first.size ());
-			auto error (id.decode_hex (text));
-			release_assert (!error, "failed to decode wallet id from text: {}", text);
-			release_assert (items.find (id) == items.end ());
+			// The wallet index range may also include entries for non-wallet sub-tables (e.g. `send_action_ids` on LMDB);
+			// skip anything that doesn't parse as a 64-char hex wallet id.
+			auto id = try_parse_wallet_id (bytes_to_string (it->first));
+			if (!id)
+			{
+				continue;
+			}
+			auto text = id->to_string ();
+			release_assert (items.find (*id) == items.end ());
 			try
 			{
 				auto wallet_l = std::make_shared<wallet> (transaction, *this, text);
-				items[id] = wallet_l;
+				items[*id] = wallet_l;
 			}
 			catch (std::exception const & ex)
 			{
@@ -1729,10 +1654,7 @@ nano::logger & logger_a) :
 	}
 	if (backup_required)
 	{
-		char const * store_path;
-		mdb_env_get_path (env, &store_path);
-		std::filesystem::path const path (store_path);
-		env.create_backup_file (path, logger);
+		backend.backup (logger);
 	}
 	for (auto & item : items)
 	{
@@ -1886,27 +1808,23 @@ void wallets::reload ()
 	nano::lock_guard<nano::mutex> lock{ mutex };
 	auto transaction (tx_begin_write ());
 	std::unordered_set<nano::uint256_union> stored_items;
-	std::string beginning (nano::uint256_union (0).to_string ());
-	nano::store::lmdb::db_val beginning_val{ beginning.size (), const_cast<char *> (beginning.c_str ()) };
-	std::string end ((nano::uint256_union (nano::uint256_t (0) - nano::uint256_t (1))).to_string ());
-	nano::store::lmdb::db_val end_val{ end.size (), const_cast<char *> (end.c_str ()) };
-	auto mdb_beginning_val = nano::store::lmdb::to_mdb_val (beginning_val);
-	auto mdb_end_val = nano::store::lmdb::to_mdb_val (end_val);
-	store::iterator i{ transaction, store::lmdb::iterator::lower_bound (env.tx (transaction), handle, mdb_beginning_val) };
-	store::iterator n{ transaction, store::lmdb::iterator::lower_bound (env.tx (transaction), handle, mdb_end_val) };
-	for (; i != n; ++i)
+	for (auto it = backend.index_begin (transaction), end = backend.index_end (transaction); it != end; ++it)
 	{
-		nano::wallet_id id;
-		std::string text (reinterpret_cast<char const *> (i->first.data ()), i->first.size ());
-		auto error (id.decode_hex (text));
-		release_assert (!error, "error decoding wallet id from text", text);
+		// The wallet index range may also include entries for non-wallet sub-tables (e.g. `send_action_ids` on LMDB);
+		// skip anything that doesn't parse as a 64-char hex wallet id.
+		auto id = try_parse_wallet_id (bytes_to_string (it->first));
+		if (!id)
+		{
+			continue;
+		}
+		auto text = id->to_string ();
 		// New wallet
-		if (items.find (id) == items.end ())
+		if (items.find (*id) == items.end ())
 		{
 			try
 			{
 				auto wallet_l = std::make_shared<wallet> (transaction, *this, text);
-				items[id] = wallet_l;
+				items[*id] = wallet_l;
 			}
 			catch (std::exception const & ex)
 			{
@@ -1914,7 +1832,7 @@ void wallets::reload ()
 			}
 		}
 		// List of wallets on disk
-		stored_items.insert (id);
+		stored_items.insert (*id);
 	}
 	// Delete non existing wallets from memory
 	std::vector<nano::wallet_id> deleted_items;
@@ -1966,19 +1884,18 @@ bool wallets::exists_any (nano::account const & account1, nano::account const & 
 
 nano::store::write_transaction wallets::tx_begin_write ()
 {
-	return env.tx_begin_write ();
+	return backend.tx_begin_write ();
 }
 
 nano::store::read_transaction wallets::tx_begin_read ()
 {
-	return env.tx_begin_read ();
+	return backend.tx_begin_read ();
 }
 
 void wallets::clear_send_ids ()
 {
 	auto transaction (tx_begin_write ());
-	auto status (mdb_drop (env.tx (transaction), send_action_ids, 0));
-	release_assert (nano::store::lmdb::success (status), nano::store::lmdb::error_string (status));
+	backend.send_action_ids_clear (transaction);
 }
 
 wallet_representatives wallets::reps () const

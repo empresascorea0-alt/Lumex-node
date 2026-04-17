@@ -13,6 +13,7 @@
 #include <cstring>
 #include <iosfwd>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -247,6 +248,11 @@ class wallet_id final : public uint256_union
 {
 	using uint256_union::uint256_union;
 };
+
+/// Parse a hex string into a wallet_id. @throws std::invalid_argument if the text is not a valid wallet id
+wallet_id parse_wallet_id (std::string const &);
+/// Parse a hex string into a wallet_id, or std::nullopt if the text is not a valid wallet id
+std::optional<wallet_id> try_parse_wallet_id (std::string const &);
 
 class account final : public public_key
 {

@@ -13,6 +13,7 @@
 #include <nano/secure/ledger_set_any.hpp>
 #include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
+#include <nano/wallet/lmdb/wallets_backend_lmdb.hpp>
 #include <nano/wallet/wallet_value.hpp>
 
 #include <gtest/gtest.h>
@@ -59,10 +60,10 @@ TEST (fan, change)
 
 TEST (wallet_store, no_special_keys_accounts)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::keypair key1;
 	ASSERT_FALSE (wallet.exists (transaction, key1.pub));
 	wallet.insert_adhoc (transaction, key1.prv);
@@ -77,10 +78,10 @@ TEST (wallet_store, no_special_keys_accounts)
 
 TEST (wallet_store, no_key)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::keypair key1;
 	auto result = wallet.fetch (transaction, key1.pub);
 	ASSERT_FALSE (result);
@@ -90,10 +91,10 @@ TEST (wallet_store, no_key)
 
 TEST (wallet_store, fetch_locked)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	ASSERT_TRUE (wallet.valid_password (transaction));
 	nano::keypair key1;
 	ASSERT_EQ (key1.pub, wallet.insert_adhoc (transaction, key1.prv));
@@ -113,10 +114,10 @@ TEST (wallet_store, fetch_locked)
 
 TEST (wallet_store, retrieval)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::keypair key1;
 	ASSERT_TRUE (wallet.valid_password (transaction));
 	wallet.insert_adhoc (transaction, key1.prv);
@@ -133,10 +134,10 @@ TEST (wallet_store, retrieval)
 
 TEST (wallet_store, empty_iteration)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	auto i (wallet.begin (transaction));
 	auto j (wallet.end (transaction));
 	ASSERT_EQ (i, j);
@@ -144,10 +145,10 @@ TEST (wallet_store, empty_iteration)
 
 TEST (wallet_store, one_item_iteration)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::keypair key1;
 	wallet.insert_adhoc (transaction, key1.prv);
 	for (auto i (wallet.begin (transaction)), j (wallet.end (transaction)); i != j; ++i)
@@ -163,7 +164,7 @@ TEST (wallet_store, one_item_iteration)
 
 TEST (wallet_store, two_item_iteration)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
 	nano::keypair key1;
 	nano::keypair key2;
 	ASSERT_NE (key1.pub, key2.pub);
@@ -171,8 +172,8 @@ TEST (wallet_store, two_item_iteration)
 	std::unordered_set<nano::raw_key> prvs;
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
 	{
-		auto transaction (env.tx_begin_write ());
-		nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+		auto transaction (backend.tx_begin_write ());
+		nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 		wallet.insert_adhoc (transaction, key1.prv);
 		wallet.insert_adhoc (transaction, key2.prv);
 		for (auto i (wallet.begin (transaction)), j (wallet.end (transaction)); i != j; ++i)
@@ -195,20 +196,20 @@ TEST (wallet_store, two_item_iteration)
 
 TEST (wallet_store, find_none)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::account account (1000);
 	ASSERT_EQ (wallet.end (transaction), wallet.find (transaction, account));
 }
 
 TEST (wallet_store, find_existing)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::keypair key1;
 	ASSERT_FALSE (wallet.exists (transaction, key1.pub));
 	wallet.insert_adhoc (transaction, key1.prv);
@@ -221,10 +222,10 @@ TEST (wallet_store, find_existing)
 
 TEST (wallet_store, rekey)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::raw_key password;
 	wallet.password.value (password);
 	nano::raw_key default_password_key;
@@ -249,10 +250,10 @@ TEST (wallet_store, rekey)
 
 TEST (wallet_store, hash_password)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::raw_key hash1;
 	wallet.derive_key (hash1, transaction, "");
 	nano::raw_key hash2;
@@ -265,26 +266,26 @@ TEST (wallet_store, hash_password)
 
 TEST (wallet_store, reopen_default_password)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
 	{
-		nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+		nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 		ASSERT_TRUE (wallet.valid_password (transaction));
 	}
 	{
-		nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+		nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 		ASSERT_TRUE (wallet.valid_password (transaction));
 	}
 	{
 		// Rekey to a non-default password
-		nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+		nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 		wallet.rekey (transaction, "secret");
 		ASSERT_TRUE (wallet.valid_password (transaction));
 	}
 	{
 		// Default password no longer works after rekey
-		nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+		nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 		ASSERT_FALSE (wallet.valid_password (transaction));
 		wallet.attempt_password (transaction, "");
 		ASSERT_FALSE (wallet.valid_password (transaction));
@@ -295,10 +296,10 @@ TEST (wallet_store, reopen_default_password)
 
 TEST (wallet_store, representative)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	ASSERT_FALSE (wallet.is_representative (transaction));
 	ASSERT_EQ (nano::dev::genesis_key.pub, wallet.representative (transaction));
 	ASSERT_FALSE (wallet.is_representative (transaction));
@@ -313,13 +314,13 @@ TEST (wallet_store, representative)
 
 TEST (wallet_store, serialize_json_empty)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet1 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet1 (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	std::string serialized;
 	wallet1.serialize_json (transaction, serialized);
-	nano::wallet::wallet_store wallet2 (kdf, transaction, env, 1, "1", serialized);
+	nano::wallet::wallet_store wallet2 (kdf, transaction, backend, 1, "1", serialized);
 	nano::raw_key password1;
 	nano::raw_key password2;
 	wallet1.wallet_key (password1, transaction);
@@ -334,15 +335,15 @@ TEST (wallet_store, serialize_json_empty)
 
 TEST (wallet_store, serialize_json_one)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet1 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet1 (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::keypair key;
 	wallet1.insert_adhoc (transaction, key.prv);
 	std::string serialized;
 	wallet1.serialize_json (transaction, serialized);
-	nano::wallet::wallet_store wallet2 (kdf, transaction, env, 1, "1", serialized);
+	nano::wallet::wallet_store wallet2 (kdf, transaction, backend, 1, "1", serialized);
 	nano::raw_key password1;
 	nano::raw_key password2;
 	wallet1.wallet_key (password1, transaction);
@@ -359,16 +360,16 @@ TEST (wallet_store, serialize_json_one)
 
 TEST (wallet_store, serialize_json_password)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet1 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet1 (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::keypair key;
 	wallet1.rekey (transaction, "password");
 	wallet1.insert_adhoc (transaction, key.prv);
 	std::string serialized;
 	wallet1.serialize_json (transaction, serialized);
-	nano::wallet::wallet_store wallet2 (kdf, transaction, env, 1, "1", serialized);
+	nano::wallet::wallet_store wallet2 (kdf, transaction, backend, 1, "1", serialized);
 	ASSERT_FALSE (wallet2.valid_password (transaction));
 	ASSERT_FALSE (wallet2.attempt_password (transaction, "password"));
 	ASSERT_TRUE (wallet2.valid_password (transaction));
@@ -388,13 +389,13 @@ TEST (wallet_store, serialize_json_password)
 
 TEST (wallet_store, move)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet1 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet1 (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::keypair key1;
 	wallet1.insert_adhoc (transaction, key1.prv);
-	nano::wallet::wallet_store wallet2 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "1");
+	nano::wallet::wallet_store wallet2 (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "1");
 	nano::keypair key2;
 	wallet2.insert_adhoc (transaction, key2.prv);
 	ASSERT_FALSE (wallet1.exists (transaction, key2.pub));
@@ -410,13 +411,13 @@ TEST (wallet_store, move)
 
 TEST (wallet_store, move_locked)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet1 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet1 (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::keypair key1;
 	wallet1.insert_adhoc (transaction, key1.prv);
-	nano::wallet::wallet_store wallet2 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "1");
+	nano::wallet::wallet_store wallet2 (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "1");
 	nano::keypair key2;
 	wallet2.insert_adhoc (transaction, key2.prv);
 	std::vector<nano::public_key> keys;
@@ -465,11 +466,11 @@ TEST (wallet_store, import_json)
 
 TEST (wallet_store, import_locked)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet1 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
-	nano::wallet::wallet_store wallet2 (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "1");
+	nano::wallet::wallet_store wallet1 (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet2 (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "1");
 	nano::keypair key1;
 	wallet2.insert_adhoc (transaction, key1.prv);
 
@@ -524,10 +525,10 @@ TEST (wallet_store, fail_import_corrupt)
 
 TEST (wallet_store, deterministic_keys)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	auto key1 = wallet.deterministic_key (transaction, 0);
 	auto key2 = wallet.deterministic_key (transaction, 0);
 	ASSERT_EQ (key1, key2);
@@ -565,10 +566,10 @@ TEST (wallet_store, deterministic_keys)
 
 TEST (wallet_store, reseed)
 {
-	nano::store::lmdb::env env (nano::unique_path () / "wallet.ldb");
-	auto transaction (env.tx_begin_write ());
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
-	nano::wallet::wallet_store wallet (kdf, transaction, env, nano::dev::genesis_key.pub, 1, "0");
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::raw_key seed1;
 	seed1 = 1;
 	nano::raw_key seed2;

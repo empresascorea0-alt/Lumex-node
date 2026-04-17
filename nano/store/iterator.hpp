@@ -37,7 +37,7 @@ class iterator final
 {
 public:
 	using iterator_category = std::bidirectional_iterator_tag;
-	using value_type = std::pair<std::span<uint8_t const>, std::span<uint8_t const>>;
+	using value_type = std::pair<std::span<uint8_t const>, std::span<uint8_t const>>; // <key, value>
 	using pointer = value_type *;
 	using const_pointer = value_type const *;
 	using reference = value_type &;
