@@ -1626,6 +1626,9 @@ void wallet::work_cache_blocking (nano::account const & account_a, nano::root co
 		if (opt_work_l.has_value ())
 		{
 			auto transaction_l (wallets.tx_begin_write ());
+			// No TOCTOU between `live()` and the ops below: LMDB's single-writer rule means
+			// `wallets::destroy()` cannot commit (and clear `store.handle`) until `transaction_l`
+			// ends, so the handle is stable for the duration of this block.
 			if (live () && store.exists (transaction_l, account_a))
 			{
 				work_update_impl (transaction_l, account_a, root_a, opt_work_l.value ());
@@ -2212,6 +2215,11 @@ void wallets::do_wallet_actions ()
 			auto wallet (first->second.first);
 			auto current (std::move (first->second.second));
 			actions.erase (first);
+			// `wallets::destroy()` takes `action_mutex` before clearing `store.handle`,
+			// so while we hold `action_lock` the handle is stable. The subsequent
+			// `current(*wallet)` runs with `action_lock` released; anything inside the
+			// action that touches `store.handle` must rely on its own synchronization
+			// (e.g. LMDB's single-writer rule for `work_cache_blocking`).
 			if (wallet->live ())
 			{
 				action_lock.unlock ();
