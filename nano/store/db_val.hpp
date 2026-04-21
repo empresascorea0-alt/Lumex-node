@@ -9,6 +9,8 @@
 
 #include <cstddef>
 #include <span>
+#include <string>
+#include <string_view>
 
 namespace nano
 {
@@ -42,6 +44,24 @@ public:
 
 	db_val (std::nullptr_t) noexcept :
 		span_view{}
+	{
+	}
+
+	// Non-owning view over the characters of `str`; `str` must outlive the db_val
+	db_val (std::string_view str) noexcept :
+		span_view{ reinterpret_cast<uint8_t const *> (str.data ()), str.size () }
+	{
+	}
+
+	// Non-owning view over the characters of `str`; `str` must outlive the db_val
+	db_val (std::string const & str) noexcept :
+		span_view{ reinterpret_cast<uint8_t const *> (str.data ()), str.size () }
+	{
+	}
+
+	// Non-owning view over the characters of `str`; `str` must outlive the db_val
+	db_val (char const * str) noexcept :
+		db_val (std::string_view{ str })
 	{
 	}
 

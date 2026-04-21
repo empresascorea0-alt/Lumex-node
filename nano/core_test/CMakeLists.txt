@@ -88,6 +88,7 @@ add_executable(
   voting.cpp
   wallet.cpp
   wallets.cpp
+  wallets_backend.cpp
   websocket.cpp
   work_pool.cpp)
 

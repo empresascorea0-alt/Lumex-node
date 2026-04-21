@@ -1,6 +1,7 @@
 #pragma once
 
-#include <nano/lib/lmdbconfig.hpp>
+#include <nano/lib/fan.hpp>
+#include <nano/lib/kdf.hpp>
 #include <nano/lib/locks.hpp>
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/numbers_templ.hpp>
@@ -10,51 +11,17 @@
 #include <nano/node/fwd.hpp>
 #include <nano/node/openclwork.hpp>
 #include <nano/secure/common.hpp>
-#include <nano/store/lmdb/lmdb_env.hpp>
-#include <nano/store/lmdb/wallet_value.hpp>
 #include <nano/store/typed_iterator.hpp>
+#include <nano/wallet/wallet_value.hpp>
+#include <nano/wallet/wallets_backend.hpp>
 
-#include <atomic>
 #include <mutex>
 #include <optional>
 #include <thread>
 #include <unordered_set>
 
-namespace nano
+namespace nano::wallet
 {
-class wallets;
-
-/*
- * The fan spreads a key out over the heap to decrease the likelihood of it being recovered by memory inspection
- */
-class fan final
-{
-public:
-	fan (nano::raw_key const & key, std::size_t count);
-	void value (nano::raw_key & result) const;
-	void value_set (nano::raw_key const & value);
-	std::vector<std::unique_ptr<nano::raw_key>> values;
-
-private:
-	mutable nano::mutex mutex;
-	void value_get (nano::raw_key & result) const;
-};
-
-/*
- * Key derivation function using password hashing scheme (PHS) to derive encryption keys from passwords
- */
-class kdf final
-{
-public:
-	kdf (unsigned const & kdf_work) :
-		kdf_work{ kdf_work }
-	{
-	}
-	void phs (nano::raw_key & result, std::string const & password, nano::uint256_union const & salt);
-	nano::mutex mutex;
-	unsigned const & kdf_work;
-};
-
 enum class key_type
 {
 	not_a_type,
@@ -66,13 +33,12 @@ enum class key_type
 class wallet_store final
 {
 public:
-	using iterator = store::typed_iterator<nano::account, nano::wallet_value>;
+	using iterator = store::typed_iterator<nano::account, nano::wallet::wallet_value>;
 
 public:
-	wallet_store (nano::kdf &, nano::store::write_transaction &, store::lmdb::env &, nano::account representative, unsigned fanout, std::string const & wallet_path);
-	wallet_store (nano::kdf &, nano::store::write_transaction &, store::lmdb::env &, unsigned fanout, std::string const & wallet_path, std::string const & json);
+	wallet_store (nano::kdf &, nano::store::write_transaction &, nano::wallet::wallets_backend &, nano::account representative, unsigned fanout, std::string const & wallet_path);
+	wallet_store (nano::kdf &, nano::store::write_transaction &, nano::wallet::wallets_backend &, unsigned fanout, std::string const & wallet_path, std::string const & json);
 
-	void initialize (nano::store::write_transaction const &, std::string const & path);
 	std::vector<nano::account> accounts (nano::store::transaction const &) const;
 	nano::uint256_union check (nano::store::transaction const &) const;
 	bool rekey (nano::store::write_transaction const &, std::string const & password);
@@ -82,7 +48,7 @@ public:
 	void wallet_key (nano::raw_key & result, nano::store::transaction const &) const;
 	nano::raw_key seed (nano::store::transaction const &) const;
 	void seed_set (nano::store::write_transaction const &, nano::raw_key const & seed);
-	nano::key_type key_type (nano::wallet_value const &) const;
+	nano::wallet::key_type key_type (nano::wallet::wallet_value const &) const;
 	nano::public_key deterministic_insert (nano::store::write_transaction const &);
 	nano::public_key deterministic_insert (nano::store::write_transaction const &, uint32_t index);
 	nano::raw_key deterministic_key (nano::store::transaction const &, uint32_t index) const;
@@ -96,8 +62,8 @@ public:
 	nano::public_key insert_adhoc (nano::store::write_transaction const &, nano::raw_key const & prv);
 	bool insert_watch (nano::store::write_transaction const &, nano::account const & pub);
 	void erase (nano::store::write_transaction const &, nano::account const & pub);
-	nano::wallet_value entry_get_raw (nano::store::transaction const &, nano::account const & pub) const;
-	void entry_put_raw (nano::store::write_transaction const &, nano::account const & pub, nano::wallet_value const & entry);
+	nano::wallet::wallet_value entry_get_raw (nano::store::transaction const &, nano::account const & pub) const;
+	void entry_put_raw (nano::store::write_transaction const &, nano::account const & pub, nano::wallet::wallet_value const & entry);
 	nano::result<nano::raw_key> fetch (nano::store::transaction const &, nano::account const & pub) const;
 	bool exists (nano::store::transaction const &, nano::account const & pub) const;
 	void destroy (nano::store::write_transaction const &);
@@ -108,8 +74,8 @@ public:
 	void derive_key (nano::raw_key & result, nano::store::transaction const &, std::string const & password) const;
 	void serialize_json (nano::store::transaction const &, std::string & json) const;
 	void write_backup (nano::store::transaction const &, std::filesystem::path const & path) const;
-	nano::result<bool> move (nano::store::write_transaction const &, nano::wallet_store & source, std::vector<nano::public_key> const & keys);
-	nano::result<bool> import (nano::store::write_transaction const &, nano::wallet_store & source);
+	nano::result<bool> move (nano::store::write_transaction const &, wallet_store & source, std::vector<nano::public_key> const & keys);
+	nano::result<bool> import (nano::store::write_transaction const &, wallet_store & source);
 	std::optional<uint64_t> work_get (nano::store::transaction const &, nano::public_key const &) const;
 	void work_put (nano::store::write_transaction const &, nano::public_key const & pub, uint64_t work);
 	unsigned version (nano::store::transaction const &) const;
@@ -119,11 +85,11 @@ public:
 	nano::fan password;
 	nano::fan wallet_key_mem;
 	nano::kdf & kdf;
-	std::atomic<MDB_dbi> handle{ 0 };
+	nano::locked<nano::wallet::wallet_handle> handle;
 	mutable std::recursive_mutex mutex;
 
 private:
-	nano::store::lmdb::env & env;
+	nano::wallet::wallets_backend & backend;
 
 public:
 	static unsigned const version_1 = 1;
@@ -147,11 +113,11 @@ public:
 /**
  * A wallet is a set of account keys encrypted by a common encryption key
  */
-class wallet final : public std::enable_shared_from_this<nano::wallet>
+class wallet final : public std::enable_shared_from_this<wallet>
 {
 public:
-	wallet (nano::store::write_transaction &, nano::wallets &, std::string const & wallet_path);
-	wallet (nano::store::write_transaction &, nano::wallets &, std::string const & wallet_path, std::string const & json);
+	wallet (nano::store::write_transaction &, wallets &, std::string const & wallet_path);
+	wallet (nano::store::write_transaction &, wallets &, std::string const & wallet_path, std::string const & json);
 
 	// Password and lock management
 	void enter_initial_password ();
@@ -169,7 +135,7 @@ public:
 	std::vector<nano::account> accounts () const;
 	bool exists (nano::public_key const & pub);
 	nano::result<bool> move_accounts (wallet & source, std::vector<nano::public_key> const & accounts);
-	nano::key_type key_type (nano::account const & account) const;
+	nano::wallet::key_type key_type (nano::account const & account) const;
 
 	// Seed management
 	nano::result<nano::raw_key> get_seed () const;
@@ -222,8 +188,8 @@ public:
 public:
 	std::unordered_set<nano::account> free_accounts;
 	std::function<void (bool, bool)> lock_observer;
-	nano::wallet_store store;
-	nano::wallets & wallets;
+	nano::wallet::wallet_store store;
+	nano::wallet::wallets & wallets;
 	nano::logger & logger;
 
 private:
@@ -267,20 +233,6 @@ public:
 	}
 };
 
-class wallets_store
-{
-public:
-	virtual ~wallets_store () = default;
-};
-
-class mdb_wallets_store final : public wallets_store
-{
-public:
-	mdb_wallets_store (std::filesystem::path const &, nano::lmdb_config const & lmdb_config_a = nano::lmdb_config{});
-	nano::store::lmdb::env environment;
-	bool error{ false };
-};
-
 /**
  * The wallets set is all the wallets a node controls.
  * A node may contain multiple wallets independently encrypted and operated.
@@ -290,7 +242,7 @@ class wallets final
 public:
 	wallets (
 	nano::node &,
-	nano::wallets_store &,
+	nano::wallet::wallets_backend &,
 	nano::ledger &,
 	nano::node_config const &,
 	nano::network_params const &,
@@ -305,15 +257,15 @@ public:
 	void stop ();
 
 	// Wallet management
-	std::shared_ptr<nano::wallet> open (nano::wallet_id const &);
-	std::shared_ptr<nano::wallet> create (nano::wallet_id const &);
-	std::shared_ptr<nano::wallet> create_from_json (nano::wallet_id const &, std::string const & json);
+	std::shared_ptr<wallet> open (nano::wallet_id const &);
+	std::shared_ptr<wallet> create (nano::wallet_id const &);
+	std::shared_ptr<wallet> create_from_json (nano::wallet_id const &, std::string const & json);
 	void destroy (nano::wallet_id const &);
 	void reload ();
 	void clear_send_ids ();
 
 	// Account lookup
-	std::unordered_map<nano::wallet_id, std::shared_ptr<nano::wallet>> all_wallets ();
+	std::unordered_map<nano::wallet_id, std::shared_ptr<wallet>> all_wallets ();
 	bool exists (nano::account const &);
 	bool exists_any (nano::account const &, nano::account const &);
 
@@ -324,13 +276,13 @@ public:
 
 	// Wallet actions queue
 	void do_wallet_actions ();
-	void queue_wallet_action (nano::uint128_t const & priority, std::shared_ptr<nano::wallet> const &, std::function<void (nano::wallet &)> action);
+	void queue_wallet_action (nano::uint128_t const & priority, std::shared_ptr<wallet> const &, std::function<void (wallet &)> action);
 
 	// Representatives
 	void foreach_representative (std::function<void (nano::public_key const &, nano::raw_key const &)> const & action);
 	bool check_rep (nano::account const &);
 	void refresh_reps ();
-	nano::wallet_representatives reps () const;
+	wallet_representatives reps () const;
 
 	/// Returns a signer that iterates over all representatives in the wallet
 	using signer_t = std::function<void (std::function<void (nano::public_key const &, nano::raw_key const &)> const &)>;
@@ -344,7 +296,7 @@ private: // Transactions
 
 public: // Dependencies
 	nano::node & node;
-	nano::wallets_store & wallets_store;
+	nano::wallet::wallets_backend & backend;
 	nano::ledger & ledger;
 	nano::node_config const & config;
 	nano::network_params const & network_params;
@@ -356,15 +308,11 @@ public: // Dependencies
 public:
 	std::function<void (bool)> observer;
 
-	std::unordered_map<nano::wallet_id, std::shared_ptr<nano::wallet>> items;
-	std::multimap<nano::uint128_t, std::pair<std::shared_ptr<nano::wallet>, std::function<void (nano::wallet &)>>, std::greater<nano::uint128_t>> actions;
+	std::unordered_map<nano::wallet_id, std::shared_ptr<wallet>> items;
+	std::multimap<nano::uint128_t, std::pair<std::shared_ptr<wallet>, std::function<void (wallet &)>>, std::greater<nano::uint128_t>> actions;
 	nano::locked<std::unordered_map<nano::account, nano::root>> delayed_work;
 
 	nano::kdf kdf;
-
-	MDB_dbi handle{};
-	MDB_dbi send_action_ids{};
-	nano::store::lmdb::env & env;
 
 	mutable nano::mutex mutex;
 	mutable nano::mutex action_mutex;
@@ -390,7 +338,7 @@ private:
 	void refresh_rep_keys_cache ();
 
 private:
-	mutable nano::locked<nano::wallet_representatives> representatives;
+	mutable nano::locked<wallet_representatives> representatives;
 	nano::locked<std::vector<std::pair<nano::public_key, std::unique_ptr<nano::fan>>>> rep_keys_cache;
 
 	friend class wallet;
