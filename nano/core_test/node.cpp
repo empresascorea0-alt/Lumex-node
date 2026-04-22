@@ -109,7 +109,7 @@ TEST (node, block_store_path_failure)
 	nano::test::system system;
 	auto path (nano::unique_path ());
 	nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
-	auto node (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), path, pool, nano::node_flags{}));
+	auto node (std::make_shared<nano::node> (system.get_available_port (), path, pool, nano::node_flags{}));
 	system.register_node (node);
 	ASSERT_TRUE (node->wallets.items.empty ());
 }
@@ -296,7 +296,7 @@ TEST (node, auto_bootstrap)
 	auto send1 (system.wallet (0)->send_action (nano::dev::genesis_key.pub, key2.pub, node0->config.receive_minimum.number ()));
 	ASSERT_NE (nullptr, send1);
 	ASSERT_TIMELY_EQ (10s, node0->balance (key2.pub), node0->config.receive_minimum.number ());
-	auto node1 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work, node_flags));
+	auto node1 (std::make_shared<nano::node> (system.get_available_port (), nano::unique_path (), system.work, node_flags));
 	node1->start ();
 	system.nodes.push_back (node1);
 	ASSERT_NE (nullptr, nano::test::establish_tcp (system, *node1, node0->network.endpoint ()));
@@ -321,7 +321,7 @@ TEST (node, auto_bootstrap_reverse)
 	nano::keypair key2;
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 	system.wallet (0)->insert_adhoc (key2.prv);
-	auto node1 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work, node_flags));
+	auto node1 (std::make_shared<nano::node> (system.get_available_port (), nano::unique_path (), system.work, node_flags));
 	ASSERT_NE (nullptr, system.wallet (0)->send_action (nano::dev::genesis_key.pub, key2.pub, node0->config.receive_minimum.number ()));
 	node1->start ();
 	system.nodes.push_back (node1);
@@ -1125,7 +1125,7 @@ TEST (node, fork_no_vote_quorum)
 	ASSERT_TRUE (key3_result);
 	auto vote = std::make_shared<nano::vote> (key1, key3_result.value (), 0, 0, std::vector<nano::block_hash>{ send2->hash () });
 	nano::messages::confirm_ack confirm{ nano::dev::network_params.network, vote };
-	auto channel = node2.network.find_node_id (node3.node_id.pub);
+	auto channel = node2.network.find_node_id (node3.get_node_id ());
 	ASSERT_NE (nullptr, channel);
 	channel->send (confirm, nano::transport::traffic_type::test);
 	ASSERT_TIMELY (10s, node3.stats.count (nano::stat::type::message, nano::stat::detail::confirm_ack, nano::stat::dir::in) >= 3);
@@ -2635,7 +2635,7 @@ TEST (node, peers)
 	auto node1 (system.nodes[0]);
 	ASSERT_TRUE (node1->network.empty ());
 
-	auto node2 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.work, nano::node_flags{}));
+	auto node2 (std::make_shared<nano::node> (system.get_available_port (), nano::unique_path (), system.work, nano::node_flags{}));
 	system.nodes.push_back (node2);
 
 	auto endpoint = node1->network.endpoint ();
@@ -2685,7 +2685,7 @@ TEST (node, peer_history_restart)
 	nano::endpoint_key endpoint_key{ endpoint.address ().to_v6 ().to_bytes (), endpoint.port () };
 	auto path (nano::unique_path ());
 	{
-		auto node2 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), path, system.work, nano::node_flags{}));
+		auto node2 (std::make_shared<nano::node> (system.get_available_port (), path, system.work, nano::node_flags{}));
 		system.nodes.push_back (node2);
 		auto & store = node2->store;
 		{
@@ -2705,7 +2705,7 @@ TEST (node, peer_history_restart)
 	{
 		nano::node_flags node_flags;
 		node_flags.read_only = true;
-		auto node3 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), path, system.work, node_flags));
+		auto node3 (std::make_shared<nano::node> (system.get_available_port (), path, system.work, node_flags));
 		system.nodes.push_back (node3);
 		// Check cached peers after restart
 		node3->network.start ();
@@ -2782,11 +2782,11 @@ TEST (node, bidirectional_tcp)
 	auto list1 (node1->network.list (1));
 	ASSERT_EQ (nano::transport::transport_type::tcp, list1[0]->get_type ());
 	ASSERT_NE (node2->network.endpoint (), list1[0]->get_remote_endpoint ()); // Ephemeral port
-	ASSERT_EQ (node2->node_id.pub, list1[0]->get_node_id ());
+	ASSERT_EQ (node2->get_node_id (), list1[0]->get_node_id ());
 	auto list2 (node2->network.list (1));
 	ASSERT_EQ (nano::transport::transport_type::tcp, list2[0]->get_type ());
 	ASSERT_EQ (node1->network.endpoint (), list2[0]->get_remote_endpoint ());
-	ASSERT_EQ (node1->node_id.pub, list2[0]->get_node_id ());
+	ASSERT_EQ (node1->get_node_id (), list2[0]->get_node_id ());
 	// Test block propagation from node 1
 	nano::keypair key;
 	nano::state_block_builder builder;
@@ -4052,7 +4052,7 @@ TEST (node, port_already_in_use)
 	config2.peering_port = node1->network.port;
 
 	// Create node in a scope so it gets destroyed if start() throws
-	auto node2 = std::make_shared<nano::node> (system.io_ctx, nano::unique_path (), config2, system.work, nano::node_flags{});
+	auto node2 = std::make_shared<nano::node> (nano::unique_path (), config2, system.work, nano::node_flags{});
 
 	// This should throw boost::system::system_error indicating port is already in use
 	ASSERT_THROW (node2->start (), boost::system::system_error);

@@ -9,7 +9,6 @@
 #include <nano/lib/logging.hpp>
 #include <nano/lib/networks.hpp>
 #include <nano/lib/runtime_files.hpp>
-#include <nano/lib/thread_runner.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/lib/version.hpp>
 #include <nano/lib/vote.hpp>
@@ -1184,8 +1183,6 @@ int main (int argc, char * const * argv)
 				}
 			}
 			std::cout << boost::str (boost::format ("Starting generating %1% blocks...\n") % (count * 2));
-			auto io_ctx1 = std::make_shared<boost::asio::io_context> ();
-			auto io_ctx2 = std::make_shared<boost::asio::io_context> ();
 			nano::work_pool work{ network_params.network, std::numeric_limits<unsigned>::max () };
 			auto path1 (nano::unique_path ());
 			auto path2 (nano::unique_path ());
@@ -1207,7 +1204,7 @@ int main (int argc, char * const * argv)
 			flags.disable_legacy_bootstrap = true;
 			flags.disable_wallet_bootstrap = true;
 			flags.disable_bootstrap_listener = true;
-			auto node1 (std::make_shared<nano::node> (io_ctx1, path1, config1, work, flags, 0));
+			auto node1 (std::make_shared<nano::node> (path1, config1, work, flags, 0));
 			nano::block_hash genesis_latest (node1->latest (nano::dev::genesis_key.pub));
 			nano::uint128_t genesis_balance (std::numeric_limits<nano::uint128_t>::max ());
 			// Generating blocks
@@ -1247,7 +1244,6 @@ int main (int argc, char * const * argv)
 				}
 			}
 			node1->start ();
-			nano::thread_runner runner1 (io_ctx1, nano::default_logger (), node1->config.io_threads);
 
 			std::cout << boost::str (boost::format ("Processing %1% blocks\n") % (count * 2));
 			node1->block_processor.add_many (blocks, nano::block_source::test);
@@ -1288,9 +1284,8 @@ int main (int argc, char * const * argv)
 				config2.active_elections->size = daemon_config.node.active_elections->size;
 			}
 
-			auto node2 (std::make_shared<nano::node> (io_ctx2, path2, config2, work, flags, 1));
+			auto node2 (std::make_shared<nano::node> (path2, config2, work, flags, 1));
 			node2->start ();
-			nano::thread_runner runner2 (io_ctx2, nano::default_logger (), node2->config.io_threads);
 			std::cout << boost::str (boost::format ("Processing %1% blocks (test node)\n") % (count * 2));
 			node2->block_processor.add_many (blocks, nano::block_source::test);
 			blocks.clear ();
@@ -1329,10 +1324,6 @@ int main (int argc, char * const * argv)
 			auto end (std::chrono::high_resolution_clock::now ());
 			auto time (std::chrono::duration_cast<std::chrono::microseconds> (end - begin).count ());
 			std::cout << boost::str (boost::format ("%|1$ 12d| us \n%2% frontiers per second\n") % time % ((count + 1) * 1000000 / time));
-			io_ctx1->stop ();
-			io_ctx2->stop ();
-			runner1.join ();
-			runner2.join ();
 			node1->stop ();
 			node2->stop ();
 		}

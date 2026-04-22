@@ -3,16 +3,12 @@
 #include <nano/boost/asio/fwd.hpp>
 #include <nano/lib/fwd.hpp>
 #include <nano/lib/keypair.hpp>
-#include <nano/lib/node_capabilities.hpp>
 #include <nano/messages/fwd.hpp>
 #include <nano/node/fwd.hpp>
-#include <nano/node/transport/fwd.hpp>
-#include <nano/secure/fwd.hpp>
-#include <nano/store/fwd.hpp>
-
-#include <boost/thread/latch.hpp>
 
 #include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -25,8 +21,8 @@ namespace nano
 class node final : public std::enable_shared_from_this<node>
 {
 public:
-	node (std::shared_ptr<boost::asio::io_context>, uint16_t peering_port, std::filesystem::path const & application_path, nano::work_pool &, nano::node_flags, unsigned seq = 0);
-	node (std::shared_ptr<boost::asio::io_context>, std::filesystem::path const & application_path, nano::node_config const &, nano::work_pool &, nano::node_flags, unsigned seq = 0);
+	node (uint16_t peering_port, std::filesystem::path const & application_path, nano::work_pool &, nano::node_flags, unsigned seq = 0);
+	node (std::filesystem::path const & application_path, nano::node_config const &, nano::work_pool &, nano::node_flags, unsigned seq = 0);
 	~node ();
 
 public:
@@ -76,9 +72,11 @@ public:
 	// Attempts to bootstrap block. This is the best effort, there is no guarantee that the block will be bootstrapped.
 	void bootstrap_block (nano::block_hash const &);
 
+	nano::messages::telemetry_data local_telemetry () const;
+
+	std::filesystem::path const & get_data_path () const;
 	nano::account get_node_id () const;
 	nano::node_capabilities_flags get_capabilities () const;
-	nano::messages::telemetry_data local_telemetry () const;
 	std::string identifier () const;
 
 	nano::container_info container_info () const;
@@ -89,7 +87,7 @@ public:
 public:
 	const std::filesystem::path application_path; // aka: data_path
 	const nano::keypair node_id;
-	boost::latch node_initialized_latch;
+
 	std::unique_ptr<nano::node_config> config_impl;
 	nano::node_config & config;
 	std::unique_ptr<nano::node_flags> flags_impl;

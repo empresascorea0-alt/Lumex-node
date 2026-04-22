@@ -3,7 +3,9 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/files.hpp>
 #include <nano/lib/formatting.hpp>
+#include <nano/lib/keypair.hpp>
 #include <nano/lib/logging.hpp>
+#include <nano/lib/node_capabilities.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/lib/stream.hpp>
 #include <nano/lib/thread_pool.hpp>
@@ -92,16 +94,15 @@
 #include <future>
 #include <sstream>
 
-nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, uint16_t peering_port_a, std::filesystem::path const & application_path_a, nano::work_pool & work_a, nano::node_flags flags_a, unsigned seq) :
+nano::node::node (uint16_t peering_port_a, std::filesystem::path const & application_path_a, nano::work_pool & work_a, nano::node_flags flags_a, unsigned seq) :
 	node (
-	io_ctx_a, application_path_a, [&] { nano::node_config c; c.peering_port = peering_port_a; return c; }(), work_a, flags_a, seq)
+	application_path_a, [&] { nano::node_config c; c.peering_port = peering_port_a; return c; }(), work_a, flags_a, seq)
 {
 }
 
-nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, std::filesystem::path const & application_path_a, nano::node_config const & config_a, nano::work_pool & work_a, nano::node_flags flags_a, unsigned seq) :
+nano::node::node (std::filesystem::path const & application_path_a, nano::node_config const & config_a, nano::work_pool & work_a, nano::node_flags flags_a, unsigned seq) :
 	application_path{ application_path_a },
 	node_id{ load_or_create_node_id (application_path_a) },
-	node_initialized_latch{ 1 },
 	config_impl{ std::make_unique<nano::node_config> (config_a) },
 	config{ *config_impl },
 	flags_impl{ std::make_unique<nano::node_flags> (flags_a) },
@@ -460,8 +461,6 @@ nano::node::node (std::shared_ptr<boost::asio::io_context> io_ctx_a, std::filesy
 			});
 		}
 	});
-
-	node_initialized_latch.count_down ();
 }
 
 nano::node::~node ()
@@ -895,7 +894,12 @@ uint64_t nano::node::cemented_count () const
 nano::account nano::node::get_node_id () const
 {
 	return node_id.pub;
-};
+}
+
+std::filesystem::path const & nano::node::get_data_path () const
+{
+	return application_path;
+}
 
 nano::messages::telemetry_data nano::node::local_telemetry () const
 {
