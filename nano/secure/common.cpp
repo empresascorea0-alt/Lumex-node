@@ -158,6 +158,32 @@ nano::block_hash const & nano::unchecked_key::key () const
 }
 
 /*
+ * topo_key
+ */
+
+void nano::topo_key::serialize (nano::stream & stream_a) const
+{
+	nano::write (stream_a, boost::endian::native_to_big (topo_height));
+	nano::write (stream_a, hash.bytes);
+}
+
+bool nano::topo_key::deserialize (nano::stream & stream_a)
+{
+	auto error (false);
+	try
+	{
+		nano::read (stream_a, topo_height);
+		boost::endian::big_to_native_inplace (topo_height);
+		nano::read (stream_a, hash.bytes);
+	}
+	catch (std::runtime_error const &)
+	{
+		error = true;
+	}
+	return error;
+}
+
+/*
  *
  */
 

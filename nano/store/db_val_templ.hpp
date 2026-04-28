@@ -71,6 +71,16 @@ inline db_val::db_val (nano::pending_key const & value) :
 	static_assert (std::is_standard_layout<nano::pending_key>::value, "Standard layout is required");
 }
 
+inline db_val::db_val (nano::topo_key const & value) :
+	buffer{ std::make_shared<std::vector<uint8_t>> () }
+{
+	{
+		nano::vectorstream stream{ *buffer };
+		value.serialize (stream);
+	}
+	convert_buffer_to_value ();
+}
+
 inline db_val::db_val (nano::confirmation_height_info const & value) :
 	buffer{ std::make_shared<std::vector<uint8_t>> () }
 {
@@ -166,6 +176,16 @@ inline db_val::operator nano::pending_key () const
 	debug_assert (span_view.size () == sizeof (result));
 	static_assert (sizeof (nano::pending_key::account) + sizeof (nano::pending_key::hash) == sizeof (result), "Packed class");
 	std::copy (span_view.begin (), span_view.end (), reinterpret_cast<uint8_t *> (&result));
+	return result;
+}
+
+inline db_val::operator nano::topo_key () const
+{
+	nano::bufferstream stream{ span_view.data (), span_view.size () };
+	nano::topo_key result;
+	bool error{ result.deserialize (stream) };
+	(void)error;
+	debug_assert (!error);
 	return result;
 }
 

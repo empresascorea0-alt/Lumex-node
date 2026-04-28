@@ -14,6 +14,8 @@
 #include <nano/secure/common.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/secure/ledger_set_any.hpp>
+#include <nano/store/db_val.hpp>
+#include <nano/store/db_val_templ.hpp>
 #include <nano/store/ledger/account.hpp>
 #include <nano/store/ledger/block.hpp>
 #include <nano/store/ledger/confirmation_height.hpp>
@@ -112,6 +114,38 @@ TEST (block_store, sideband_serialization)
 	ASSERT_EQ (sideband1.height, sideband2.height);
 	ASSERT_EQ (sideband1.timestamp, sideband2.timestamp);
 	ASSERT_EQ (sideband1.topo_height, sideband2.topo_height);
+}
+
+TEST (block_store, topo_key_round_trip)
+{
+	nano::topo_key key1{ 12345, nano::block_hash{ 42 } };
+	nano::store::db_val val{ key1 };
+	auto key2 = static_cast<nano::topo_key> (val);
+	ASSERT_EQ (key1.topo_height, key2.topo_height);
+	ASSERT_EQ (key1.hash, key2.hash);
+	ASSERT_EQ (key1, key2);
+}
+
+// Lexicographic byte order must match numeric order of topo_height (big-endian encoding),
+// otherwise DB-level forward iteration would not yield blocks in topological order.
+TEST (block_store, topo_key_ordering)
+{
+	nano::topo_key a{ 1, nano::block_hash{ 100 } };
+	nano::topo_key b{ 1, nano::block_hash{ 200 } };
+	nano::topo_key c{ 2, nano::block_hash{ 50 } };
+	ASSERT_LT (a, b);
+	ASSERT_LT (a, c);
+	ASSERT_LT (b, c);
+
+	nano::store::db_val a_val{ a };
+	nano::store::db_val b_val{ b };
+	nano::store::db_val c_val{ c };
+	auto bytes = [] (nano::store::db_val const & v) {
+		return std::span<uint8_t const>{ static_cast<uint8_t const *> (v.data ()), v.size () };
+	};
+	ASSERT_TRUE (std::lexicographical_compare (bytes (a_val).begin (), bytes (a_val).end (), bytes (b_val).begin (), bytes (b_val).end ()));
+	ASSERT_TRUE (std::lexicographical_compare (bytes (a_val).begin (), bytes (a_val).end (), bytes (c_val).begin (), bytes (c_val).end ()));
+	ASSERT_TRUE (std::lexicographical_compare (bytes (b_val).begin (), bytes (b_val).end (), bytes (c_val).begin (), bytes (c_val).end ()));
 }
 
 TEST (block_store, add_item)
