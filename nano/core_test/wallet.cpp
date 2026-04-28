@@ -132,6 +132,52 @@ TEST (wallet_store, retrieval)
 	ASSERT_FALSE (wallet.valid_password (transaction));
 }
 
+TEST (wallet_store, unlock_locked)
+{
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
+	nano::kdf kdf{ nano::dev::network_params.kdf_work };
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
+	// Fresh wallet unlocks under the default password
+	auto cipher_unlocked = wallet.unlock (transaction);
+	ASSERT_TRUE (cipher_unlocked);
+	// Corrupt the live password fan to simulate a locked / wrong-password state
+	nano::raw_key garbage;
+	garbage = 1;
+	wallet.password.value_set (garbage);
+	auto cipher_locked = wallet.unlock (transaction);
+	ASSERT_FALSE (cipher_locked);
+}
+
+TEST (wallet_store, cipher_round_trip)
+{
+	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
+	auto transaction (backend.tx_begin_write ());
+	nano::kdf kdf{ nano::dev::network_params.kdf_work };
+	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
+	auto cipher = wallet.unlock (transaction);
+	ASSERT_TRUE (cipher);
+	// Random non-zero plaintext: covers the non-zero encrypt case
+	nano::raw_key plaintext;
+	nano::random_pool::generate_block (plaintext.bytes.data (), plaintext.bytes.size ());
+	ASSERT_FALSE (plaintext.is_zero ());
+	nano::uint128_union iv{ 42 };
+	auto ciphertext = cipher.value ().encrypt (plaintext, iv);
+	// Encryption should actually transform the data
+	ASSERT_NE (plaintext, ciphertext);
+	// Round-trip: decrypt with the same IV recovers the plaintext
+	auto recovered = cipher.value ().decrypt (ciphertext, iv);
+	ASSERT_EQ (plaintext, recovered);
+	// Sanity: a different IV does not recover the plaintext
+	nano::uint128_union iv_other{ 43 };
+	ASSERT_NE (plaintext, cipher.value ().decrypt (ciphertext, iv_other));
+	// Encrypting different plaintexts under the same IV produces different ciphertexts
+	nano::raw_key plaintext_other;
+	nano::random_pool::generate_block (plaintext_other.bytes.data (), plaintext_other.bytes.size ());
+	auto ciphertext_other = cipher.value ().encrypt (plaintext_other, iv);
+	ASSERT_NE (ciphertext, ciphertext_other);
+}
+
 TEST (wallet_store, empty_iteration)
 {
 	nano::wallet::lmdb::wallets_backend_lmdb backend (nano::unique_path () / "wallet.ldb");
@@ -154,10 +200,9 @@ TEST (wallet_store, one_item_iteration)
 	for (auto i (wallet.begin (transaction)), j (wallet.end (transaction)); i != j; ++i)
 	{
 		ASSERT_EQ (key1.pub, nano::uint256_union (i->first));
-		nano::raw_key password;
-		wallet.wallet_key (password, transaction);
-		nano::raw_key key;
-		key.decrypt (nano::wallet::wallet_value (i->second).key, password, (nano::uint256_union (i->first)).owords[0].number ());
+		auto cipher = wallet.unlock (transaction);
+		ASSERT_TRUE (cipher);
+		auto key = cipher.value ().decrypt (nano::wallet::wallet_value (i->second).key, (nano::uint256_union (i->first)).owords[0]);
 		ASSERT_EQ (key1.prv, key);
 	}
 }
@@ -179,10 +224,9 @@ TEST (wallet_store, two_item_iteration)
 		for (auto i (wallet.begin (transaction)), j (wallet.end (transaction)); i != j; ++i)
 		{
 			pubs.insert (i->first);
-			nano::raw_key password;
-			wallet.wallet_key (password, transaction);
-			nano::raw_key key;
-			key.decrypt (nano::wallet::wallet_value (i->second).key, password, (i->first).owords[0].number ());
+			auto cipher = wallet.unlock (transaction);
+			ASSERT_TRUE (cipher);
+			auto key = cipher.value ().decrypt (nano::wallet::wallet_value (i->second).key, (i->first).owords[0]);
 			prvs.insert (key);
 		}
 	}
@@ -228,8 +272,7 @@ TEST (wallet_store, rekey)
 	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
 	nano::raw_key password;
 	wallet.password.value (password);
-	nano::raw_key default_password_key;
-	wallet.derive_key (default_password_key, transaction, nano::wallet::wallet_store::default_password);
+	auto default_password_key = wallet.derive_key (transaction, nano::wallet::wallet_store::default_password);
 	ASSERT_EQ (default_password_key, password);
 	nano::keypair key1;
 	wallet.insert_adhoc (transaction, key1.prv);
@@ -238,8 +281,7 @@ TEST (wallet_store, rekey)
 	ASSERT_EQ (key1.prv, result1.value ());
 	ASSERT_FALSE (wallet.rekey (transaction, "1"));
 	wallet.password.value (password);
-	nano::raw_key password1;
-	wallet.derive_key (password1, transaction, "1");
+	auto password1 = wallet.derive_key (transaction, "1");
 	ASSERT_EQ (password1, password);
 	auto result2 = wallet.fetch (transaction, key1.pub);
 	ASSERT_TRUE (result2);
@@ -254,13 +296,10 @@ TEST (wallet_store, hash_password)
 	auto transaction (backend.tx_begin_write ());
 	nano::kdf kdf{ nano::dev::network_params.kdf_work };
 	nano::wallet::wallet_store wallet (kdf, transaction, backend, nano::dev::genesis_key.pub, 1, "0");
-	nano::raw_key hash1;
-	wallet.derive_key (hash1, transaction, "");
-	nano::raw_key hash2;
-	wallet.derive_key (hash2, transaction, "");
+	auto hash1 = wallet.derive_key (transaction, "");
+	auto hash2 = wallet.derive_key (transaction, "");
 	ASSERT_EQ (hash1, hash2);
-	nano::raw_key hash3;
-	wallet.derive_key (hash3, transaction, "a");
+	auto hash3 = wallet.derive_key (transaction, "a");
 	ASSERT_NE (hash1, hash3);
 }
 
@@ -321,13 +360,16 @@ TEST (wallet_store, serialize_json_empty)
 	std::string serialized;
 	wallet1.serialize_json (transaction, serialized);
 	nano::wallet::wallet_store wallet2 (kdf, transaction, backend, 1, "1", serialized);
-	nano::raw_key password1;
-	nano::raw_key password2;
-	wallet1.wallet_key (password1, transaction);
-	wallet2.wallet_key (password2, transaction);
-	ASSERT_EQ (password1, password2);
-	ASSERT_EQ (wallet1.salt (transaction), wallet2.salt (transaction));
-	ASSERT_EQ (wallet1.check (transaction), wallet2.check (transaction));
+	auto cipher1 = wallet1.unlock (transaction);
+	auto cipher2 = wallet2.unlock (transaction);
+	ASSERT_TRUE (cipher1);
+	ASSERT_TRUE (cipher2);
+	nano::raw_key zero;
+	zero.clear ();
+	nano::uint128_union iv{ 0 };
+	ASSERT_EQ (cipher1.value ().encrypt (zero, iv), cipher2.value ().encrypt (zero, iv));
+	ASSERT_EQ (wallet1.salt_get (transaction), wallet2.salt_get (transaction));
+	ASSERT_EQ (wallet1.check_value_get (transaction), wallet2.check_value_get (transaction));
 	ASSERT_EQ (wallet1.representative (transaction), wallet2.representative (transaction));
 	ASSERT_EQ (wallet1.end (transaction), wallet1.begin (transaction));
 	ASSERT_EQ (wallet2.end (transaction), wallet2.begin (transaction));
@@ -344,13 +386,16 @@ TEST (wallet_store, serialize_json_one)
 	std::string serialized;
 	wallet1.serialize_json (transaction, serialized);
 	nano::wallet::wallet_store wallet2 (kdf, transaction, backend, 1, "1", serialized);
-	nano::raw_key password1;
-	nano::raw_key password2;
-	wallet1.wallet_key (password1, transaction);
-	wallet2.wallet_key (password2, transaction);
-	ASSERT_EQ (password1, password2);
-	ASSERT_EQ (wallet1.salt (transaction), wallet2.salt (transaction));
-	ASSERT_EQ (wallet1.check (transaction), wallet2.check (transaction));
+	auto cipher1 = wallet1.unlock (transaction);
+	auto cipher2 = wallet2.unlock (transaction);
+	ASSERT_TRUE (cipher1);
+	ASSERT_TRUE (cipher2);
+	nano::raw_key zero;
+	zero.clear ();
+	nano::uint128_union iv{ 0 };
+	ASSERT_EQ (cipher1.value ().encrypt (zero, iv), cipher2.value ().encrypt (zero, iv));
+	ASSERT_EQ (wallet1.salt_get (transaction), wallet2.salt_get (transaction));
+	ASSERT_EQ (wallet1.check_value_get (transaction), wallet2.check_value_get (transaction));
 	ASSERT_EQ (wallet1.representative (transaction), wallet2.representative (transaction));
 	ASSERT_TRUE (wallet2.exists (transaction, key.pub));
 	auto prv_result = wallet2.fetch (transaction, key.pub);
@@ -373,13 +418,16 @@ TEST (wallet_store, serialize_json_password)
 	ASSERT_FALSE (wallet2.valid_password (transaction));
 	ASSERT_FALSE (wallet2.attempt_password (transaction, "password"));
 	ASSERT_TRUE (wallet2.valid_password (transaction));
-	nano::raw_key password1;
-	nano::raw_key password2;
-	wallet1.wallet_key (password1, transaction);
-	wallet2.wallet_key (password2, transaction);
-	ASSERT_EQ (password1, password2);
-	ASSERT_EQ (wallet1.salt (transaction), wallet2.salt (transaction));
-	ASSERT_EQ (wallet1.check (transaction), wallet2.check (transaction));
+	auto cipher1 = wallet1.unlock (transaction);
+	auto cipher2 = wallet2.unlock (transaction);
+	ASSERT_TRUE (cipher1);
+	ASSERT_TRUE (cipher2);
+	nano::raw_key zero;
+	zero.clear ();
+	nano::uint128_union iv{ 0 };
+	ASSERT_EQ (cipher1.value ().encrypt (zero, iv), cipher2.value ().encrypt (zero, iv));
+	ASSERT_EQ (wallet1.salt_get (transaction), wallet2.salt_get (transaction));
+	ASSERT_EQ (wallet1.check_value_get (transaction), wallet2.check_value_get (transaction));
 	ASSERT_EQ (wallet1.representative (transaction), wallet2.representative (transaction));
 	ASSERT_TRUE (wallet2.exists (transaction, key.pub));
 	auto prv_result = wallet2.fetch (transaction, key.pub);
