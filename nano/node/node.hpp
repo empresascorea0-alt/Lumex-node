@@ -31,7 +31,7 @@ public:
 
 	std::shared_ptr<nano::node> shared ();
 
-	int store_version ();
+	uint64_t store_version () const;
 	void inbound (nano::messages::message const &, std::shared_ptr<nano::transport::channel> const &);
 	void process_active (std::shared_ptr<nano::block> const &);
 	void process_active (std::shared_ptr<nano::vote> const &);

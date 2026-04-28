@@ -1409,3 +1409,29 @@ TEST (block_store, rocksdb_tombstone_count)
 	store.account.del (tx, account);
 	ASSERT_EQ (rocksdb_backend->get_tombstone_map ().at (nano::store::table::accounts).num_since_last_flush.load (), 1);
 }
+
+TEST (block_store, meta_flags)
+{
+	auto store = nano::test::make_store ();
+	auto const key = static_cast<nano::store::meta_key> (99);
+	{
+		auto txn = store->tx_begin_read ();
+		ASSERT_FALSE (store->version.get_flag (txn, key));
+	}
+	{
+		auto txn = store->tx_begin_write ();
+		store->version.put_flag (txn, key, true);
+	}
+	{
+		auto txn = store->tx_begin_read ();
+		ASSERT_TRUE (store->version.get_flag (txn, key));
+	}
+	{
+		auto txn = store->tx_begin_write ();
+		store->version.put_flag (txn, key, false);
+	}
+	{
+		auto txn = store->tx_begin_read ();
+		ASSERT_FALSE (store->version.get_flag (txn, key));
+	}
+}

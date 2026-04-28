@@ -849,10 +849,9 @@ std::shared_ptr<nano::node> nano::node::shared ()
 	return shared_from_this ();
 }
 
-int nano::node::store_version ()
+uint64_t nano::node::store_version () const
 {
-	auto transaction (store.tx_begin_read ());
-	return store.version.get (transaction);
+	return store.version.get_version (store.tx_begin_read ());
 }
 
 nano::node_capabilities_flags nano::node::get_capabilities () const

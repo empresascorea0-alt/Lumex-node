@@ -5886,7 +5886,7 @@ TEST (ledger, copy_to_rocksdb)
 		store->peer.put (transaction, endpoint_key, 37);
 		store->pending.put (transaction, nano::pending_key (nano::dev::genesis_key.pub, send->hash ()), nano::pending_info (nano::dev::genesis_key.pub, 100, nano::epoch::epoch_0));
 		store->pruned.put (transaction, send->hash ());
-		store->version.put (transaction, version);
+		store->version.put_version (transaction, version);
 		send->sideband_set ({});
 		store->block.put (transaction, send->hash (), *send);
 		store->final_vote.put (transaction, send->qualified_root (), nano::block_hash (2));
@@ -5923,7 +5923,7 @@ TEST (ledger, copy_to_rocksdb)
 		ASSERT_EQ (*send, *block1);
 
 		ASSERT_TRUE (rocksdb_store->peer.exists (rocksdb_transaction, endpoint_key));
-		ASSERT_EQ (rocksdb_store->version.get (rocksdb_transaction), version);
+		ASSERT_EQ (rocksdb_store->version.get_version (rocksdb_transaction), version);
 
 		nano::confirmation_height_info confirmation_height_info;
 		ASSERT_FALSE (rocksdb_store->confirmation_height.get (rocksdb_transaction, nano::dev::genesis_key.pub, confirmation_height_info));
