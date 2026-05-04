@@ -242,8 +242,7 @@ void ledger_store::upgrade_v24_to_v25 ()
 			processed++;
 			if (processed % batch_size == 0)
 			{
-				double const percentage = total_blocks > 0 ? (static_cast<double> (processed) / total_blocks * 100.0) : 0.0;
-				logger.info (nano::log::type::ledger_upgrade, "Processed {} blocks ({:.1f}%)", processed, percentage);
+				logger.info (nano::log::type::ledger_upgrade, "Processed {} blocks ({:.1f}%)", processed, nano::log::percentage (processed, total_blocks));
 				transaction.refresh ();
 			}
 		});
@@ -256,7 +255,7 @@ void ledger_store::upgrade_v24_to_v25 ()
 	logger.info (nano::log::type::ledger_upgrade, "Upgrading database from v24 to v25 completed");
 }
 
-// Remove successor from block sideband
+// Remove successor from block sideband and add topo_height placeholder sideband field
 void ledger_store::upgrade_v25_to_v26 ()
 {
 	logger.info (nano::log::type::ledger_upgrade, "Upgrading database from v25 to v26...");
@@ -349,8 +348,7 @@ void ledger_store::upgrade_v25_to_v26 ()
 			batch_count++;
 			if (batch_count >= batch_size)
 			{
-				double const percentage = total_blocks > 0 ? (static_cast<double> (processed + skipped) / total_blocks * 100.0) : 0.0;
-				logger.info (nano::log::type::ledger_upgrade, "Processed {} blocks ({:.1f}%)", processed + skipped, percentage);
+				logger.info (nano::log::type::ledger_upgrade, "Processed {} blocks ({:.1f}%)", processed + skipped, nano::log::percentage (processed + skipped, total_blocks));
 
 				// Refresh transaction to commit changes
 				crawler.refresh ();

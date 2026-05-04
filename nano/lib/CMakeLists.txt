@@ -91,6 +91,7 @@ add_library(
   logging.cpp
   logging_enums.hpp
   logging_enums.cpp
+  logging_utils.hpp
   memory.hpp
   memory.cpp
   network_filter.hpp

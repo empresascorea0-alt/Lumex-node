@@ -73,6 +73,8 @@ void nano::add_node_options (boost::program_options::options_description & descr
 	("final_vote_clear", "Clear final votes")
 	("migrate_database_lmdb_to_rocksdb", "Migrates LMDB database to RocksDB")
 	("database_upgrade", "Upgrade the ledger database to the latest version without starting the node")
+	("populate_topo_index", "Build the topology index for an existing ledger and enable the topo_index flag. One-off operation, may take a long time.")
+	("drop_topo_index", "Drop the topology index and disable the topo_index flag. Required before enabling pruning on a ledger that has topo_index enabled.")
 	("rollback", "Rolls back the specified block hash, effectively removing this block and all blocks following it")
 	("diagnostics", "Run internal diagnostics")
 	("generate_config", boost::program_options::value<std::string> (), "Write configuration to stdout, populated with defaults suitable for this system. Pass the configuration type node, rpc or log. See also use_defaults.")
@@ -557,6 +559,96 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 			catch (std::exception const & e)
 			{
 				std::cerr << "Database upgrade failed: " << e.what () << std::endl;
+				ec = nano::error_cli::generic;
+			}
+		}
+	}
+	else if (vm.count ("populate_topo_index"))
+	{
+		nano::logger::initialize (nano::log_config::daemon_default (), data_path);
+
+		nano::network_params network_params{ nano::get_active_network () };
+		nano::daemon_config daemon_config{ data_path, network_params };
+
+		auto config_arg (vm.find ("config"));
+		std::vector<std::string> config_overrides;
+		if (config_arg != vm.end ())
+		{
+			config_overrides = nano::config_overrides (config_arg->second.as<std::vector<nano::config_key_value_pair>> ());
+		}
+
+		if (auto error = nano::read_node_config_toml (data_path, daemon_config, config_overrides))
+		{
+			std::cerr << "Error reading config: " << error.get_message () << std::endl;
+			ec = nano::error_cli::reading_config;
+		}
+		else
+		{
+			try
+			{
+				auto & logger = nano::default_logger ();
+				nano::stats stats{ logger };
+				auto store = nano::make_store (logger, stats, data_path, network_params.ledger, false, true, daemon_config.node);
+				nano::ledger ledger{ *store, network_params, stats, logger };
+
+				if (ledger.flags.topo_index)
+				{
+					std::cout << "Topology index is already populated" << std::endl;
+				}
+				else
+				{
+					ledger.populate_topo_index ();
+					std::cout << "Topology index populated" << std::endl;
+				}
+			}
+			catch (std::exception const & e)
+			{
+				std::cerr << "Failed to populate topology index: " << e.what () << std::endl;
+				ec = nano::error_cli::generic;
+			}
+		}
+	}
+	else if (vm.count ("drop_topo_index"))
+	{
+		nano::logger::initialize (nano::log_config::daemon_default (), data_path);
+
+		nano::network_params network_params{ nano::get_active_network () };
+		nano::daemon_config daemon_config{ data_path, network_params };
+
+		auto config_arg (vm.find ("config"));
+		std::vector<std::string> config_overrides;
+		if (config_arg != vm.end ())
+		{
+			config_overrides = nano::config_overrides (config_arg->second.as<std::vector<nano::config_key_value_pair>> ());
+		}
+
+		if (auto error = nano::read_node_config_toml (data_path, daemon_config, config_overrides))
+		{
+			std::cerr << "Error reading config: " << error.get_message () << std::endl;
+			ec = nano::error_cli::reading_config;
+		}
+		else
+		{
+			try
+			{
+				auto & logger = nano::default_logger ();
+				nano::stats stats{ logger };
+				auto store = nano::make_store (logger, stats, data_path, network_params.ledger, false, true, daemon_config.node);
+				nano::ledger ledger{ *store, network_params, stats, logger };
+
+				if (!ledger.flags.topo_index)
+				{
+					std::cout << "Topology index is not enabled" << std::endl;
+				}
+				else
+				{
+					ledger.drop_topo_index ();
+					std::cout << "Topology index dropped" << std::endl;
+				}
+			}
+			catch (std::exception const & e)
+			{
+				std::cerr << "Failed to drop topology index: " << e.what () << std::endl;
 				ec = nano::error_cli::generic;
 			}
 		}
