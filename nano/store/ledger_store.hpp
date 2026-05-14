@@ -27,7 +27,6 @@ public:
 	nano::store::read_transaction tx_begin_read () const;
 
 	bool empty (nano::store::transaction const &) const;
-	void initialize (nano::store::write_transaction const &, nano::ledger_constants const &);
 	void perform_upgrades (nano::store::backend_meta);
 
 	uint64_t count (nano::store::transaction const &, nano::store::table) const;
@@ -63,6 +62,7 @@ private:
 	std::unique_ptr<nano::store::ledger::peer_view> peer_impl;
 	std::unique_ptr<nano::store::ledger::confirmation_height_view> confirmation_height_impl;
 	std::unique_ptr<nano::store::ledger::final_vote_view> final_vote_impl;
+	std::unique_ptr<nano::store::ledger::topology_view> topology_impl;
 	std::unique_ptr<nano::store::ledger::version_view> version_impl;
 
 public:
@@ -77,6 +77,7 @@ public:
 	nano::store::ledger::peer_view & peer;
 	nano::store::ledger::confirmation_height_view & confirmation_height;
 	nano::store::ledger::final_vote_view & final_vote;
+	nano::store::ledger::topology_view & topology;
 	nano::store::ledger::version_view & version;
 
 public:

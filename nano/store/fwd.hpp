@@ -5,6 +5,7 @@ namespace nano::store
 enum class table;
 
 class backend;
+class meta_view;
 class txn_tracking_config;
 class ledger_store;
 class read_transaction;
@@ -24,5 +25,7 @@ class pending_view;
 class pruned_view;
 class successor_view;
 class rep_weight_view;
-class version_view;
+class topology_view;
+
+using version_view = nano::store::meta_view;
 }

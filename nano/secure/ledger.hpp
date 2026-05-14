@@ -37,13 +37,26 @@ private:
 	std::atomic<uint64_t> account_count{ 0 };
 };
 
+struct ledger_options
+{
+	nano::generate_cache_flags generate_cache{};
+	nano::uint128_t min_rep_weight{ 0 };
+	uint64_t max_backlog{ 0 };
+	bool enable_topo_index{ true };
+};
+
+struct ledger_flags
+{
+	bool topo_index{ false };
+};
+
 class ledger final
 {
 	template <typename T>
 	friend class receivable_iterator;
 
 public:
-	ledger (nano::store::ledger_store &, nano::network_params const &, nano::stats &, nano::logger &, nano::generate_cache_flags = {}, nano::uint128_t min_rep_weight = 0, uint64_t max_backlog = 0);
+	ledger (nano::store::ledger_store &, nano::network_params const &, nano::stats &, nano::logger &, ledger_options = {});
 	~ledger ();
 
 	/** Start read-write transaction */
@@ -115,6 +128,18 @@ public:
 
 	void verify_consistency (secure::transaction const &) const;
 
+	/**
+	 * Walk every block in the ledger, compute and persist its topology height, then enable the topology index flag
+	 * Intended as a one-time offline upgrade for ledgers initialized before the topology index existed
+	 */
+	void populate_topo_index ();
+
+	/**
+	 * Drop the topology index table and disable the topology index flag.
+	 * Intended for users who need to enable pruning, which is incompatible with the topology index.
+	 */
+	void drop_topo_index ();
+
 	nano::container_info container_info () const;
 
 public:
@@ -127,6 +152,8 @@ public:
 	nano::logger & logger;
 
 public:
+	nano::ledger_options const options;
+	nano::ledger_flags flags;
 	nano::ledger_cache cache;
 	nano::rep_weights rep_weights;
 
@@ -136,8 +163,14 @@ public:
 
 	nano::bootstrap_weights bootstrap_weights{};
 
+public:
+	/**
+	 * Seed a fresh ledger store with genesis state. Aborts if the store is not empty.
+	 */
+	static void seed_genesis (nano::store::ledger_store &, nano::store::write_transaction const &, nano::ledger_constants const &, ledger_options const & = {});
+
 private:
-	void initialize (nano::generate_cache_flags const &);
+	void initialize ();
 	void cement_one (secure::write_transaction &, nano::block const & block);
 
 	std::unique_ptr<ledger_set_any> any_impl;

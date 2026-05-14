@@ -1238,6 +1238,7 @@ TEST (rpc, history_pruning)
 	node_config.enable_voting = false; // Remove after allowing pruned voting
 	nano::node_flags node_flags;
 	node_flags.enable_pruning = true;
+	node_flags.disable_topo_index = true; // Topo index is incompatible with pruning
 	auto node0 = add_ipc_enabled_node (system, node_config, node_flags);
 	std::vector<std::shared_ptr<nano::block>> blocks;
 
@@ -1855,7 +1856,7 @@ TEST (rpc, version)
 	ASSERT_EQ ("1", response1.json.get<std::string> ("rpc_version"));
 	{
 		auto transaction (node1->store.tx_begin_read ());
-		ASSERT_EQ (std::to_string (node1->store.version.get (transaction)), response1.json.get<std::string> ("store_version"));
+		ASSERT_EQ (std::to_string (node1->store.version.get_version (transaction)), response1.json.get<std::string> ("store_version"));
 	}
 	ASSERT_EQ (std::to_string (node1->network_params.network.protocol_version), response1.json.get<std::string> ("protocol_version"));
 	ASSERT_EQ (boost::str (boost::format ("Nano %1%") % NANO_VERSION_STRING), response1.json.get<std::string> ("node_vendor"));
@@ -2361,6 +2362,7 @@ TEST (rpc, block_count_pruning)
 	node_config.enable_voting = false; // Remove after allowing pruned voting
 	nano::node_flags node_flags;
 	node_flags.enable_pruning = true;
+	node_flags.disable_topo_index = true; // Topo index is incompatible with pruning
 	auto node1 = add_ipc_enabled_node (system, node_config, node_flags);
 	auto latest (node1->latest (nano::dev::genesis_key.pub));
 	nano::block_builder builder;
@@ -4343,6 +4345,7 @@ TEST (rpc, block_info_pruning)
 	node_config1.enable_voting = false; // Remove after allowing pruned voting
 	nano::node_flags node_flags;
 	node_flags.enable_pruning = true;
+	node_flags.disable_topo_index = true; // Topo index is incompatible with pruning
 	auto node1 = add_ipc_enabled_node (system, node_config1, node_flags);
 	auto latest (node1->latest (nano::dev::genesis_key.pub));
 	nano::block_builder builder;
@@ -4409,6 +4412,7 @@ TEST (rpc, pruned_exists)
 	node_config1.enable_voting = false; // Remove after allowing pruned voting
 	nano::node_flags node_flags;
 	node_flags.enable_pruning = true;
+	node_flags.disable_topo_index = true; // Topo index is incompatible with pruning
 	auto node1 = add_ipc_enabled_node (system, node_config1, node_flags);
 	auto latest (node1->latest (nano::dev::genesis_key.pub));
 	nano::block_builder builder;
@@ -6698,6 +6702,7 @@ TEST (rpc, receive_pruned)
 	node_config.enable_voting = false; // Remove after allowing pruned voting
 	nano::node_flags node_flags;
 	node_flags.enable_pruning = true;
+	node_flags.disable_topo_index = true; // Topo index is incompatible with pruning
 	auto node2 = add_ipc_enabled_node (system, node_config, node_flags);
 	auto wallet1 = system.wallet (0);
 	auto wallet2 = system.wallet (1);

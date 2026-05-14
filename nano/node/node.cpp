@@ -118,7 +118,14 @@ nano::node::node (std::filesystem::path const & application_path_a, nano::node_c
 	store{ *store_impl },
 	wallets_backend_impl{ std::make_unique<nano::wallet::lmdb::wallets_backend_lmdb> (application_path_a / "wallets.ldb", config_a.lmdb_config) },
 	wallets_backend{ *wallets_backend_impl },
-	ledger_impl{ std::make_unique<nano::ledger> (store, network_params, stats, logger, flags_a.generate_cache, config.representative_vote_weight_minimum.number (), config.max_backlog) },
+	ledger_impl{ std::make_unique<nano::ledger> (store, network_params, stats, logger,
+	nano::ledger_options{
+	.generate_cache = flags_a.generate_cache,
+	.min_rep_weight = config.representative_vote_weight_minimum.number (),
+	.max_backlog = config.max_backlog,
+	// Topo index is incompatible with pruning, so disable it on fresh ledgers when pruning is on
+	// For existing ledgers the persisted meta flag wins, so this only affects first-init
+	.enable_topo_index = !(flags_a.enable_pruning || flags_a.disable_topo_index) }) },
 	ledger{ *ledger_impl },
 	runner_impl{ std::make_unique<nano::thread_runner> (io_ctx_shared, logger, config.io_threads) },
 	runner{ *runner_impl },
@@ -438,6 +445,7 @@ nano::node::node (std::filesystem::path const & application_path_a, nano::node_c
 
 	if (ledger.pruning)
 	{
+		// Gated on !flags.inactive_node so CLI utilities can still open the ledger
 		if (config.enable_voting && !flags.inactive_node)
 		{
 			logger.critical (nano::log::type::node, "Incompatibility detected between config node.enable_voting and existing pruned blocks");
@@ -446,6 +454,11 @@ nano::node::node (std::filesystem::path const & application_path_a, nano::node_c
 		if (!flags.enable_pruning && !flags.inactive_node)
 		{
 			logger.critical (nano::log::type::node, "To start node with existing pruned blocks use launch flag --enable_pruning");
+			std::exit (1);
+		}
+		if (ledger.flags.topo_index && !flags.inactive_node)
+		{
+			logger.critical (nano::log::type::node, "Incompatibility detected between topological index and ledger pruning. To proceed, either disable pruning, or run the node with --drop_topo_index to remove the topology index.");
 			std::exit (1);
 		}
 
@@ -849,10 +862,9 @@ std::shared_ptr<nano::node> nano::node::shared ()
 	return shared_from_this ();
 }
 
-int nano::node::store_version ()
+uint64_t nano::node::store_version () const
 {
-	auto transaction (store.tx_begin_read ());
-	return store.version.get (transaction);
+	return store.version.get_version (store.tx_begin_read ());
 }
 
 nano::node_capabilities_flags nano::node::get_capabilities () const

@@ -1,9 +1,19 @@
 #pragma once
 
+#include <nano/lib/numbers.hpp>
 #include <nano/store/fwd.hpp>
+
+#include <cstdint>
+#include <optional>
 
 namespace nano::store
 {
+enum class meta_key : uint64_t
+{
+	version = 1,
+	topo_index_enabled = 8,
+};
+
 class meta_view
 {
 public:
@@ -13,10 +23,13 @@ public:
 	uint64_t get_version (nano::store::transaction const &) const;
 	bool version_exists (nano::store::transaction const &) const;
 
-private:
-	nano::store::backend & backend;
+	bool get_flag (nano::store::transaction const &, nano::store::meta_key) const;
+	void put_flag (nano::store::write_transaction const &, nano::store::meta_key, bool value);
 
 private:
-	static uint64_t constexpr version_key{ 1 };
+	std::optional<nano::uint256_union> get_value (nano::store::transaction const &, nano::store::meta_key) const;
+	void put_value (nano::store::write_transaction const &, nano::store::meta_key, nano::uint256_union const & value);
+
+	nano::store::backend & backend;
 };
 }

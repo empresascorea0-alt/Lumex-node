@@ -170,7 +170,7 @@ void ledger_store::upgrade_v22_to_v23 ()
 		});
 
 		logger.info (nano::log::type::ledger_upgrade, "Done processing {} accounts", processed);
-		version.put (transaction, 23);
+		version.put_version (transaction, 23);
 	}
 	backend.close ();
 
@@ -190,7 +190,7 @@ void ledger_store::upgrade_v23_to_v24 ()
 		release_assert (dropped, "failed to drop frontiers table during upgrade");
 
 		auto transaction = backend.tx_begin_write ();
-		version.put (transaction, 24);
+		version.put_version (transaction, 24);
 	}
 	backend.close ();
 
@@ -242,21 +242,20 @@ void ledger_store::upgrade_v24_to_v25 ()
 			processed++;
 			if (processed % batch_size == 0)
 			{
-				double const percentage = total_blocks > 0 ? (static_cast<double> (processed) / total_blocks * 100.0) : 0.0;
-				logger.info (nano::log::type::ledger_upgrade, "Processed {} blocks ({:.1f}%)", processed, percentage);
+				logger.info (nano::log::type::ledger_upgrade, "Processed {} blocks ({:.1f}%)", processed, nano::log::percentage (processed, total_blocks));
 				transaction.refresh ();
 			}
 		});
 
 		logger.info (nano::log::type::ledger_upgrade, "Done processing {} blocks", processed);
-		version.put (transaction, 25);
+		version.put_version (transaction, 25);
 	}
 	backend.close ();
 
 	logger.info (nano::log::type::ledger_upgrade, "Upgrading database from v24 to v25 completed");
 }
 
-// Remove successor from block sideband
+// Remove successor from block sideband and add topo_height placeholder sideband field
 void ledger_store::upgrade_v25_to_v26 ()
 {
 	logger.info (nano::log::type::ledger_upgrade, "Upgrading database from v25 to v26...");
@@ -349,8 +348,7 @@ void ledger_store::upgrade_v25_to_v26 ()
 			batch_count++;
 			if (batch_count >= batch_size)
 			{
-				double const percentage = total_blocks > 0 ? (static_cast<double> (processed + skipped) / total_blocks * 100.0) : 0.0;
-				logger.info (nano::log::type::ledger_upgrade, "Processed {} blocks ({:.1f}%)", processed + skipped, percentage);
+				logger.info (nano::log::type::ledger_upgrade, "Processed {} blocks ({:.1f}%)", processed + skipped, nano::log::percentage (processed + skipped, total_blocks));
 
 				// Refresh transaction to commit changes
 				crawler.refresh ();
@@ -362,7 +360,7 @@ void ledger_store::upgrade_v25_to_v26 ()
 		crawler.refresh ();
 
 		logger.info (nano::log::type::ledger_upgrade, "Done processing {} blocks ({} converted, {} already upgraded)", processed + skipped, processed, skipped);
-		version.put (transaction, 26);
+		version.put_version (transaction, 26);
 	}
 
 	backend.close ();

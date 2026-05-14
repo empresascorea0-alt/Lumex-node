@@ -27,6 +27,26 @@ public:
 	nano::block_hash hash{ 0 };
 };
 
+class topo_key final
+{
+public:
+	topo_key () = default;
+	topo_key (uint64_t topo_height_a, nano::block_hash const & hash_a) :
+		topo_height{ topo_height_a },
+		hash{ hash_a }
+	{
+	}
+
+	auto operator<=> (topo_key const &) const = default;
+
+	void serialize (nano::stream &) const;
+	bool deserialize (nano::stream &);
+
+public:
+	uint64_t topo_height{ 0 };
+	nano::block_hash hash{ 0 };
+};
+
 /**
  * Information on an unchecked block
  */
