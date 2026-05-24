@@ -77,7 +77,7 @@ _clang_format_perform()
         return 2
     fi
 
-    find "$ROOTPATH/nano" -type f \( -iname "*.hpp" \
+    find "$ROOTPATH/lumex" -type f \( -iname "*.hpp" \
                                      -o             \
                                      -iname "*.cpp" \
                                   \)                \

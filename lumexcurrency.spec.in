@@ -29,8 +29,8 @@ fi
 
 %build
 cmake -DCMAKE_VERBOSE_MAKEFILE=ON .
-make nano_node %{?_smp_mflags}
-make nano_rpc %{?_smp_mflags}
+make lumex_node %{?_smp_mflags}
+make lumex_rpc %{?_smp_mflags}
 
 %install
 if [ ! %{buildroot} = "/" ]; then %{__rm} -rf %{buildroot}; fi

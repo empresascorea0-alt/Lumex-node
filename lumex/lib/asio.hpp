@@ -1,0 +1,62 @@
+#pragma once
+
+#include <lumex/boost/asio/ip/tcp.hpp>
+#include <lumex/boost/asio/strand.hpp>
+#include <lumex/boost/asio/write.hpp>
+
+#include <span>
+
+namespace lumex
+{
+using buffer_view = std::span<const uint8_t>;
+using shared_buffer = std::shared_ptr<std::vector<uint8_t>>;
+
+class shared_const_buffer
+{
+public:
+	using value_type = boost::asio::const_buffer;
+	using const_iterator = boost::asio::const_buffer const *;
+
+	explicit shared_const_buffer (std::vector<uint8_t> const & data);
+	explicit shared_const_buffer (uint8_t data);
+	explicit shared_const_buffer (std::string const & data);
+	explicit shared_const_buffer (std::vector<uint8_t> && data);
+	explicit shared_const_buffer (std::shared_ptr<std::vector<uint8_t>> const & data);
+
+	boost::asio::const_buffer const * begin () const;
+	boost::asio::const_buffer const * end () const;
+
+	std::size_t size () const;
+	std::vector<uint8_t> to_bytes () const;
+
+	operator lumex::shared_buffer () const
+	{
+		return m_data;
+	}
+
+private:
+	std::shared_ptr<std::vector<uint8_t>> m_data;
+	boost::asio::const_buffer m_buffer;
+};
+
+static_assert (boost::asio::is_const_buffer_sequence<shared_const_buffer>::value, "Not ConstBufferSequence compliant");
+
+template <typename AsyncWriteStream, typename WriteHandler>
+BOOST_ASIO_INITFN_RESULT_TYPE (WriteHandler, void (boost::system::error_code, std::size_t))
+async_write (AsyncWriteStream & s, lumex::shared_const_buffer const & buffer, WriteHandler && handler)
+{
+	return boost::asio::async_write (s, buffer, std::forward<WriteHandler> (handler));
+}
+
+/**
+ * Alternative to lumex::async_write where scatter/gather is desired for best performance, and where
+ * the buffer originates from Flatbuffers.
+ * @warning The buffers must be captured in the handler to ensure their lifetimes are properly extended.
+ */
+template <typename AsyncWriteStream, typename BufferType, typename WriteHandler>
+BOOST_ASIO_INITFN_RESULT_TYPE (WriteHandler, void (boost::system::error_code, std::size_t))
+unsafe_async_write (AsyncWriteStream & s, BufferType && buffer, WriteHandler && handler)
+{
+	return boost::asio::async_write (s, buffer, std::forward<WriteHandler> (handler));
+}
+}

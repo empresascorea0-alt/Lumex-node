@@ -1,0 +1,201 @@
+#include <lumex/node/bootstrap/frontier_scan_index.hpp>
+
+#include <boost/multiprecision/cpp_dec_float.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
+
+namespace lumex::bootstrap
+{
+frontier_scan_index::frontier_scan_index (frontier_scan_config const & config_a, lumex::stats & stats_a) :
+	config{ config_a },
+	stats{ stats_a }
+{
+	// Divide lumex::account numeric range into consecutive and equal ranges
+	lumex::uint256_t max_account = std::numeric_limits<lumex::uint256_t>::max ();
+	lumex::uint256_t range_size = max_account / config.head_parallelism;
+
+	for (unsigned i = 0; i < config.head_parallelism; ++i)
+	{
+		// Start at 1 to avoid the burn account
+		lumex::uint256_t start = (i == 0) ? 1 : i * range_size;
+		lumex::uint256_t end = (i == config.head_parallelism - 1) ? max_account : start + range_size;
+
+		heads.emplace_back (frontier_head{ lumex::account{ start }, lumex::account{ end } });
+	}
+
+	release_assert (!heads.empty ());
+}
+
+void frontier_scan_index::reset ()
+{
+	for (auto it = heads.begin (); it != heads.end (); ++it)
+	{
+		heads.modify (it, [] (frontier_head & head) {
+			head.reset ();
+		});
+	}
+}
+
+lumex::account frontier_scan_index::next ()
+{
+	auto const cutoff = std::chrono::steady_clock::now () - config.cooldown;
+
+	auto & heads_by_timestamp = heads.get<tag_timestamp> ();
+	for (auto it = heads_by_timestamp.begin (); it != heads_by_timestamp.end (); ++it)
+	{
+		auto const & head = *it;
+
+		if (head.requests < config.consideration_count || head.timestamp < cutoff)
+		{
+			stats.inc (lumex::stat::type::bootstrap_frontier_scan, (head.requests < config.consideration_count) ? lumex::stat::detail::next_by_requests : lumex::stat::detail::next_by_timestamp);
+
+			debug_assert (head.next.number () >= head.start.number ());
+			debug_assert (head.next.number () < head.end.number ());
+
+			auto result = head.next;
+
+			heads_by_timestamp.modify (it, [this] (auto & entry) {
+				entry.requests += 1;
+				entry.timestamp = std::chrono::steady_clock::now ();
+			});
+
+			return result;
+		}
+	}
+
+	stats.inc (lumex::stat::type::bootstrap_frontier_scan, lumex::stat::detail::next_none);
+	return { 0 };
+}
+
+bool frontier_scan_index::process (lumex::account start, std::deque<std::pair<lumex::account, lumex::block_hash>> const & response)
+{
+	debug_assert (std::all_of (response.begin (), response.end (), [&] (auto const & pair) { return pair.first.number () >= start.number (); }));
+
+	stats.inc (lumex::stat::type::bootstrap_frontier_scan, lumex::stat::detail::process);
+
+	// Find the first head with head.start <= start
+	auto & heads_by_start = heads.get<tag_start> ();
+	auto it = heads_by_start.upper_bound (start);
+	release_assert (it != heads_by_start.begin ());
+	it = std::prev (it);
+
+	bool done = false;
+	heads_by_start.modify (it, [this, &response, &done] (frontier_head & entry) {
+		entry.completed += 1;
+
+		for (auto const & [account, _] : response)
+		{
+			// Only consider candidates that actually advance the current frontier
+			if (account.number () > entry.next.number ())
+			{
+				entry.candidates.insert (account);
+			}
+		}
+
+		// Trim the candidates
+		while (entry.candidates.size () > config.candidates)
+		{
+			release_assert (!entry.candidates.empty ());
+			entry.candidates.erase (std::prev (entry.candidates.end ()));
+		}
+
+		// Special case for the last frontier head that won't receive larger than max frontier
+		if (entry.completed >= config.consideration_count * 2 && entry.candidates.empty ())
+		{
+			stats.inc (lumex::stat::type::bootstrap_frontier_scan, lumex::stat::detail::done_empty);
+			entry.candidates.insert (entry.end);
+		}
+
+		// Check if done
+		if (entry.completed >= config.consideration_count && !entry.candidates.empty ())
+		{
+			stats.inc (lumex::stat::type::bootstrap_frontier_scan, lumex::stat::detail::done);
+
+			// Take the last candidate as the next frontier
+			release_assert (!entry.candidates.empty ());
+			auto it = std::prev (entry.candidates.end ());
+
+			debug_assert (entry.next.number () < it->number ());
+			entry.next = *it;
+			entry.processed += entry.candidates.size ();
+			entry.candidates.clear ();
+			entry.requests = 0;
+			entry.completed = 0;
+			entry.timestamp = {};
+
+			// Bound the search range
+			if (entry.next.number () >= entry.end.number ())
+			{
+				stats.inc (lumex::stat::type::bootstrap_frontier_scan, lumex::stat::detail::done_range);
+				entry.next = entry.start;
+			}
+
+			done = true;
+		}
+	});
+
+	return done;
+}
+
+lumex::container_info frontier_scan_index::container_info () const
+{
+	auto collect_progress = [&] () {
+		lumex::container_info info;
+		for (int n = 0; n < heads.size (); ++n)
+		{
+			auto const & head = heads[n];
+
+			boost::multiprecision::cpp_dec_float_50 start{ head.start.number ().str () };
+			boost::multiprecision::cpp_dec_float_50 next{ head.next.number ().str () };
+			boost::multiprecision::cpp_dec_float_50 end{ head.end.number ().str () };
+
+			// Progress in the range [0, 1000000] since we can only represent `size_t` integers in the container_info data
+			boost::multiprecision::cpp_dec_float_50 progress = (next - start) * boost::multiprecision::cpp_dec_float_50 (1000000) / (end - start);
+
+			info.put (std::to_string (n), progress.convert_to<std::uint64_t> ());
+		}
+		return info;
+	};
+
+	auto collect_candidates = [&] () {
+		lumex::container_info info;
+		for (int n = 0; n < heads.size (); ++n)
+		{
+			auto const & head = heads[n];
+			info.put (std::to_string (n), head.candidates.size ());
+		}
+		return info;
+	};
+
+	auto collect_responses = [&] () {
+		lumex::container_info info;
+		for (int n = 0; n < heads.size (); ++n)
+		{
+			auto const & head = heads[n];
+			info.put (std::to_string (n), head.completed);
+		}
+		return info;
+	};
+
+	auto collect_processed = [&] () {
+		lumex::container_info info;
+		for (int n = 0; n < heads.size (); ++n)
+		{
+			auto const & head = heads[n];
+			info.put (std::to_string (n), head.processed);
+		}
+		return info;
+	};
+
+	auto total_processed = std::accumulate (heads.begin (), heads.end (), std::size_t{ 0 }, [] (auto total, auto const & head) {
+		return total + head.processed;
+	});
+
+	lumex::container_info info;
+	info.put ("total_processed", total_processed);
+	info.add ("progress", collect_progress ());
+	info.add ("candidates", collect_candidates ());
+	info.add ("responses", collect_responses ());
+	info.add ("processed", collect_processed ());
+	return info;
+}
+}

@@ -72,32 +72,32 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR})
 
-set(NANO_GUI
+set(LUMEX_GUI
     OFF
     CACHE BOOL "")
-set(NANO_TEST
+set(LUMEX_TEST
     OFF
     CACHE BOOL "")
-set(NANO_SECURE_RPC
+set(LUMEX_SECURE_RPC
     OFF
     CACHE BOOL "")
-set(NANO_WARN_TO_ERR
+set(LUMEX_WARN_TO_ERR
     OFF
     CACHE BOOL "")
-set(NANO_TIMED_LOCKS
+set(LUMEX_TIMED_LOCKS
     0
     CACHE STRING "")
-set(NANO_TIMED_LOCKS_IGNORE_BLOCKED
+set(LUMEX_TIMED_LOCKS_IGNORE_BLOCKED
     OFF
     CACHE BOOL "")
-set(NANO_TIMED_LOCKS_FILTER
+set(LUMEX_TIMED_LOCKS_FILTER
     ""
     CACHE
       STRING
       "Selects which mutex should be the only one to have stacktraces generated, empty string means report on all"
 )
 set_property(
-  CACHE NANO_TIMED_LOCKS_FILTER
+  CACHE LUMEX_TIMED_LOCKS_FILTER
   PROPERTY STRINGS
            active
            block_arrival
@@ -116,53 +116,53 @@ set_property(
            vote_uniquer
            votes_cache
            work_pool)
-set(NANO_FUZZER_TEST
+set(LUMEX_FUZZER_TEST
     OFF
     CACHE BOOL "")
-set(NANO_ASIO_HANDLER_TRACKING
+set(LUMEX_ASIO_HANDLER_TRACKING
     OFF
     CACHE BOOL "")
-set(NANO_ROCKSDB_TOOLS
+set(LUMEX_ROCKSDB_TOOLS
     OFF
     CACHE BOOL "")
 
-# Enable NANO_TRACING by default in Debug builds
+# Enable LUMEX_TRACING by default in Debug builds
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  option(NANO_TRACING "Enable trace logging" ON)
+  option(LUMEX_TRACING "Enable trace logging" ON)
 else()
-  option(NANO_TRACING "Enable trace logging" OFF)
+  option(LUMEX_TRACING "Enable trace logging" OFF)
 endif()
-if(NANO_TRACING)
+if(LUMEX_TRACING)
   message(STATUS "Using trace logging")
-  add_compile_definitions(NANO_TRACING)
+  add_compile_definitions(LUMEX_TRACING)
 endif()
 
-if(${NANO_TIMED_LOCKS} GREATER 0)
-  add_definitions(-DNANO_TIMED_LOCKS=${NANO_TIMED_LOCKS})
-  add_definitions(-DNANO_TIMED_LOCKS_FILTER=${NANO_TIMED_LOCKS_FILTER})
-  if(NANO_TIMED_LOCKS_IGNORE_BLOCKED)
-    add_definitions(-DNANO_TIMED_LOCKS_IGNORE_BLOCKED)
+if(${LUMEX_TIMED_LOCKS} GREATER 0)
+  add_definitions(-DLUMEX_TIMED_LOCKS=${LUMEX_TIMED_LOCKS})
+  add_definitions(-DLUMEX_TIMED_LOCKS_FILTER=${LUMEX_TIMED_LOCKS_FILTER})
+  if(LUMEX_TIMED_LOCKS_IGNORE_BLOCKED)
+    add_definitions(-DLUMEX_TIMED_LOCKS_IGNORE_BLOCKED)
   endif()
 endif()
 
-if(NANO_ASIO_HANDLER_TRACKING)
+if(LUMEX_ASIO_HANDLER_TRACKING)
   add_definitions(-DBOOST_ASIO_ENABLE_HANDLER_TRACKING)
 endif()
 
-option(NANO_SIMD_OPTIMIZATIONS
+option(LUMEX_SIMD_OPTIMIZATIONS
        "Enable CPU-specific SIMD optimizations (SSE/AVX or NEON, e.g.)" OFF)
 option(
   ENABLE_AES
-  "Enable AES optimizations (enabled by default with NANO_SIMD_OPTIMIZATIONS, set OFF to disable"
+  "Enable AES optimizations (enabled by default with LUMEX_SIMD_OPTIMIZATIONS, set OFF to disable"
   ON)
 option(ENABLE_AVX2 "Enable AVX2 optimizations" OFF)
 
 set(ACTIVE_NETWORK
-    nano_live_network
+    lumex_live_network
     CACHE STRING "Selects which network parameters are used")
 set_property(
-  CACHE ACTIVE_NETWORK PROPERTY STRINGS nano_dev_network nano_beta_network
-                                nano_live_network nano_test_network)
+  CACHE ACTIVE_NETWORK PROPERTY STRINGS lumex_dev_network lumex_beta_network
+                                lumex_live_network lumex_test_network)
 set(CPACK_PACKAGE_NAME
     "lumex-node"
     CACHE STRING "" FORCE)
@@ -172,9 +172,9 @@ set(CPACK_NSIS_PACKAGE_NAME
 set(CPACK_PACKAGE_INSTALL_DIRECTORY
     "lumexcurrency"
     CACHE STRING "" FORCE)
-set(NANO_SERVICE "lumexcurrency.service")
-set(NANO_PREFIX "")
-if("${ACTIVE_NETWORK}" MATCHES "nano_beta_network")
+set(LUMEX_SERVICE "lumexcurrency.service")
+set(LUMEX_PREFIX "")
+if("${ACTIVE_NETWORK}" MATCHES "lumex_beta_network")
   project("lumex-node-beta")
   set(CPACK_PACKAGE_NAME
       "lumex-node-beta"
@@ -185,9 +185,9 @@ if("${ACTIVE_NETWORK}" MATCHES "nano_beta_network")
   set(CPACK_PACKAGE_INSTALL_DIRECTORY
       "lumexcurrency-beta"
       CACHE STRING "" FORCE)
-  set(NANO_SERVICE "lumexcurrency-beta.service")
-  set(NANO_PREFIX "Beta")
-elseif("${ACTIVE_NETWORK}" MATCHES "nano_test_network")
+  set(LUMEX_SERVICE "lumexcurrency-beta.service")
+  set(LUMEX_PREFIX "Beta")
+elseif("${ACTIVE_NETWORK}" MATCHES "lumex_test_network")
   project("lumex-node-test")
   set(CPACK_PACKAGE_NAME
       "lumex-node-test"
@@ -198,10 +198,10 @@ elseif("${ACTIVE_NETWORK}" MATCHES "nano_test_network")
   set(CPACK_PACKAGE_INSTALL_DIRECTORY
       "lumexcurrency-test"
       CACHE STRING "" FORCE)
-  set(NANO_SERVICE "lumexcurrency-test.service")
-  set(NANO_PREFIX "Test")
+  set(LUMEX_SERVICE "lumexcurrency-test.service")
+  set(LUMEX_PREFIX "Test")
 endif()
-set(NANO_OSX_PACKAGE_NAME
+set(LUMEX_OSX_PACKAGE_NAME
     ${CPACK_NSIS_PACKAGE_NAME}
     CACHE STRING "" FORCE)
 
@@ -219,8 +219,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package(Threads)
 
 # Sanitizers
-option(NANO_ASAN "Enable ASan" OFF)
-if(NANO_ASAN)
+option(LUMEX_ASAN "Enable ASan" OFF)
+if(LUMEX_ASAN)
   if(MSVC)
     message(FATAL_ERROR "ASan is not supported on MSVC")
   endif()
@@ -239,8 +239,8 @@ if(NANO_ASAN)
   add_definitions(-DED25519_NO_INLINE_ASM)
 endif()
 
-option(NANO_ASAN_INT "Enable ASan+Integer overflow" OFF)
-if(NANO_ASAN_INT)
+option(LUMEX_ASAN_INT "Enable ASan+Integer overflow" OFF)
+if(LUMEX_ASAN_INT)
   if(MSVC)
     message(FATAL_ERROR "ASan+Integer overflow is not supported on MSVC")
   endif()
@@ -259,8 +259,8 @@ if(NANO_ASAN_INT)
   add_definitions(-DED25519_NO_INLINE_ASM)
 endif()
 
-option(NANO_UBSAN "Enable UBSan" OFF)
-if(NANO_UBSAN)
+option(LUMEX_UBSAN "Enable UBSan" OFF)
+if(LUMEX_UBSAN)
   if(MSVC)
     message(FATAL_ERROR "UBSan is not supported on MSVC")
   endif()
@@ -280,8 +280,8 @@ if(NANO_UBSAN)
   add_definitions(-DROCKSDB_UBSAN_RUN)
 endif()
 
-option(NANO_TSAN "Enable TSan" OFF)
-if(NANO_TSAN)
+option(LUMEX_TSAN "Enable TSan" OFF)
+if(LUMEX_TSAN)
   if(MSVC)
     message(FATAL_ERROR "TSan is not supported on MSVC")
   endif()
@@ -300,7 +300,7 @@ if(NANO_TSAN)
   add_definitions(-DED25519_NO_INLINE_ASM)
 endif()
 
-if(NANO_WARN_TO_ERR)
+if(LUMEX_WARN_TO_ERR)
   add_compile_options(-Werror -Wno-deprecated-declarations)
 endif()
 
@@ -309,13 +309,13 @@ if(WIN32)
   add_definitions(-D_WIN32_WINNT=0x0600 -DWINVER=0x0600 -DMINIUPNP_STATICLIB
                   -D_CRT_SECURE_NO_WARNINGS -DNOGDI /EHsc)
 else()
-  if(NANO_FUZZER_TEST)
+  if(LUMEX_FUZZER_TEST)
     add_compile_options(-fsanitize=fuzzer-no-link -fno-omit-frame-pointer)
-    add_definitions(-DNANO_FUZZER_TEST)
+    add_definitions(-DLUMEX_FUZZER_TEST)
   endif()
 
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(i.86|x86(_64)?)$")
-    if(NANO_SIMD_OPTIMIZATIONS
+    if(LUMEX_SIMD_OPTIMIZATIONS
        OR RAIBLOCKS_SIMD_OPTIMIZATIONS
        OR ENABLE_AVX2)
       add_compile_options(-msse4)
@@ -330,7 +330,7 @@ else()
     endif()
 
   elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-    if(NANO_SIMD_OPTIMIZATIONS OR RAIBLOCKS_SIMD_OPTIMIZATIONS)
+    if(LUMEX_SIMD_OPTIMIZATIONS OR RAIBLOCKS_SIMD_OPTIMIZATIONS)
       add_compile_options(-march=armv8-a+crc+crypto)
     else()
       add_compile_options(-march=armv8-a)
@@ -360,27 +360,27 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(NANO_PRECOMPILED_HEADERS
+option(LUMEX_PRECOMPILED_HEADERS
        "Enable precompiled headers for first-party C++ targets" OFF)
 
-if(NANO_PRECOMPILED_HEADERS AND NOT COMMAND target_precompile_headers)
+if(LUMEX_PRECOMPILED_HEADERS AND NOT COMMAND target_precompile_headers)
   message(STATUS "Precompiled headers require CMake 3.16 or newer; skipping")
 endif()
 
-function(nano_target_precompile_headers target)
-  if(NOT NANO_PRECOMPILED_HEADERS OR NOT COMMAND target_precompile_headers)
+function(lumex_target_precompile_headers target)
+  if(NOT LUMEX_PRECOMPILED_HEADERS OR NOT COMMAND target_precompile_headers)
     return()
   endif()
 
   if(ARGC GREATER 1)
     set(header "${ARGV1}")
   else()
-    set(header "nano/pch.hpp")
+    set(header "lumex/pch.hpp")
   endif()
 
   if(NOT TARGET ${target})
     message(
-      FATAL_ERROR "Unknown nano target for precompiled headers: ${target}")
+      FATAL_ERROR "Unknown lumex target for precompiled headers: ${target}")
   endif()
 
   target_precompile_headers(
@@ -398,17 +398,17 @@ else()
     set(PLATFORM_LINK_FLAGS "-static-libgcc -static-libstdc++")
   endif()
 
-  if(NANO_FUZZER_TEST)
+  if(LUMEX_FUZZER_TEST)
     set(PLATFORM_LINK_FLAGS "${PLATFORM_LINK_FLAGS} -fsanitize=fuzzer-no-link")
   endif()
 endif()
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${PLATFORM_LINK_FLAGS}")
 
-if(NANO_SECURE_RPC OR RAIBLOCKS_SECURE_RPC)
+if(LUMEX_SECURE_RPC OR RAIBLOCKS_SECURE_RPC)
   find_package(OpenSSL 1.0 REQUIRED)
   include_directories(${OPENSSL_INCLUDE_DIR})
-  add_definitions(-DNANO_SECURE_RPC)
+  add_definitions(-DLUMEX_SECURE_RPC)
   message("OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
   message("OpenSSL libraries: ${OPENSSL_LIBRARIES}")
   message("OpenSSL lib: ${OPENSSL_SSL_LIBRARY}")
@@ -435,7 +435,7 @@ if(NOT WIN32)
   endif()
 endif()
 
-# Then set up Boost modules. Only list libraries directly used by nano-node;
+# Then set up Boost modules. Only list libraries directly used by lumex-node;
 # BoostRoot resolves transitive dependencies automatically. BoostRoot resolves
 # transitive dependencies automatically.
 set(BOOST_INCLUDE_LIBRARIES
@@ -505,10 +505,10 @@ set(ROCKSDB_BUILD_SHARED
     OFF
     CACHE BOOL "")
 set(WITH_CORE_TOOLS
-    ${NANO_ROCKSDB_TOOLS}
+    ${LUMEX_ROCKSDB_TOOLS}
     CACHE BOOL "" FORCE)
 set(WITH_TOOLS
-    ${NANO_ROCKSDB_TOOLS}
+    ${LUMEX_ROCKSDB_TOOLS}
     CACHE BOOL "" FORCE)
 if(ENABLE_AVX2)
   set(PORTABLE
@@ -529,8 +529,8 @@ include_directories(submodules/magic_enum/include/magic_enum)
 
 add_subdirectory(crypto/ed25519-donna)
 
-add_subdirectory(nano/ipc_flatbuffers_lib)
-add_subdirectory(nano/ipc_flatbuffers_test)
+add_subdirectory(lumex/ipc_flatbuffers_lib)
+add_subdirectory(lumex/ipc_flatbuffers_test)
 
 # fmt
 add_subdirectory(submodules/fmt EXCLUDE_FROM_ALL)
@@ -561,7 +561,7 @@ if(WIN32)
   add_definitions(-DCRYPTOPP_DISABLE_ASM -DCRYPTOPP_DISABLE_SSSE3
                   -DCRYPTOPP_DISABLE_AESNI)
 elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64"
-       AND (NANO_SIMD_OPTIMIZATIONS OR RAIBLOCKS_SIMD_OPTIMIZATIONS))
+       AND (LUMEX_SIMD_OPTIMIZATIONS OR RAIBLOCKS_SIMD_OPTIMIZATIONS))
   set(CRYPTOPP_EXTRA
       submodules/cryptopp/crc_simd.cpp submodules/cryptopp/gcm_simd.cpp
       submodules/cryptopp/gf2n_simd.cpp submodules/cryptopp/neon_simd.cpp)
@@ -683,47 +683,47 @@ add_library(blake2 crypto/blake2/blake2-config.h crypto/blake2/blake2-impl.h
 
 target_compile_definitions(blake2 PRIVATE -D__SSE2__)
 
-add_subdirectory(nano/crypto_lib)
-add_subdirectory(nano/secure)
-add_subdirectory(nano/store)
-target_include_directories(nano_store PUBLIC ${BOOST_LIBRARY_INCLUDES})
-target_include_directories(nano_store PUBLIC submodules)
-add_subdirectory(nano/lib)
-add_subdirectory(nano/weights)
-add_subdirectory(nano/messages)
-add_subdirectory(nano/wallet)
-add_subdirectory(nano/node)
-add_subdirectory(nano/nano_node)
-add_subdirectory(nano/rpc)
-add_subdirectory(nano/nano_rpc)
+add_subdirectory(lumex/crypto_lib)
+add_subdirectory(lumex/secure)
+add_subdirectory(lumex/store)
+target_include_directories(lumex_store PUBLIC ${BOOST_LIBRARY_INCLUDES})
+target_include_directories(lumex_store PUBLIC submodules)
+add_subdirectory(lumex/lib)
+add_subdirectory(lumex/weights)
+add_subdirectory(lumex/messages)
+add_subdirectory(lumex/wallet)
+add_subdirectory(lumex/node)
+add_subdirectory(lumex/lumex_node)
+add_subdirectory(lumex/rpc)
+add_subdirectory(lumex/lumex_rpc)
 
 foreach(
-  nano_pch_target
-  nano_lib
+  lumex_pch_target
+  lumex_lib
   secure
-  nano_store
-  nano_messages
+  lumex_store
+  lumex_messages
   rpc
   node
-  nano_node)
-  nano_target_precompile_headers(${nano_pch_target})
+  lumex_node)
+  lumex_target_precompile_headers(${lumex_pch_target})
 endforeach()
 
 add_custom_target(
   executables
   COMMAND echo "BATCH BUILDING node + rpc"
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-  DEPENDS nano_node nano_rpc)
+  DEPENDS lumex_node lumex_rpc)
 
-if(NANO_FUZZER_TEST)
+if(LUMEX_FUZZER_TEST)
   if(NOT WIN32)
-    add_subdirectory(nano/fuzzer_test)
+    add_subdirectory(lumex/fuzzer_test)
   else()
     message(WARNING "Fuzzing is not supported on Windows")
   endif()
 endif()
 
-if(NANO_TEST OR RAIBLOCKS_TEST)
+if(LUMEX_TEST OR RAIBLOCKS_TEST)
   if(WIN32)
     if(MSVC_VERSION)
       if(MSVC_VERSION GREATER_EQUAL 1910)
@@ -736,7 +736,7 @@ if(NANO_TEST OR RAIBLOCKS_TEST)
     set(gtest_force_shared_crt OFF)
   endif()
 
-  add_subdirectory(nano/load_test)
+  add_subdirectory(lumex/load_test)
 
   # FIXME: This fixes googletest GOOGLETEST_VERSION requirement
   set(GOOGLETEST_VERSION 1.11.0)
@@ -751,27 +751,27 @@ if(NANO_TEST OR RAIBLOCKS_TEST)
   set(BENCHMARK_ENABLE_TESTING OFF)
   add_subdirectory(submodules/benchmark)
 
-  add_subdirectory(nano/test_common)
-  add_subdirectory(nano/core_test)
-  add_subdirectory(nano/rpc_test)
-  add_subdirectory(nano/slow_test)
-  add_subdirectory(nano/benchmarks)
+  add_subdirectory(lumex/test_common)
+  add_subdirectory(lumex/core_test)
+  add_subdirectory(lumex/rpc_test)
+  add_subdirectory(lumex/slow_test)
+  add_subdirectory(lumex/benchmarks)
 
-  foreach(nano_test_pch_target test_common core_test rpc_test slow_test
+  foreach(lumex_test_pch_target test_common core_test rpc_test slow_test
                                benchmarks)
-    nano_target_precompile_headers(${nano_test_pch_target}
-                                   nano/test_common/pch.hpp)
+    lumex_target_precompile_headers(${lumex_test_pch_target}
+                                   lumex/test_common/pch.hpp)
   endforeach()
 
   add_custom_target(
     all_tests
     COMMAND echo "BATCH BUILDING TESTS"
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    DEPENDS core_test load_test rpc_test slow_test nano_node nano_rpc)
+    DEPENDS core_test load_test rpc_test slow_test lumex_node lumex_rpc)
 endif()
 
-if(NANO_TEST OR RAIBLOCKS_TEST)
-  if(NANO_GUI OR RAIBLOCKS_GUI)
+if(LUMEX_TEST OR RAIBLOCKS_TEST)
+  if(LUMEX_GUI OR RAIBLOCKS_GUI)
     add_custom_target(
       quick_tests
       COMMAND echo "BATCH QUICK TESTS"
@@ -786,7 +786,7 @@ if(NANO_TEST OR RAIBLOCKS_TEST)
   endif()
 endif()
 
-if(NANO_GUI OR RAIBLOCKS_GUI)
+if(LUMEX_GUI OR RAIBLOCKS_GUI)
   install(FILES ${PROJECT_BINARY_DIR}/config-node.toml.sample DESTINATION .)
   install(FILES ${PROJECT_BINARY_DIR}/config-rpc.toml.sample DESTINATION .)
   install(FILES ${PROJECT_BINARY_DIR}/config-log.toml.sample DESTINATION .)
@@ -798,14 +798,14 @@ if(NANO_GUI OR RAIBLOCKS_GUI)
 
   find_package(Qt5 COMPONENTS Core Gui Widgets Test ${PLATFORM_QT_PACKAGES})
 
-  add_library(qt nano/qt/qt.cpp nano/qt/qt.hpp)
+  add_library(qt lumex/qt/qt.cpp lumex/qt/qt.hpp)
   include_directories(${CMAKE_SOURCE_DIR}/submodules)
 
   target_link_libraries(
     qt
     node
     secure
-    nano_lib
+    lumex_lib
     libminiupnpc-static
     Qt5::Gui
     Qt5::Widgets)
@@ -821,13 +821,13 @@ if(NANO_GUI OR RAIBLOCKS_GUI)
   endif()
 
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(PLATFORM_WALLET_SOURCE nano/nano_wallet/plat/default/icon.cpp)
+    set(PLATFORM_WALLET_SOURCE lumex/lumex_wallet/plat/default/icon.cpp)
   elseif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    set(PLATFORM_WALLET_SOURCE nano/nano_wallet/plat/windows/icon.cpp Lumex.rc)
+    set(PLATFORM_WALLET_SOURCE lumex/lumex_wallet/plat/windows/icon.cpp Lumex.rc)
   elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    set(PLATFORM_WALLET_SOURCE nano/nano_wallet/plat/default/icon.cpp)
+    set(PLATFORM_WALLET_SOURCE lumex/lumex_wallet/plat/default/icon.cpp)
   elseif(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
-    set(PLATFORM_WALLET_SOURCE nano/nano_wallet/plat/default/icon.cpp)
+    set(PLATFORM_WALLET_SOURCE lumex/lumex_wallet/plat/default/icon.cpp)
   else()
     error("Unknown platform: ${CMAKE_SYSTEM_NAME}")
   endif()
@@ -835,22 +835,22 @@ if(NANO_GUI OR RAIBLOCKS_GUI)
   qt5_add_resources(RES resources.qrc)
 
   add_executable(
-    nano_wallet ${PLATFORM_GUI_TARGET_PROPERTIES} ${PLATFORM_WALLET_SOURCE}
-                nano/nano_wallet/entry.cpp nano/nano_wallet/icon.hpp ${RES})
+    lumex_wallet ${PLATFORM_GUI_TARGET_PROPERTIES} ${PLATFORM_WALLET_SOURCE}
+                lumex/lumex_wallet/entry.cpp lumex/lumex_wallet/icon.hpp ${RES})
 
-  target_link_libraries(nano_wallet Boost::process rpc node qt)
+  target_link_libraries(lumex_wallet Boost::process rpc node qt)
 
   if(WIN32)
-    target_link_libraries(nano_wallet Qt5::WinExtras)
+    target_link_libraries(lumex_wallet Qt5::WinExtras)
   endif()
 
   set_target_properties(
-    nano_wallet PROPERTIES OUTPUT_NAME lumex_wallet
+    lumex_wallet PROPERTIES OUTPUT_NAME lumex_wallet
                            COMPILE_FLAGS
                            "-DQT_NO_KEYWORDS -DBOOST_ASIO_HAS_STD_ARRAY=1")
 
-  if(NANO_TEST OR RAIBLOCKS_TEST)
-    add_executable(qt_test nano/qt_test/entry.cpp nano/qt_test/qt.cpp)
+  if(LUMEX_TEST OR RAIBLOCKS_TEST)
+    add_executable(qt_test lumex/qt_test/entry.cpp lumex/qt_test/qt.cpp)
 
     target_link_libraries(
       qt_test
@@ -872,31 +872,31 @@ if(NANO_GUI OR RAIBLOCKS_GUI)
     set(CPACK_GENERATOR "DragNDrop")
     configure_file(${CMAKE_SOURCE_DIR}/Info.plist.in
                    ${CMAKE_SOURCE_DIR}/Info.plist @ONLY)
-    install(TARGETS nano_wallet
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/MacOS)
-    install(TARGETS nano_node
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/MacOS)
-    install(TARGETS nano_rpc
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/MacOS)
-    install(FILES Info.plist DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents)
+    install(TARGETS lumex_wallet
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/MacOS)
+    install(TARGETS lumex_node
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/MacOS)
+    install(TARGETS lumex_rpc
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/MacOS)
+    install(FILES Info.plist DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents)
     install(FILES qt.conf
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/Resources)
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/Resources)
     install(DIRECTORY ${Qt5_DIR}/../../QtCore.framework
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
     install(DIRECTORY ${Qt5_DIR}/../../QtDBus.framework
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
     install(DIRECTORY ${Qt5_DIR}/../../QtGui.framework
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
     install(DIRECTORY ${Qt5_DIR}/../../QtPrintSupport.framework
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
     install(DIRECTORY ${Qt5_DIR}/../../QtTest.framework
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
     install(DIRECTORY ${Qt5_DIR}/../../QtWidgets.framework
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
     install(FILES "${Qt5_DIR}/../../../plugins/platforms/libqcocoa.dylib"
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/PlugIns/platforms)
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/PlugIns/platforms)
     install(FILES Lumex.icns
-            DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/Resources)
+            DESTINATION ${LUMEX_OSX_PACKAGE_NAME}.app/Contents/Resources)
   elseif(WIN32)
     if("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
       set(WIN_REDIST vc_redist.x64.exe)
@@ -905,23 +905,23 @@ if(NANO_GUI OR RAIBLOCKS_GUI)
     endif()
     set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
         "ExecWait '\\\"$INSTDIR\\\\${WIN_REDIST}\\\" /quiet /norestart'
-												WriteRegDWORD HKLM 'SYSTEM\\\\CurrentControlSet\\\\Services\\\\EventLog\\\\Nano\\\\Nano${NANO_PREFIX}' 'TypesSupported' '0x7'
-												WriteRegStr HKLM 'SYSTEM\\\\CurrentControlSet\\\\Services\\\\EventLog\\\\Nano\\\\Nano${NANO_PREFIX}' 'EventMessageFile' '$INSTDIR\\\\nano_wallet.exe'"
+												WriteRegDWORD HKLM 'SYSTEM\\\\CurrentControlSet\\\\Services\\\\EventLog\\\\Lumex\\\\Lumex${LUMEX_PREFIX}' 'TypesSupported' '0x7'
+												WriteRegStr HKLM 'SYSTEM\\\\CurrentControlSet\\\\Services\\\\EventLog\\\\Lumex\\\\Lumex${LUMEX_PREFIX}' 'EventMessageFile' '$INSTDIR\\\\lumex_wallet.exe'"
     )
     set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
-        "DeleteRegKey HKLM 'SYSTEM\\\\CurrentControlSet\\\\Services\\\\EventLog\\\\Nano${NANO_PREFIX}'"
+        "DeleteRegKey HKLM 'SYSTEM\\\\CurrentControlSet\\\\Services\\\\EventLog\\\\Lumex${LUMEX_PREFIX}'"
     )
     set(CPACK_NSIS_MUI_ICON ${CMAKE_SOURCE_DIR}/Lumex.ico)
-    set(CPACK_NSIS_DISPLAY_NAME "Lumex${NANO_PREFIX}")
+    set(CPACK_NSIS_DISPLAY_NAME "Lumex${LUMEX_PREFIX}")
     set(CPACK_NSIS_URL_INFO_ABOUT "https://lumex.org")
     set(CPACK_NSIS_CONTACT "info@lumex.org")
-    set(CPACK_NSIS_MENU_LINKS "nano_wallet.exe" "Lumex Wallet"
+    set(CPACK_NSIS_MENU_LINKS "lumex_wallet.exe" "Lumex Wallet"
                               "https://lumex.org" "Lumex website")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     get_target_property(Qt5WindowsPlugin Qt5::QWindowsIntegrationPlugin
                         LOCATION)
     get_filename_component(Qt5_bin_DIR ${Qt5_DIR}/../../../bin ABSOLUTE)
-    install(TARGETS nano_wallet DESTINATION .)
+    install(TARGETS lumex_wallet DESTINATION .)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${WIN_REDIST} DESTINATION .)
     install(FILES ${Qt5_bin_DIR}/libGLESv2.dll DESTINATION .)
     install(FILES ${Qt5_bin_DIR}/Qt5Core.dll DESTINATION .)
@@ -933,8 +933,8 @@ if(NANO_GUI OR RAIBLOCKS_GUI)
     set(CPACK_GENERATOR "TBZ2;DEB")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS
         "qt5-default | qtbase5-dev, qtchooser, qt5-qmake, qtbase5-dev-tools")
-    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "russel@nano.org")
-    install(TARGETS nano_wallet RUNTIME DESTINATION ./bin)
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "russel@lumex.org")
+    install(TARGETS lumex_wallet RUNTIME DESTINATION ./bin)
     set(DEBIAN_POSTINST postinst.in)
     set(DEBIAN_POSTRM postrm.in)
 
@@ -954,7 +954,7 @@ if(NANO_GUI OR RAIBLOCKS_GUI)
         GROUP_EXECUTE
         WORLD_READ
         WORLD_EXECUTE)
-    install(FILES etc/systemd/${NANO_SERVICE} DESTINATION ./extras/systemd/.)
+    install(FILES etc/systemd/${LUMEX_SERVICE} DESTINATION ./extras/systemd/.)
     set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
         "${CMAKE_CURRENT_BINARY_DIR}/debian-control/postinst;${CMAKE_CURRENT_BINARY_DIR}/debian-control/postrm"
     )

@@ -2,21 +2,21 @@
 
 set +e
 
-useradd -r nanocurrency
-groupadd -r nanocurrency
+useradd -r lumexcurrency
+groupadd -r lumexcurrency
 
-mkdir -p /var/nanocurrency/Nano
-mkdir -p /var/nanocurrency/NanoBeta
-mkdir -p /var/nanocurrency/NanoTest
-chown -R nanocurrency: /var/nanocurrency
+mkdir -p /var/lumexcurrency/Lumex
+mkdir -p /var/lumexcurrency/LumexBeta
+mkdir -p /var/lumexcurrency/LumexTest
+chown -R lumexcurrency: /var/lumexcurrency
 
-systemctl stop ${NANO_SERVICE} 2>/dev/null
-systemctl disable ${NANO_SERVICE} 2>/dev/null
-cp ${CMAKE_INSTALL_PREFIX}/extras/systemd/${NANO_SERVICE} /etc/systemd/system/${NANO_SERVICE}
+systemctl stop ${LUMEX_SERVICE} 2>/dev/null
+systemctl disable ${LUMEX_SERVICE} 2>/dev/null
+cp ${CMAKE_INSTALL_PREFIX}/extras/systemd/${LUMEX_SERVICE} /etc/systemd/system/${LUMEX_SERVICE}
 systemctl daemon-reload
-systemctl enable ${NANO_SERVICE}
-systemctl start ${NANO_SERVICE}
+systemctl enable ${LUMEX_SERVICE}
+systemctl start ${LUMEX_SERVICE}
 sleep 1
-systemctl --no-pager status ${NANO_SERVICE}
+systemctl --no-pager status ${LUMEX_SERVICE}
 
 set -e

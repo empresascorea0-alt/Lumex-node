@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly CONFIG_SRC_DIR="/usr/share/nano/config"
+readonly CONFIG_SRC_DIR="/usr/share/lumex/config"
 
 usage() {
 	cat <<'EOF'
@@ -11,7 +11,7 @@ Usage:
       start as daemon (default mode)
 
     cli_options
-      nano_node CLI options (see nano_node --help)
+      lumex_node CLI options (see lumex_node --help)
 
     --vacuum-over <size>
       vacuum database if over size GB on startup (daemon mode only)
@@ -21,7 +21,7 @@ Usage:
     command
       shell passthrough (defaults to $SHELL)
 
-Note: 'nano_node' is the default executable and can be omitted.
+Note: 'lumex_node' is the default executable and can be omitted.
 Use --docker-help to show this message.
 EOF
 }
@@ -36,8 +36,8 @@ die() {
 read_network() {
 	# live | beta | dev | test ; default live
 	local n=''
-	if [[ -r /etc/nano-network ]]; then
-		read -r n </etc/nano-network || n=''
+	if [[ -r /etc/lumex-network ]]; then
+		read -r n </etc/lumex-network || n=''
 	fi
 	case "$n" in
 	live | '') echo live ;;
@@ -96,7 +96,7 @@ maybe_vacuum() {
 	if ((bytes > limit_bytes)); then
 		local size_gb=$((bytes / 1024 / 1024 / 1024))
 		log "Current ledger size: ${size_gb}GB (${bytes} bytes) is over threshold: ${limit_gb}GB. Vacuuming..."
-		nano_node --vacuum
+		lumex_node --vacuum
 		log "Database vacuum completed"
 	fi
 }
@@ -104,7 +104,7 @@ maybe_vacuum() {
 # Parsed args / state
 DAEMON_MODE=0
 VACUUM_THRESHOLD_GB=0
-EXEC="nano_node" # default executable is nano_node
+EXEC="lumex_node" # default executable is lumex_node
 declare -a PASSTHROUGH=()
 declare -a CMD=() # filled after we finalize EXEC
 
@@ -121,14 +121,14 @@ parse_args() {
 		fi
 	fi
 
-	# First argument may be an explicit executable: nano_node or nano_rpc
+	# First argument may be an explicit executable: lumex_node or lumex_rpc
 	case "${1:-}" in
-	nano_node)
-		EXEC="nano_node"
+	lumex_node)
+		EXEC="lumex_node"
 		shift || true
 		;;
-	nano_rpc)
-		EXEC="nano_rpc"
+	lumex_rpc)
+		EXEC="lumex_rpc"
 		shift || true
 		;;
 	esac
@@ -174,7 +174,7 @@ parse_args "$@"
 NETWORK="$(read_network)"
 SUFFIX="$(network_suffix "$NETWORK")"
 LEGACY_DIR="${HOME}/RaiBlocks${SUFFIX}"
-DATA_DIR="${HOME}/Nano${SUFFIX}"
+DATA_DIR="${HOME}/Lumex${SUFFIX}"
 DB_FILE="${DATA_DIR}/data.ldb"
 
 ensure_data_directory "$LEGACY_DIR" "$DATA_DIR"

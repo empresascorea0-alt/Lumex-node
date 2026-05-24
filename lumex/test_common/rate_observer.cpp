@@ -1,0 +1,106 @@
+#include <lumex/lib/stats.hpp>
+#include <lumex/node/node.hpp>
+#include <lumex/test_common/rate_observer.hpp>
+
+#include <iostream>
+#include <sstream>
+#include <utility>
+
+/*
+ * rate_observer::counter
+ */
+
+lumex::test::rate_observer::counter::counter (std::string name_a, std::function<value_t ()> count_a) :
+	name{ std::move (name_a) },
+	count{ std::move (count_a) }
+{
+}
+
+lumex::test::rate_observer::counter::observation lumex::test::rate_observer::counter::observe ()
+{
+	auto now = std::chrono::system_clock::now ();
+	auto total = count ();
+	if (last_observation.time_since_epoch ().count () > 0)
+	{
+		auto time_delta = std::chrono::duration_cast<std::chrono::milliseconds> (now - last_observation);
+		last_observation = now;
+		auto delta = total - last_count;
+		last_count = total;
+		return { total, delta, time_delta };
+	}
+	else
+	{
+		last_observation = now;
+		last_count = total;
+		return { 0, 0, std::chrono::milliseconds{ 0 } };
+	}
+}
+
+lumex::test::rate_observer::~rate_observer ()
+{
+	if (!stopped.exchange (true))
+	{
+		if (thread.joinable ())
+		{
+			thread.join ();
+		}
+	}
+}
+
+void lumex::test::rate_observer::background_print (std::chrono::seconds interval)
+{
+	release_assert (!thread.joinable ());
+	thread = std::thread{ [this, interval] () { background_print_impl (interval); } };
+}
+
+void lumex::test::rate_observer::background_print_impl (std::chrono::seconds interval)
+{
+	while (!stopped)
+	{
+		print_once ();
+
+		std::this_thread::sleep_for (interval);
+	}
+}
+
+void lumex::test::rate_observer::print_once ()
+{
+	std::stringstream ss;
+
+	ss << "-----------------------------------------------------------------------------------------------------------------------"
+	   << "\n";
+
+	for (auto & counter : counters)
+	{
+		const auto observation = counter->observe ();
+		// Convert delta milliseconds to seconds (double precision) and then divide the counter delta to get rate per second
+		auto per_sec = observation.delta / (observation.time_delta.count () / 1000.0);
+		auto prettier_name = "'" + counter->name + "'";
+
+		ss << "counter: " << std::setw (50) << std::left << prettier_name
+		   << " | "
+		   << "total: " << std::setw (14) << observation.total
+		   << " | "
+		   << "rate /s: " << std::setw (12) << std::setprecision (2) << std::fixed << per_sec
+		   << "\n";
+	}
+
+	ss << "-----------------------------------------------------------------------------------------------------------------------"
+	   << "\n";
+
+	std::cout << ss.str () << std::endl;
+}
+
+void lumex::test::rate_observer::observe (std::string name, std::function<int64_t ()> observe)
+{
+	auto counter_instance = std::make_shared<counter> (name, observe);
+	counters.push_back (counter_instance);
+}
+
+void lumex::test::rate_observer::observe (lumex::node & node, lumex::stat::type type, lumex::stat::detail detail, lumex::stat::dir dir)
+{
+	auto name = std::string{ to_string (type) } + "::" + std::string{ to_string (detail) } + "::" + std::string{ to_string (dir) };
+	observe (name, [&node, type, detail, dir] () {
+		return node.stats.count (type, detail, dir);
+	});
+}

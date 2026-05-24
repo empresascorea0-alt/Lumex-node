@@ -1,0 +1,267 @@
+#pragma once
+
+#include <lumex/lib/errors.hpp>
+#include <lumex/lib/observer_set.hpp>
+#include <lumex/lib/stats_enums.hpp>
+#include <lumex/lib/utility.hpp>
+
+#include <boost/circular_buffer.hpp>
+
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <initializer_list>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <string>
+#include <thread>
+
+namespace lumex
+{
+class node;
+class tomlconfig;
+class jsonconfig;
+class logger;
+
+/**
+ * Serialize and deserialize the 'statistics' node from config.json
+ * All configuration values have defaults. In particular, file logging of statistics
+ * is disabled by default.
+ */
+class stats_config final
+{
+public:
+	/** Reads the JSON statistics node */
+	lumex::error deserialize_toml (lumex::tomlconfig & toml);
+	lumex::error serialize_toml (lumex::tomlconfig & toml) const;
+
+public:
+	/** Maximum number samples to keep in the ring buffer */
+	size_t max_samples{ 1024 * 16 };
+
+	/** How often to log sample array, in milliseconds. Default is 0 (no logging) */
+	std::chrono::milliseconds log_samples_interval{ 0 };
+
+	/** How often to log counters, in milliseconds. Default is 0 (no logging) */
+	std::chrono::milliseconds log_counters_interval{ 0 };
+
+	/** Maximum number of log outputs before rotating the file */
+	size_t log_rotation_count{ 100 };
+
+	/** If true, write headers on each counter or samples writeout. The header contains log type and the current wall time. */
+	bool log_headers{ true };
+
+	/** Filename for the counter log  */
+	std::string log_counters_filename{ "counters.stat" };
+
+	/** Filename for the sampling log */
+	std::string log_samples_filename{ "samples.stat" };
+};
+
+class stat_log_sink;
+
+/**
+ * Collects counts and samples for inbound and outbound traffic, blocks, errors, and so on.
+ * Stats can be queried and observed on a type level (such as message and ledger) as well as a more
+ * specific detail level (such as send blocks)
+ */
+class stats final
+{
+public:
+	using counter_value_t = uint64_t;
+	using sampler_value_t = int64_t;
+
+public: // Array dimensions - must match the enum sizes in stats_enums.hpp
+	static constexpr size_t types_count = 256; // Enough for stat::type enum range
+	static constexpr size_t details_count = 1024; // Enough for stat::detail enum range
+	static constexpr size_t dirs_count = 2; // Enough for stat::dir enum range
+
+public:
+	explicit stats (lumex::logger &, lumex::stats_config = {});
+	~stats ();
+
+	void start ();
+	void stop ();
+
+	/** Clear all stats */
+	void clear ();
+
+	/** Increments the given counter */
+	void inc (stat::type type, stat::detail detail, bool aggregate_all = false)
+	{
+		inc (type, detail, stat::dir::in, aggregate_all);
+	}
+
+	void inc (stat::type type, stat::detail detail, stat::dir dir, bool aggregate_all = false)
+	{
+		add (type, detail, dir, 1, aggregate_all);
+	}
+
+	/** Adds \p value to the given counter */
+	void add (stat::type type, stat::detail detail, counter_value_t value, bool aggregate_all = false)
+	{
+		add (type, detail, stat::dir::in, value, aggregate_all);
+	}
+
+	void add (stat::type type, stat::detail detail, stat::dir dir, counter_value_t value, bool aggregate_all = false);
+
+	/** Returns current value for the given counter at the detail level */
+	counter_value_t count (stat::type type, stat::detail detail, stat::dir dir = stat::dir::in) const;
+
+	/** Returns current value for the given counter at the type level (sum of all details) */
+	counter_value_t count (stat::type type, stat::dir dir = stat::dir::in) const;
+
+	/** Adds a sample to the given sampler */
+	void sample (stat::sample sample, sampler_value_t value, std::pair<sampler_value_t, sampler_value_t> expected_min_max = {});
+
+	/** Returns a potentially empty list of the last N samples, where N is determined by the 'max_samples' configuration. Samples are reset after each lookup. */
+	std::vector<sampler_value_t> samples (stat::sample sample);
+
+	/** Returns the number of seconds since clear() was last called, or node startup if it's never called. */
+	std::chrono::seconds last_reset ();
+
+	/** Log counters to the given log link */
+	void log_counters (stat_log_sink & sink);
+
+	/** Log samples to the given log sink */
+	void log_samples (stat_log_sink & sink);
+
+public:
+	enum class category
+	{
+		counters,
+		samples
+	};
+
+	/** Return string showing stats counters (convenience function for debugging) */
+	std::string dump (category category = category::counters);
+
+private:
+	struct sampler_key
+	{
+		stat::sample sample;
+
+		auto operator<=> (const sampler_key &) const = default;
+	};
+
+private:
+	class sampler_entry
+	{
+	public:
+		std::pair<sampler_value_t, sampler_value_t> const expected_min_max;
+
+		sampler_entry (size_t max_samples, std::pair<sampler_value_t, sampler_value_t> expected_min_max) :
+			samples{ max_samples },
+			expected_min_max{ expected_min_max } {};
+
+		// Prevent copying
+		sampler_entry (sampler_entry const &) = delete;
+		sampler_entry & operator= (sampler_entry const &) = delete;
+
+	public:
+		void add (sampler_value_t value);
+		std::vector<sampler_value_t> collect ();
+
+	private:
+		boost::circular_buffer<sampler_value_t> samples;
+		mutable lumex::mutex mutex;
+	};
+
+	// Flat array for direct-indexed counter access
+	// Allocate on the heap to avoid stack overflows when intantiating the stats class in tests
+	using counters_array_t = std::array<std::atomic<counter_value_t>, types_count * details_count * dirs_count>;
+	std::unique_ptr<counters_array_t> counters_impl;
+	counters_array_t & counters;
+
+	// Keep samplers as map since they have different behavior and lower frequency
+	std::map<sampler_key, std::unique_ptr<sampler_entry>> samplers;
+
+private:
+	void run ();
+	void run_one (std::unique_lock<std::shared_mutex> & lock);
+	bool should_run () const;
+
+	/** Unlocked implementation of log_counters() to avoid using recursive locking */
+	void log_counters_impl (stat_log_sink & sink, tm & tm);
+
+	/** Unlocked implementation of log_samples() to avoid using recursive locking */
+	void log_samples_impl (stat_log_sink & sink, tm & tm);
+
+	static bool is_stat_logging_enabled ();
+
+	std::atomic<counter_value_t> & counter_ref (stat::type type, stat::detail detail, stat::dir dir);
+	std::atomic<counter_value_t> const & counter_ref (stat::type type, stat::detail detail, stat::dir dir) const;
+
+	// Helper function to calculate flat array index
+	static size_t idx (stat::type type, stat::detail detail, stat::dir dir);
+
+private:
+	lumex::stats_config const config;
+	lumex::logger & logger;
+
+	bool const enable_logging;
+
+	/** Time of last clear() call */
+	std::chrono::steady_clock::time_point timestamp{ std::chrono::steady_clock::now () };
+
+	std::chrono::steady_clock::time_point log_last_count_writeout{ std::chrono::steady_clock::now () };
+	std::chrono::steady_clock::time_point log_last_sample_writeout{ std::chrono::steady_clock::now () };
+
+	bool stopped{ false };
+	mutable std::shared_mutex mutex;
+	lumex::condition_variable condition;
+	std::thread thread;
+};
+
+/** Log sink interface */
+class stat_log_sink
+{
+public:
+	virtual ~stat_log_sink () = default;
+
+	/** Returns a reference to the log output stream */
+	virtual std::ostream & out () = 0;
+
+	/** Called before logging starts */
+	virtual void begin ()
+	{
+	}
+
+	/** Called after logging is completed */
+	virtual void finalize ()
+	{
+	}
+
+	/** Write a header enrty to the log */
+	virtual void write_header (std::string const & header, std::chrono::system_clock::time_point & walltime)
+	{
+	}
+
+	/** Write a counter or sampling entry to the log. */
+	virtual void write_counter_entry (tm & tm, std::string const & type, std::string const & detail, std::string const & dir, stats::counter_value_t value) = 0;
+	virtual void write_sampler_entry (tm & tm, std::string const & sample, std::vector<stats::sampler_value_t> const & values, std::pair<stats::sampler_value_t, stats::sampler_value_t> expected_min_max) = 0;
+
+	/** Rotates the log (e.g. empty file). This is a no-op for sinks where rotation is not supported. */
+	virtual void rotate ()
+	{
+	}
+
+	/** Returns a reference to the log entry counter */
+	std::size_t & entries ()
+	{
+		return log_entries;
+	}
+
+	/** Returns the string representation of the log. If not supported, an empty string is returned. */
+	virtual std::string to_string ()
+	{
+		return "";
+	}
+
+protected:
+	std::string tm_to_string (tm & tm);
+	size_t log_entries{ 0 };
+};
+}

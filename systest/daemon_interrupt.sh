@@ -13,7 +13,7 @@ cleanup() {
 trap cleanup EXIT
 
 # Start the node in daemon mode with ephemeral port
-$NANO_NODE_EXE --daemon --network dev --data_path "$DATADIR" \
+$LUMEX_NODE_EXE --daemon --network dev --data_path "$DATADIR" \
     --runtime_info_file "$RUNTIME_INFO" \
     --config node.peering_port=0 &
 NODE_PID=$!

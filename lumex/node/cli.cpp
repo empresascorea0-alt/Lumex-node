@@ -1,0 +1,1606 @@
+#include <lumex/lib/blocks.hpp>
+#include <lumex/lib/cli.hpp>
+#include <lumex/lib/files.hpp>
+#include <lumex/lib/logging.hpp>
+#include <lumex/lib/stats.hpp>
+#include <lumex/lib/tomlconfig.hpp>
+#include <lumex/node/cli.hpp>
+#include <lumex/node/daemonconfig.hpp>
+#include <lumex/node/endpoint.hpp>
+#include <lumex/node/inactive_node.hpp>
+#include <lumex/node/make_store.hpp>
+#include <lumex/node/migrations.hpp>
+#include <lumex/node/network.hpp>
+#include <lumex/node/node.hpp>
+#include <lumex/node/unchecked_map.hpp>
+#include <lumex/node/wallet.hpp>
+#include <lumex/secure/ledger.hpp>
+#include <lumex/secure/ledger_set_any.hpp>
+#include <lumex/secure/ledger_set_cemented.hpp>
+#include <lumex/store/ledger/confirmation_height.hpp>
+#include <lumex/store/ledger/final_vote.hpp>
+#include <lumex/store/ledger/online_weight.hpp>
+#include <lumex/store/ledger/peer.hpp>
+
+#include <boost/format.hpp>
+
+namespace
+{
+void reset_confirmation_heights (lumex::ledger_constants & constants, lumex::store::ledger_store & store);
+bool is_using_rocksdb (std::filesystem::path const & data_path, boost::program_options::variables_map const & vm, std::error_code & ec);
+}
+
+std::string lumex::error_cli_messages::message (int ev) const
+{
+	switch (static_cast<lumex::error_cli> (ev))
+	{
+		case lumex::error_cli::generic:
+			return "Unknown error";
+		case lumex::error_cli::parse_error:
+			return "Could not parse command line";
+		case lumex::error_cli::invalid_arguments:
+			return "Invalid arguments";
+		case lumex::error_cli::unknown_command:
+			return "Unknown command";
+		case lumex::error_cli::database_write_error:
+			return "Database write error";
+		case lumex::error_cli::reading_config:
+			return "Config file read error";
+		case lumex::error_cli::ambiguous_pruning_voting_options:
+			return "Flag --enable_pruning and --enable_voting in node config cannot be used together";
+	}
+
+	return "Invalid error code";
+}
+
+void lumex::add_node_options (boost::program_options::options_description & description_a)
+{
+	// clang-format off
+	description_a.add_options ()
+	("initialize", "Initialize the data folder, if it is not already initialised. This command is meant to be run when the data folder is empty, to populate it with the genesis block.")
+	("account_create", "Insert next deterministic key in to <wallet>")
+	("account_get", "Get account number for the <key>")
+	("account_key", "Get the public key for <account>")
+	("vacuum", "Compact database. If data_path is missing, the database in data directory is compacted.")
+	("snapshot", "Compact database and create snapshot, functions similar to vacuum but does not replace the existing database")
+	("data_path", boost::program_options::value<std::string> (), "Use the supplied path as the data directory")
+	("network", boost::program_options::value<std::string> (), "Use the supplied network (live, test, beta or dev)")
+	("clear_send_ids", "Remove all send IDs from the database (dangerous: not intended for production use)")
+	("online_weight_clear", "Clear online weight history records")
+	("peer_clear", "Clear online peers database dump")
+	("unchecked_clear", "Clear unchecked blocks")
+	("confirmation_height_clear", "Clear confirmation height. Requires an <account> option that can be 'all' to clear all accounts")
+	("final_vote_clear", "Clear final votes")
+	("migrate_database_lmdb_to_rocksdb", "Migrates LMDB database to RocksDB")
+	("database_upgrade", "Upgrade the ledger database to the latest version without starting the node")
+	("populate_topo_index", "Build the topology index for an existing ledger and enable the topo_index flag. One-off operation, may take a long time.")
+	("drop_topo_index", "Drop the topology index and disable the topo_index flag. Required before enabling pruning on a ledger that has topo_index enabled.")
+	("rollback", "Rolls back the specified block hash, effectively removing this block and all blocks following it")
+	("diagnostics", "Run internal diagnostics")
+	("generate_config", boost::program_options::value<std::string> (), "Write configuration to stdout, populated with defaults suitable for this system. Pass the configuration type node, rpc or log. See also use_defaults.")
+	("update_config", "Reads the current node configuration and updates it with missing keys and values and delete keys that are no longer used. Updated configuration is written to stdout.")
+	("key_create", "Generates a adhoc random keypair and prints it to stdout")
+	("key_expand", "Derive public key and account number from <key>")
+	("wallet_add_adhoc", "Insert <key> in to <wallet>")
+	("wallet_create", "Creates a new wallet and prints the ID")
+	("wallet_change_seed", "Changes seed for <wallet> to <key>")
+	("wallet_decrypt_unsafe", "Decrypts <wallet> using <password>, !!THIS WILL PRINT YOUR PRIVATE KEY TO STDOUT!!")
+	("wallet_destroy", "Destroys <wallet> and all keys it contains")
+	("wallet_import", "Imports keys in <file> using <password> in to <wallet>")
+	("wallet_list", "Dumps wallet IDs and public keys")
+	("wallet_remove", "Remove <account> from <wallet>")
+	("wallet_representative_get", "Prints default representative for <wallet>")
+	("wallet_representative_set", "Set <account> as default representative for <wallet>")
+	("all", "Only valid with --final_vote_clear")
+	("account", boost::program_options::value<std::string> (), "Defines <account> for other commands")
+	("root", boost::program_options::value<std::string> (), "Defines <root> for other commands")
+	("hash", boost::program_options::value<std::string> (), "Defines <hash> for other commands")
+	("file", boost::program_options::value<std::string> (), "Defines <file> for other commands")
+	("key", boost::program_options::value<std::string> (), "Defines the <key> for other commands, hex")
+	("seed", boost::program_options::value<std::string> (), "Defines the <seed> for other commands, hex")
+	("password", boost::program_options::value<std::string> (), "Defines <password> for other commands")
+	("wallet", boost::program_options::value<std::string> (), "Defines <wallet> for other commands")
+	("force", boost::program_options::value<bool>(), "Bool to force command if allowed")
+	("use_defaults", "If present, the generate_config command will generate uncommented entries");
+	// clang-format on
+}
+
+void lumex::add_node_flag_options (boost::program_options::options_description & description_a)
+{
+	// clang-format off
+	description_a.add_options()
+		("disable_add_initial_peers", "Disable contacting the peer in the peers table at startup")
+		("disable_max_peers_per_ip", "Disables the limit on the number of peer connections allowed per IP address")
+		("disable_max_peers_per_subnetwork", "Disables the limit on the number of peer connections allowed per subnetwork")
+		("disable_activate_successors", "Disables activate_successors in active_elections")
+		("disable_backup", "Disable wallet automatic backups")
+		("disable_lazy_bootstrap", "Disables lazy bootstrap")
+		("disable_legacy_bootstrap", "Disables legacy bootstrap")
+		("disable_wallet_bootstrap", "Disables wallet lazy bootstrap")
+		("disable_ongoing_bootstrap", "Disable ongoing bootstrap")
+		("disable_reachout", "Disable peer reachout")
+		("disable_reachout_preconfigured", "Disable preconfigured peer reachout")
+		("disable_rep_crawler", "Disable rep crawler")
+		("disable_request_loop", "Disable request loop")
+		("disable_bootstrap_listener", "Disables bootstrap processing for TCP listener (not including realtime network TCP connections)")
+		("disable_unchecked_cleanup", "Disables periodic cleanup of old records from unchecked table")
+		("disable_unchecked_drop", "Disables drop of unchecked table at startup")
+		("disable_providing_telemetry_metrics", "Disable using any node information in the telemetry_ack messages.")
+		("disable_block_processor_unchecked_deletion", "Disable deletion of unchecked blocks after processing")
+		("disable_bootstrap_bulk_pull_server", "Disables the legacy bulk pull server for bootstrap operations")
+		("disable_bootstrap_bulk_push_client", "Disables the legacy bulk push client for bootstrap operations")
+		("disable_tcp_realtime", "Disables TCP realtime connections")
+		("disable_search_pending", "Disables the periodic search for pending transactions")
+		("disable_topo_index", "Initialize a fresh ledger without the topology index. Required for pruning. Has no effect on an existing ledger; use --drop_topo_index to disable on an existing ledger.")
+		("enable_pruning", "Enable experimental ledger pruning")
+		("enable_rpc", "Enable RPC")
+		("enable_voting", "Enable voting")
+		("super_rebroadcaster", "Broadcast all blocks and votes to all peers (high bandwidth usage)")
+		("allow_bootstrap_peers_duplicates", "Allow multiple connections to same peer in bootstrap attempts")
+		("fast_bootstrap", "Increase bootstrap speed for high end nodes with higher limits")
+		("block_processor_batch_size", boost::program_options::value<std::size_t>(), "Increase block processor transaction batch write size, default 0 (limited by config block_processor_batch_max_time), 256k for fast_bootstrap")
+		("block_processor_full_size", boost::program_options::value<std::size_t>(), "Increase block processor allowed blocks queue size before dropping live network packets and holding bootstrap download, default 65536, 1 million for fast_bootstrap")
+		("block_processor_verification_size", boost::program_options::value<std::size_t>(), "Increase batch signature verification size in block processor, default 0 (limited by config signature_checker_threads), unlimited for fast_bootstrap")
+		("inactive_votes_cache_size", boost::program_options::value<std::size_t>(), "Increase cached votes without active elections size, default 16384")
+		("vote_processor_capacity", boost::program_options::value<std::size_t>(), "Vote processor queue size before dropping votes, default 144k")
+		("disable_large_votes", boost::program_options::value<bool>(), "Disable large votes")
+		("skip_consistency_check", "Skip ledger consistency check on startup, this is not recommended and should only be used for testing or recovery purposes");
+	// clang-format on
+}
+
+void lumex::update_flags (lumex::node_flags & flags_a, boost::program_options::variables_map const & vm)
+{
+	flags_a.disable_add_initial_peers = (vm.count ("disable_add_initial_peers") > 0);
+	flags_a.disable_max_peers_per_ip = (vm.count ("disable_max_peers_per_ip") > 0);
+	flags_a.disable_max_peers_per_subnetwork = (vm.count ("disable_max_peers_per_subnetwork") > 0);
+	flags_a.disable_activate_successors = (vm.count ("disable_activate_successors") > 0);
+	flags_a.disable_backup = (vm.count ("disable_backup") > 0);
+	flags_a.disable_lazy_bootstrap = (vm.count ("disable_lazy_bootstrap") > 0);
+	flags_a.disable_legacy_bootstrap = (vm.count ("disable_legacy_bootstrap") > 0);
+	flags_a.disable_wallet_bootstrap = (vm.count ("disable_wallet_bootstrap") > 0);
+	flags_a.disable_ongoing_bootstrap = (vm.count ("disable_ongoing_bootstrap") > 0);
+	flags_a.disable_reachout = (vm.count ("disable_reachout") > 0);
+	flags_a.disable_reachout_preconfigured = (vm.count ("disable_reachout_preconfigured") > 0);
+	flags_a.disable_rep_crawler = (vm.count ("disable_rep_crawler") > 0);
+	flags_a.disable_request_loop = (vm.count ("disable_request_loop") > 0);
+	flags_a.disable_bootstrap_bulk_pull_server = (vm.count ("disable_bootstrap_bulk_pull_server") > 0);
+	flags_a.disable_bootstrap_bulk_push_client = (vm.count ("disable_bootstrap_bulk_push_client") > 0);
+	flags_a.disable_tcp_realtime = (vm.count ("disable_tcp_realtime") > 0);
+	flags_a.disable_search_pending = (vm.count ("disable_search_pending") > 0);
+	if (!flags_a.inactive_node)
+	{
+		flags_a.disable_bootstrap_listener = (vm.count ("disable_bootstrap_listener") > 0);
+	}
+	flags_a.disable_providing_telemetry_metrics = (vm.count ("disable_providing_telemetry_metrics") > 0);
+	flags_a.disable_block_processor_unchecked_deletion = (vm.count ("disable_block_processor_unchecked_deletion") > 0);
+	flags_a.disable_topo_index = (vm.count ("disable_topo_index") > 0);
+	flags_a.enable_pruning = (vm.count ("enable_pruning") > 0);
+	flags_a.enable_rpc = (vm.count ("enable_rpc") > 0);
+	flags_a.enable_voting = (vm.count ("enable_voting") > 0);
+	flags_a.super_rebroadcaster = (vm.count ("super_rebroadcaster") > 0);
+	flags_a.allow_bootstrap_peers_duplicates = (vm.count ("allow_bootstrap_peers_duplicates") > 0);
+	flags_a.fast_bootstrap = (vm.count ("fast_bootstrap") > 0);
+	if (flags_a.fast_bootstrap)
+	{
+		flags_a.disable_block_processor_unchecked_deletion = true;
+		flags_a.block_processor_batch_size = 256 * 1024;
+		flags_a.block_processor_full_size = 1024 * 1024;
+		flags_a.block_processor_verification_size = std::numeric_limits<std::size_t>::max ();
+	}
+	auto block_processor_batch_size_it = vm.find ("block_processor_batch_size");
+	if (block_processor_batch_size_it != vm.end ())
+	{
+		flags_a.block_processor_batch_size = block_processor_batch_size_it->second.as<std::size_t> ();
+	}
+	auto block_processor_full_size_it = vm.find ("block_processor_full_size");
+	if (block_processor_full_size_it != vm.end ())
+	{
+		flags_a.block_processor_full_size = block_processor_full_size_it->second.as<std::size_t> ();
+	}
+	auto block_processor_verification_size_it = vm.find ("block_processor_verification_size");
+	if (block_processor_verification_size_it != vm.end ())
+	{
+		flags_a.block_processor_verification_size = block_processor_verification_size_it->second.as<std::size_t> ();
+	}
+	auto vote_processor_capacity_it = vm.find ("vote_processor_capacity");
+	if (vote_processor_capacity_it != vm.end ())
+	{
+		flags_a.vote_processor_capacity = vote_processor_capacity_it->second.as<std::size_t> ();
+	}
+	auto disable_large_votes_it = vm.find ("disable_large_votes");
+	if (disable_large_votes_it != vm.end ())
+	{
+		lumex::network::confirm_req_hashes_max = 7;
+		lumex::network::confirm_ack_hashes_max = 12;
+	}
+	if (vm.contains ("skip_consistency_check"))
+	{
+		flags_a.generate_cache.consistency_check = false;
+	}
+	// Config overriding
+	auto config (vm.find ("config"));
+	if (config != vm.end ())
+	{
+		flags_a.config_overrides = lumex::config_overrides (config->second.as<std::vector<lumex::config_key_value_pair>> ());
+	}
+	auto rpcconfig (vm.find ("rpcconfig"));
+	if (rpcconfig != vm.end ())
+	{
+		flags_a.rpc_config_overrides = lumex::config_overrides (rpcconfig->second.as<std::vector<lumex::config_key_value_pair>> ());
+	}
+	if (auto it = vm.find ("runtime_info_file"); it != vm.end ())
+	{
+		flags_a.runtime_info_file = it->second.as<std::string> ();
+	}
+}
+
+std::error_code lumex::flags_config_conflicts (lumex::node_flags const & flags_a, lumex::node_config const & config_a)
+{
+	std::error_code ec;
+	if (flags_a.enable_pruning && (config_a.enable_voting || flags_a.enable_voting))
+	{
+		ec = lumex::error_cli::ambiguous_pruning_voting_options;
+	}
+	return ec;
+}
+
+namespace
+{
+void database_write_lock_error (std::error_code & ec)
+{
+	std::cerr << "Write database error, this cannot be run while the node is already running\n";
+	ec = lumex::error_cli::database_write_error;
+}
+
+void copy_database (std::filesystem::path const & data_path, boost::program_options::variables_map const & vm, std::filesystem::path const & output_path)
+{
+	bool needs_to_write = vm.count ("unchecked_clear") || vm.count ("clear_send_ids") || vm.count ("online_weight_clear") || vm.count ("peer_clear") || vm.count ("confirmation_height_clear") || vm.count ("final_vote_clear");
+
+	auto node_flags = lumex::inactive_node_flag_defaults ();
+	node_flags.read_only = !needs_to_write;
+	lumex::update_flags (node_flags, vm);
+
+	lumex::inactive_node node (data_path, node_flags);
+
+	auto & store (node.node->store);
+	if (vm.count ("unchecked_clear"))
+	{
+		node.node->unchecked.clear ();
+	}
+	if (vm.count ("clear_send_ids"))
+	{
+		node.node->wallets.clear_send_ids ();
+	}
+	if (vm.count ("online_weight_clear"))
+	{
+		node.node->store.online_weight.clear ();
+	}
+	if (vm.count ("peer_clear"))
+	{
+		node.node->store.peer.clear ();
+	}
+	if (vm.count ("confirmation_height_clear"))
+	{
+		reset_confirmation_heights (node.node->network_params.ledger, store);
+	}
+	if (vm.count ("final_vote_clear"))
+	{
+		node.node->store.final_vote.clear ();
+	}
+
+	node.node->copy_with_compaction (output_path);
+}
+}
+
+std::error_code lumex::handle_node_options (boost::program_options::variables_map const & vm)
+{
+	std::error_code ec;
+	std::filesystem::path data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : lumex::working_path ();
+
+	if (vm.count ("initialize"))
+	{
+		// TODO: --config flag overrides are not taken into account here
+		lumex::logger::initialize (lumex::log_config::daemon_default (), data_path);
+
+		auto node_flags = lumex::inactive_node_flag_defaults ();
+		node_flags.read_only = false;
+		lumex::update_flags (node_flags, vm);
+		lumex::inactive_node node (data_path, node_flags);
+	}
+	else if (vm.count ("account_create"))
+	{
+		if (vm.count ("wallet") == 1)
+		{
+			lumex::wallet_id wallet_id;
+			if (!wallet_id.decode_hex (vm["wallet"].as<std::string> ()))
+			{
+				std::string password;
+				if (vm.count ("password") > 0)
+				{
+					password = vm["password"].as<std::string> ();
+				}
+				auto inactive_node = lumex::default_inactive_node (data_path, vm);
+				auto wallet = inactive_node->node->wallets.open (wallet_id);
+				if (wallet != nullptr)
+				{
+					if (!wallet->enter_password (password))
+					{
+						auto pub_result = wallet->deterministic_insert ();
+						if (pub_result)
+						{
+							std::cout << boost::str (boost::format ("Account: %1%\n") % pub_result.value ().to_account ());
+						}
+						else
+						{
+							std::cerr << "Failed to create account\n";
+							ec = pub_result.error ();
+						}
+					}
+					else
+					{
+						std::cerr << "Invalid password\n";
+						ec = lumex::error_cli::invalid_arguments;
+					}
+				}
+				else
+				{
+					std::cerr << "Wallet doesn't exist\n";
+					ec = lumex::error_cli::invalid_arguments;
+				}
+			}
+			else
+			{
+				std::cerr << "Invalid wallet id\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else
+		{
+			std::cerr << "account_create command requires one <wallet> option and optionally one <password> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("account_get") > 0)
+	{
+		if (vm.count ("key") == 1)
+		{
+			lumex::account pub;
+			pub.decode_hex (vm["key"].as<std::string> ());
+			std::cout << "Account: " << pub.to_account () << std::endl;
+		}
+		else
+		{
+			std::cerr << "account command requires one <key> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("account_key") > 0)
+	{
+		if (vm.count ("account") == 1)
+		{
+			lumex::account account;
+			account.decode_account (vm["account"].as<std::string> ());
+			std::cout << "Hex: " << account.to_string () << std::endl;
+		}
+		else
+		{
+			std::cerr << "account_key command requires one <account> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("vacuum") > 0)
+	{
+		try
+		{
+			auto using_rocksdb = is_using_rocksdb (data_path, vm, ec);
+			if (!ec)
+			{
+				std::cout << "Vacuuming database copy in ";
+				std::filesystem::path source_path;
+				std::filesystem::path backup_path;
+				std::filesystem::path vacuum_path;
+				if (using_rocksdb)
+				{
+					source_path = data_path / "rocksdb";
+					backup_path = source_path / "backup";
+					vacuum_path = backup_path / "vacuumed";
+					if (!std::filesystem::exists (vacuum_path))
+					{
+						std::filesystem::create_directories (vacuum_path);
+					}
+
+					std::cout << source_path << "\n";
+				}
+				else
+				{
+					source_path = data_path / "data.ldb";
+					backup_path = data_path / "backup.vacuum.ldb";
+					vacuum_path = data_path / "vacuumed.ldb";
+					std::cout << data_path << "\n";
+				}
+				std::cout << "This may take a while..." << std::endl;
+
+				copy_database (data_path, vm, vacuum_path);
+
+				// Note that these throw on failure
+				std::cout << "Finalizing" << std::endl;
+				if (using_rocksdb)
+				{
+					lumex::remove_all_files_in_dir (backup_path);
+					lumex::move_all_files_to_dir (source_path, backup_path);
+					lumex::move_all_files_to_dir (vacuum_path, source_path);
+					std::filesystem::remove_all (vacuum_path);
+				}
+				else
+				{
+					std::filesystem::remove (backup_path);
+					std::filesystem::rename (source_path, backup_path);
+					std::filesystem::rename (vacuum_path, source_path);
+				}
+				std::cout << "Vacuum completed" << std::endl;
+			}
+			else
+			{
+				std::cerr << "Vacuum failed. RocksDB is enabled but the node has not been built with RocksDB support" << std::endl;
+			}
+		}
+		catch (std::filesystem::filesystem_error const & ex)
+		{
+			std::cerr << "Vacuum failed during a file operation: " << ex.what () << std::endl;
+		}
+		catch (std::exception const & ex)
+		{
+			std::cerr << "Vacuum failed: " << ex.what () << std::endl;
+		}
+		catch (...)
+		{
+			std::cerr << "Vacuum failed (unknown reason)" << std::endl;
+		}
+	}
+	else if (vm.count ("snapshot"))
+	{
+		try
+		{
+			auto using_rocksdb = is_using_rocksdb (data_path, vm, ec);
+			if (!ec)
+			{
+				std::filesystem::path source_path;
+				std::filesystem::path snapshot_path;
+				if (using_rocksdb)
+				{
+					source_path = data_path / "rocksdb";
+					snapshot_path = source_path / "backup";
+				}
+				else
+				{
+					source_path = data_path / "data.ldb";
+					snapshot_path = data_path / "snapshot.ldb";
+				}
+
+				std::cout << "Database snapshot of " << source_path << " to " << snapshot_path << " in progress" << std::endl;
+				std::cout << "This may take a while..." << std::endl;
+
+				copy_database (data_path, vm, snapshot_path);
+				std::cout << "Snapshot completed, This can be found at " << snapshot_path << std::endl;
+			}
+			else
+			{
+				std::cerr << "Snapshot failed. RocksDB is enabled but the node has not been built with RocksDB support" << std::endl;
+			}
+		}
+		catch (std::filesystem::filesystem_error const & ex)
+		{
+			std::cerr << "Snapshot failed during a file operation: " << ex.what () << std::endl;
+		}
+		catch (std::exception const & ex)
+		{
+			std::cerr << "Snapshot failed: " << ex.what () << std::endl;
+		}
+		catch (...)
+		{
+			std::cerr << "Snapshot failed (unknown reason)" << std::endl;
+		}
+	}
+	else if (vm.count ("migrate_database_lmdb_to_rocksdb"))
+	{
+		auto data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : lumex::working_path ();
+
+		lumex::logger::initialize (lumex::log_config::daemon_default (), data_path);
+
+		lumex::lmdb_config lmdb_config;
+		lumex::rocksdb_config rocksdb_config;
+		{
+			lumex::network_params network_params{ lumex::get_active_network () };
+			lumex::daemon_config daemon_config{ data_path, network_params };
+			if (!lumex::read_node_config_toml (data_path, daemon_config))
+			{
+				lmdb_config = daemon_config.node.lmdb_config;
+				rocksdb_config = daemon_config.node.rocksdb_config;
+			}
+		}
+
+		try
+		{
+			lumex::migrate_lmdb_to_rocksdb (data_path, lmdb_config, rocksdb_config);
+		}
+		catch (std::exception const & e)
+		{
+			lumex::default_logger ().error (lumex::log::type::migration, "Migration failed: {}", e.what ());
+			std::cerr << "Migration failed: " << e.what () << std::endl;
+		}
+	}
+	else if (vm.count ("database_upgrade"))
+	{
+		lumex::logger::initialize (lumex::log_config::daemon_default (), data_path);
+
+		lumex::network_params network_params{ lumex::get_active_network () };
+		lumex::daemon_config daemon_config{ data_path, network_params };
+
+		auto config_arg (vm.find ("config"));
+		std::vector<std::string> config_overrides;
+		if (config_arg != vm.end ())
+		{
+			config_overrides = lumex::config_overrides (config_arg->second.as<std::vector<lumex::config_key_value_pair>> ());
+		}
+
+		if (auto error = lumex::read_node_config_toml (data_path, daemon_config, config_overrides))
+		{
+			std::cerr << "Error reading config: " << error.get_message () << std::endl;
+			ec = lumex::error_cli::reading_config;
+		}
+		else
+		{
+			try
+			{
+				auto & logger = lumex::default_logger ();
+				lumex::stats stats{ logger };
+				auto store = lumex::make_store (logger, stats, data_path, network_params.ledger, false, true, daemon_config.node);
+				std::cout << "Database upgrade completed successfully" << std::endl;
+				std::cout << "Database version: " << store->get_version () << " (" << store->get_vendor () << ")" << std::endl;
+			}
+			catch (std::exception const & e)
+			{
+				std::cerr << "Database upgrade failed: " << e.what () << std::endl;
+				ec = lumex::error_cli::generic;
+			}
+		}
+	}
+	else if (vm.count ("populate_topo_index"))
+	{
+		lumex::logger::initialize (lumex::log_config::daemon_default (), data_path);
+
+		lumex::network_params network_params{ lumex::get_active_network () };
+		lumex::daemon_config daemon_config{ data_path, network_params };
+
+		auto config_arg (vm.find ("config"));
+		std::vector<std::string> config_overrides;
+		if (config_arg != vm.end ())
+		{
+			config_overrides = lumex::config_overrides (config_arg->second.as<std::vector<lumex::config_key_value_pair>> ());
+		}
+
+		if (auto error = lumex::read_node_config_toml (data_path, daemon_config, config_overrides))
+		{
+			std::cerr << "Error reading config: " << error.get_message () << std::endl;
+			ec = lumex::error_cli::reading_config;
+		}
+		else
+		{
+			try
+			{
+				auto & logger = lumex::default_logger ();
+				lumex::stats stats{ logger };
+				auto store = lumex::make_store (logger, stats, data_path, network_params.ledger, false, true, daemon_config.node);
+				lumex::ledger ledger{ *store, network_params, stats, logger };
+
+				if (ledger.flags.topo_index)
+				{
+					std::cout << "Topology index is already populated" << std::endl;
+				}
+				else
+				{
+					ledger.populate_topo_index ();
+					std::cout << "Topology index populated" << std::endl;
+				}
+			}
+			catch (std::exception const & e)
+			{
+				std::cerr << "Failed to populate topology index: " << e.what () << std::endl;
+				ec = lumex::error_cli::generic;
+			}
+		}
+	}
+	else if (vm.count ("drop_topo_index"))
+	{
+		lumex::logger::initialize (lumex::log_config::daemon_default (), data_path);
+
+		lumex::network_params network_params{ lumex::get_active_network () };
+		lumex::daemon_config daemon_config{ data_path, network_params };
+
+		auto config_arg (vm.find ("config"));
+		std::vector<std::string> config_overrides;
+		if (config_arg != vm.end ())
+		{
+			config_overrides = lumex::config_overrides (config_arg->second.as<std::vector<lumex::config_key_value_pair>> ());
+		}
+
+		if (auto error = lumex::read_node_config_toml (data_path, daemon_config, config_overrides))
+		{
+			std::cerr << "Error reading config: " << error.get_message () << std::endl;
+			ec = lumex::error_cli::reading_config;
+		}
+		else
+		{
+			try
+			{
+				auto & logger = lumex::default_logger ();
+				lumex::stats stats{ logger };
+				auto store = lumex::make_store (logger, stats, data_path, network_params.ledger, false, true, daemon_config.node);
+				lumex::ledger ledger{ *store, network_params, stats, logger };
+
+				if (!ledger.flags.topo_index)
+				{
+					std::cout << "Topology index is not enabled" << std::endl;
+				}
+				else
+				{
+					ledger.drop_topo_index ();
+					std::cout << "Topology index dropped" << std::endl;
+				}
+			}
+			catch (std::exception const & e)
+			{
+				std::cerr << "Failed to drop topology index: " << e.what () << std::endl;
+				ec = lumex::error_cli::generic;
+			}
+		}
+	}
+	else if (vm.count ("rollback"))
+	{
+		if (vm.count ("hash") == 1)
+		{
+			lumex::block_hash block_hash;
+			if (!block_hash.decode_hex (vm["hash"].as<std::string> ()))
+			{
+				std::filesystem::path data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : lumex::working_path ();
+				auto node_flags = lumex::inactive_node_flag_defaults ();
+				node_flags.read_only = false;
+				lumex::update_flags (node_flags, vm);
+
+				try
+				{
+					lumex::inactive_node node (data_path, node_flags);
+					auto transaction (node.node->ledger.tx_begin_write ());
+					auto block = node.node->ledger.any.block_get (transaction, block_hash);
+					if (block != nullptr)
+					{
+						if (!node.node->ledger.cemented.block_exists (transaction, block_hash))
+						{
+							std::cout << "Rolling back " << block_hash.to_string () << " ..." << std::endl;
+
+							std::deque<std::shared_ptr<lumex::block>> rollback_list;
+							bool error = node.node->ledger.rollback (transaction, block_hash, rollback_list);
+							if (!error)
+							{
+								std::cout << "Block rollback complete" << std::endl;
+								std::cout << "Rolled back " << rollback_list.size () << " dependent blocks" << std::endl;
+							}
+							else
+							{
+								std::cerr << "Error rolling back block, rolled back " << rollback_list.size () << " dependents" << std::endl;
+								ec = lumex::error_cli::generic;
+							}
+						}
+						else
+						{
+							std::cerr << "Cannot rollback cemented block" << std::endl;
+							ec = lumex::error_cli::invalid_arguments;
+						}
+					}
+					else
+					{
+						std::cerr << "Block not found in ledger" << std::endl;
+						ec = lumex::error_cli::invalid_arguments;
+					}
+				}
+				catch (std::exception const &)
+				{
+					database_write_lock_error (ec);
+				}
+			}
+			else
+			{
+				std::cerr << "Invalid block hash" << std::endl;
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else
+		{
+			std::cerr << "rollback command requires one <hash> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("unchecked_clear"))
+	{
+		std::filesystem::path data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : lumex::working_path ();
+		auto node_flags = lumex::inactive_node_flag_defaults ();
+		node_flags.read_only = false;
+		lumex::update_flags (node_flags, vm);
+		try
+		{
+			lumex::inactive_node node (data_path, node_flags);
+			auto transaction (node.node->store.tx_begin_write ());
+			node.node->unchecked.clear ();
+			std::cout << "Unchecked blocks deleted" << std::endl;
+		}
+		catch (std::exception const &)
+		{
+			database_write_lock_error (ec);
+		}
+	}
+	else if (vm.count ("clear_send_ids"))
+	{
+		std::filesystem::path data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : lumex::working_path ();
+		auto node_flags = lumex::inactive_node_flag_defaults ();
+		node_flags.read_only = false;
+		lumex::update_flags (node_flags, vm);
+		try
+		{
+			lumex::inactive_node node (data_path, node_flags);
+			node.node->wallets.clear_send_ids ();
+			std::cout << "Send IDs deleted" << std::endl;
+		}
+		catch (std::exception const &)
+		{
+			database_write_lock_error (ec);
+		}
+	}
+	else if (vm.count ("online_weight_clear"))
+	{
+		std::filesystem::path data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : lumex::working_path ();
+		auto node_flags = lumex::inactive_node_flag_defaults ();
+		node_flags.read_only = false;
+		lumex::update_flags (node_flags, vm);
+		try
+		{
+			lumex::inactive_node node (data_path, node_flags);
+			node.node->store.online_weight.clear ();
+			std::cout << "Online weight records are removed" << std::endl;
+		}
+		catch (std::exception const &)
+		{
+			database_write_lock_error (ec);
+		}
+	}
+	else if (vm.count ("peer_clear"))
+	{
+		std::filesystem::path data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : lumex::working_path ();
+		auto node_flags = lumex::inactive_node_flag_defaults ();
+		node_flags.read_only = false;
+		lumex::update_flags (node_flags, vm);
+		try
+		{
+			lumex::inactive_node node (data_path, node_flags);
+			node.node->store.peer.clear ();
+			std::cout << "Database peers are removed" << std::endl;
+		}
+		catch (std::exception const &)
+		{
+			database_write_lock_error (ec);
+		}
+	}
+	else if (vm.count ("confirmation_height_clear"))
+	{
+		std::filesystem::path data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : lumex::working_path ();
+		auto node_flags = lumex::inactive_node_flag_defaults ();
+		node_flags.read_only = false;
+		lumex::update_flags (node_flags, vm);
+		try
+		{
+			lumex::inactive_node node (data_path, node_flags);
+			if (vm.count ("account") == 1)
+			{
+				auto account_str = vm["account"].as<std::string> ();
+				lumex::account account;
+				if (!account.decode_account (account_str))
+				{
+					lumex::confirmation_height_info confirmation_height_info;
+					if (!node.node->store.confirmation_height.get (node.node->store.tx_begin_read (), account, confirmation_height_info))
+					{
+						auto transaction (node.node->store.tx_begin_write ());
+						auto conf_height_reset_num = 0;
+						if (account == node.node->network_params.ledger.genesis->account ())
+						{
+							conf_height_reset_num = 1;
+							node.node->store.confirmation_height.put (transaction, account, { confirmation_height_info.height, node.node->network_params.ledger.genesis->hash () });
+						}
+						else
+						{
+							node.node->store.confirmation_height.del (transaction, account);
+						}
+
+						std::cout << "Confirmation height of account " << account_str << " is set to " << conf_height_reset_num << std::endl;
+					}
+					else
+					{
+						std::cerr << "Could not find account" << std::endl;
+						ec = lumex::error_cli::generic;
+					}
+				}
+				else if (account_str == "all")
+				{
+					reset_confirmation_heights (node.node->network_params.ledger, node.node->store);
+					std::cout << "Confirmation heights of all accounts (except genesis which is set to 1) are set to 0" << std::endl;
+				}
+				else
+				{
+					std::cerr << "Specify either valid account id or 'all'\n";
+					ec = lumex::error_cli::invalid_arguments;
+				}
+			}
+			else
+			{
+				std::cerr << "confirmation_height_clear command requires one <account> option that may contain an account or the value 'all'\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		catch (std::exception const &)
+		{
+			database_write_lock_error (ec);
+		}
+	}
+	else if (vm.count ("final_vote_clear"))
+	{
+		std::filesystem::path data_path = vm.count ("data_path") ? std::filesystem::path (vm["data_path"].as<std::string> ()) : lumex::working_path ();
+		auto node_flags = lumex::inactive_node_flag_defaults ();
+		node_flags.read_only = false;
+		lumex::update_flags (node_flags, vm);
+		try
+		{
+			lumex::inactive_node node (data_path, node_flags);
+			if (auto root_it = vm.find ("root"); root_it != vm.cend ())
+			{
+				auto root_str = root_it->second.as<std::string> ();
+				auto transaction (node.node->store.tx_begin_write ());
+				lumex::qualified_root root;
+				if (!root.decode_hex (root_str))
+				{
+					node.node->store.final_vote.del (transaction, root);
+					std::cout << "Successfully cleared final votes" << std::endl;
+				}
+				else
+				{
+					std::cerr << "Invalid root" << std::endl;
+					ec = lumex::error_cli::invalid_arguments;
+				}
+			}
+			else if (vm.count ("all"))
+			{
+				node.node->store.final_vote.clear ();
+				std::cout << "All final votes are cleared" << std::endl;
+			}
+			else
+			{
+				std::cerr << "Either specify a single --root to clear or --all to clear all final votes (not recommended)" << std::endl;
+			}
+		}
+		catch (std::exception const &)
+		{
+			database_write_lock_error (ec);
+		}
+	}
+	else if (vm.count ("generate_config"))
+	{
+		auto type = vm["generate_config"].as<std::string> ();
+		lumex::tomlconfig toml;
+		bool valid_type = false;
+		if (type == "node")
+		{
+			valid_type = true;
+			lumex::network_params network_params{ lumex::get_active_network () };
+			lumex::daemon_config config{ data_path, network_params };
+			// set the peering port to the default value so that it is printed in the example toml file
+			config.node.peering_port = network_params.network.default_node_port;
+			config.serialize_toml (toml);
+		}
+		else if (type == "rpc")
+		{
+			valid_type = true;
+			lumex::rpc_config config{ lumex::dev::network_params.network };
+			config.serialize_toml (toml);
+		}
+		else if (type == "log")
+		{
+			valid_type = true;
+			lumex::log_config config = lumex::log_config::sample_config ();
+			config.serialize_toml (toml);
+		}
+		else
+		{
+			std::cerr << "Invalid configuration type " << type << ". Must be node or rpc." << std::endl;
+		}
+
+		if (valid_type)
+		{
+			std::cout << "# This is an example configuration file for Lumex. Visit https://docs.lumex.org/running-a-node/configuration/ for more information.\n#\n"
+					  << "# Fields may need to be defined in the context of a [category] above them.\n"
+					  << "# The desired configuration changes should be placed in config-" << type << ".toml in the node data path.\n"
+					  << "# To change a value from its default, uncomment (erasing #) the corresponding field.\n"
+					  << "# It is not recommended to uncomment every field, as the default value for important fields may change in the future. Only change what you need.\n"
+					  << "# Additional information for notable configuration options is available in https://docs.lumex.org/running-a-node/configuration/#notable-configuration-options\n";
+
+			if (vm.count ("use_defaults"))
+			{
+				std::cout << toml.to_string (false) << std::endl;
+			}
+			else
+			{
+				std::cout << toml.to_string (true) << std::endl;
+			}
+		}
+	}
+	else if (vm.count ("update_config"))
+	{
+		lumex::network_params network_params{ lumex::get_active_network () };
+		lumex::tomlconfig default_toml;
+		lumex::tomlconfig current_toml;
+		lumex::daemon_config default_config{ data_path, network_params };
+		lumex::daemon_config current_config{ data_path, network_params };
+
+		std::vector<std::string> config_overrides;
+		auto error = lumex::read_node_config_toml (data_path, current_config, config_overrides);
+		if (error)
+		{
+			std::cerr << "Could not read existing config file\n";
+			ec = lumex::error_cli::reading_config;
+		}
+		else
+		{
+			current_config.serialize_toml (current_toml);
+			default_config.serialize_toml (default_toml);
+
+			auto output = current_toml.merge_defaults (current_toml, default_toml);
+
+			std::cout << output;
+		}
+	}
+	else if (vm.count ("diagnostics"))
+	{
+		auto inactive_node = lumex::default_inactive_node (data_path, vm);
+		std::cout << "Testing hash function" << std::endl;
+		lumex::raw_key key;
+		key.clear ();
+		lumex::send_block send (0, 0, 0, key, 0, 0);
+		std::cout << "Testing key derivation function" << std::endl;
+		lumex::raw_key junk1;
+		junk1.clear ();
+		lumex::uint256_union junk2 (0);
+		lumex::kdf kdf{ inactive_node->node->config.network_params.kdf_work };
+		kdf.phs (junk1, "", junk2);
+		std::cout << "Testing time retrieval latency... " << std::flush;
+		lumex::timer<std::chrono::lumexseconds> timer (lumex::timer_state::started);
+		auto const iters = 2'000'000;
+		for (auto i (0); i < iters; ++i)
+		{
+			(void)std::chrono::steady_clock::now ();
+		}
+		std::cout << timer.stop ().count () / iters << " " << timer.unit () << std::endl;
+		std::cout << "Dumping OpenCL information" << std::endl;
+		bool error (false);
+		lumex::opencl_environment environment (error);
+		if (!error)
+		{
+			environment.dump (std::cout);
+			std::stringstream stream;
+			environment.dump (stream);
+			std::cout << stream.str () << std::endl;
+		}
+		else
+		{
+			std::cerr << "Error initializing OpenCL" << std::endl;
+			ec = lumex::error_cli::generic;
+		}
+	}
+	else if (vm.count ("key_create"))
+	{
+		lumex::keypair pair;
+		std::cout << "Private: " << pair.prv.to_string () << std::endl
+				  << "Public: " << pair.pub.to_string () << std::endl
+				  << "Account: " << pair.pub.to_account () << std::endl;
+	}
+	else if (vm.count ("key_expand"))
+	{
+		if (vm.count ("key") == 1)
+		{
+			lumex::raw_key prv;
+			prv.decode_hex (vm["key"].as<std::string> ());
+			lumex::public_key pub (lumex::pub_key (prv));
+			std::cout << "Private: " << prv.to_string () << std::endl
+					  << "Public: " << pub.to_string () << std::endl
+					  << "Account: " << pub.to_account () << std::endl;
+		}
+		else
+		{
+			std::cerr << "key_expand command requires one <key> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("wallet_add_adhoc"))
+	{
+		if (vm.count ("wallet") == 1 && vm.count ("key") == 1)
+		{
+			lumex::wallet_id wallet_id;
+			if (!wallet_id.decode_hex (vm["wallet"].as<std::string> ()))
+			{
+				std::string password;
+				if (vm.count ("password") > 0)
+				{
+					password = vm["password"].as<std::string> ();
+				}
+				auto inactive_node = lumex::default_inactive_node (data_path, vm);
+				auto wallet = inactive_node->node->wallets.open (wallet_id);
+				if (wallet != nullptr)
+				{
+					if (!wallet->enter_password (password))
+					{
+						lumex::raw_key key;
+						if (!key.decode_hex (vm["key"].as<std::string> ()))
+						{
+							auto result = wallet->insert_adhoc (key);
+							if (!result)
+							{
+								std::cerr << "Failed to add key\n";
+								ec = result.error ();
+							}
+						}
+						else
+						{
+							std::cerr << "Invalid key\n";
+							ec = lumex::error_cli::invalid_arguments;
+						}
+					}
+					else
+					{
+						std::cerr << "Invalid password\n";
+						ec = lumex::error_cli::invalid_arguments;
+					}
+				}
+				else
+				{
+					std::cerr << "Wallet doesn't exist\n";
+					ec = lumex::error_cli::invalid_arguments;
+				}
+			}
+			else
+			{
+				std::cerr << "Invalid wallet id\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else
+		{
+			std::cerr << "wallet_add command requires one <wallet> option and one <key> option and optionally one <password> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("wallet_change_seed"))
+	{
+		if (vm.count ("wallet") == 1 && (vm.count ("seed") == 1 || vm.count ("key") == 1))
+		{
+			lumex::wallet_id wallet_id;
+			if (!wallet_id.decode_hex (vm["wallet"].as<std::string> ()))
+			{
+				std::string password;
+				if (vm.count ("password") > 0)
+				{
+					password = vm["password"].as<std::string> ();
+				}
+				auto inactive_node = lumex::default_inactive_node (data_path, vm);
+				auto wallet (inactive_node->node->wallets.open (wallet_id));
+				if (wallet != nullptr)
+				{
+					if (!wallet->enter_password (password))
+					{
+						lumex::raw_key seed;
+						if (vm.count ("seed"))
+						{
+							if (seed.decode_hex (vm["seed"].as<std::string> ()))
+							{
+								std::cerr << "Invalid seed\n";
+								ec = lumex::error_cli::invalid_arguments;
+							}
+						}
+						else if (seed.decode_hex (vm["key"].as<std::string> ()))
+						{
+							std::cerr << "Invalid key seed\n";
+							ec = lumex::error_cli::invalid_arguments;
+						}
+						if (!ec)
+						{
+							std::cout << "Changing seed and caching work. Please wait..." << std::endl;
+							wallet->change_seed (seed);
+						}
+					}
+					else
+					{
+						std::cerr << "Invalid password\n";
+						ec = lumex::error_cli::invalid_arguments;
+					}
+				}
+				else
+				{
+					std::cerr << "Wallet doesn't exist\n";
+					ec = lumex::error_cli::invalid_arguments;
+				}
+			}
+			else
+			{
+				std::cerr << "Invalid wallet id\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else
+		{
+			std::cerr << "wallet_change_seed command requires one <wallet> option and one <seed> option and optionally one <password> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("wallet_create"))
+	{
+		lumex::raw_key seed_key;
+		if (vm.count ("seed") == 1)
+		{
+			if (seed_key.decode_hex (vm["seed"].as<std::string> ()))
+			{
+				std::cerr << "Invalid seed\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else if (vm.count ("seed") > 1)
+		{
+			std::cerr << "wallet_create command allows one optional <seed> parameter\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+		else if (vm.count ("key") == 1)
+		{
+			if (seed_key.decode_hex (vm["key"].as<std::string> ()))
+			{
+				std::cerr << "Invalid seed key\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else if (vm.count ("key") > 1)
+		{
+			std::cerr << "wallet_create command allows one optional <key> seed parameter\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+		if (!ec)
+		{
+			auto inactive_node = lumex::default_inactive_node (data_path, vm);
+			auto wallet_key = lumex::random_wallet_id ();
+			auto wallet (inactive_node->node->wallets.create (wallet_key));
+			if (wallet != nullptr)
+			{
+				if (vm.count ("password") > 0)
+				{
+					std::string password (vm["password"].as<std::string> ());
+					auto error (wallet->rekey (password));
+					if (error)
+					{
+						std::cerr << "Password change error\n";
+						ec = lumex::error_cli::invalid_arguments;
+					}
+				}
+				if (vm.count ("seed") || vm.count ("key"))
+				{
+					wallet->change_seed (seed_key);
+				}
+				std::cout << wallet_key.to_string () << std::endl;
+			}
+			else
+			{
+				std::cerr << "Wallet creation error\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+	}
+	else if (vm.count ("wallet_decrypt_unsafe"))
+	{
+		if (vm.count ("wallet") == 1)
+		{
+			std::string password;
+			if (vm.count ("password") == 1)
+			{
+				password = vm["password"].as<std::string> ();
+			}
+			lumex::wallet_id wallet_id;
+			if (!wallet_id.decode_hex (vm["wallet"].as<std::string> ()))
+			{
+				auto inactive_node = lumex::default_inactive_node (data_path, vm);
+				auto node = inactive_node->node;
+				auto existing (inactive_node->node->wallets.items.find (wallet_id));
+				if (existing != inactive_node->node->wallets.items.end ())
+				{
+					if (!existing->second->enter_password (password))
+					{
+						auto seed_result = existing->second->get_seed ();
+						if (seed_result)
+						{
+							std::cout << boost::str (boost::format ("Seed: %1%\n") % seed_result.value ().to_string ());
+							for (auto const & account : existing->second->accounts ())
+							{
+								auto key_result = existing->second->fetch_prv (account);
+								debug_assert (key_result);
+								if (key_result)
+								{
+									std::cout << boost::str (boost::format ("Pub: %1% Prv: %2%\n") % account.to_account () % key_result.value ().to_string ());
+									if (lumex::pub_key (key_result.value ()) != account)
+									{
+										std::cerr << boost::str (boost::format ("Invalid private key %1%\n") % key_result.value ().to_string ());
+									}
+								}
+								else
+								{
+									std::cerr << boost::str (boost::format ("Unable to fetch private key for account %1% (%2%)\n") % account.to_account () % key_result.error ());
+								}
+							}
+						}
+						else
+						{
+							std::cerr << boost::str (boost::format ("Unable to retrieve seed: %1%\n") % seed_result.error ());
+							ec = seed_result.error ();
+						}
+					}
+					else
+					{
+						std::cerr << "Invalid password\n";
+						ec = lumex::error_cli::invalid_arguments;
+					}
+				}
+				else
+				{
+					std::cerr << "Wallet doesn't exist\n";
+					ec = lumex::error_cli::invalid_arguments;
+				}
+			}
+			else
+			{
+				std::cerr << "Invalid wallet id\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else
+		{
+			std::cerr << "wallet_decrypt_unsafe requires one <wallet> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("wallet_destroy"))
+	{
+		if (vm.count ("wallet") == 1)
+		{
+			lumex::wallet_id wallet_id;
+			if (!wallet_id.decode_hex (vm["wallet"].as<std::string> ()))
+			{
+				auto inactive_node = lumex::default_inactive_node (data_path, vm);
+				auto node = inactive_node->node;
+				if (node->wallets.items.find (wallet_id) != node->wallets.items.end ())
+				{
+					node->wallets.destroy (wallet_id);
+				}
+				else
+				{
+					std::cerr << "Wallet doesn't exist\n";
+					ec = lumex::error_cli::invalid_arguments;
+				}
+			}
+			else
+			{
+				std::cerr << "Invalid wallet id\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else
+		{
+			std::cerr << "wallet_destroy requires one <wallet> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("wallet_import"))
+	{
+		if (vm.count ("file") == 1)
+		{
+			std::string filename (vm["file"].as<std::string> ());
+			std::ifstream stream;
+			stream.open (filename.c_str ());
+			if (!stream.fail ())
+			{
+				std::stringstream contents;
+				contents << stream.rdbuf ();
+				std::string password;
+				if (vm.count ("password") == 1)
+				{
+					password = vm["password"].as<std::string> ();
+				}
+				bool forced (false);
+				if (vm.count ("force") == 1)
+				{
+					forced = vm["force"].as<bool> ();
+				}
+				if (vm.count ("wallet") == 1)
+				{
+					lumex::wallet_id wallet_id;
+					if (!wallet_id.decode_hex (vm["wallet"].as<std::string> ()))
+					{
+						auto inactive_node = lumex::default_inactive_node (data_path, vm);
+						auto node = inactive_node->node;
+						auto existing (node->wallets.items.find (wallet_id));
+						if (existing != node->wallets.items.end ())
+						{
+							bool valid (!existing->second->is_locked ());
+							if (!valid)
+							{
+								valid = !existing->second->enter_password (password);
+							}
+							if (valid)
+							{
+								if (existing->second->import (contents.str (), password))
+								{
+									std::cerr << "Unable to import wallet\n";
+									ec = lumex::error_cli::invalid_arguments;
+								}
+								else
+								{
+									std::cout << "Import completed\n";
+								}
+							}
+							else
+							{
+								std::cerr << boost::str (boost::format ("Invalid password for wallet %1%\nNew wallet should have empty (default) password or passwords for new wallet & json file should match\n") % wallet_id.to_string ());
+								ec = lumex::error_cli::invalid_arguments;
+							}
+						}
+						else
+						{
+							if (!forced)
+							{
+								std::cerr << "Wallet doesn't exist\n";
+								ec = lumex::error_cli::invalid_arguments;
+							}
+							else
+							{
+								auto wallet = node->wallets.create_from_json (wallet_id, contents.str ());
+								if (!wallet)
+								{
+									std::cerr << "Unable to import wallet\n";
+									ec = lumex::error_cli::invalid_arguments;
+								}
+								else
+								{
+									std::cout << "Import completed\n";
+								}
+							}
+						}
+					}
+					else
+					{
+						std::cerr << "Invalid wallet id\n";
+						ec = lumex::error_cli::invalid_arguments;
+					}
+				}
+				else
+				{
+					std::cerr << "wallet_import requires one <wallet> option\n";
+					ec = lumex::error_cli::invalid_arguments;
+				}
+			}
+			else
+			{
+				std::cerr << "Unable to open <file>\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else
+		{
+			std::cerr << "wallet_import requires one <file> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("wallet_list"))
+	{
+		auto inactive_node = lumex::default_inactive_node (data_path, vm);
+		auto node = inactive_node->node;
+		for (auto const & [id, wallet] : node->wallets.all_wallets ())
+		{
+			std::cout << boost::str (boost::format ("Wallet ID: %1%\n") % id.to_string ());
+			for (auto const & account : wallet->accounts ())
+			{
+				std::cout << account.to_account () << '\n';
+			}
+		}
+	}
+	else if (vm.count ("wallet_remove"))
+	{
+		if (vm.count ("wallet") == 1 && vm.count ("account") == 1)
+		{
+			auto inactive_node = lumex::default_inactive_node (data_path, vm);
+			auto node = inactive_node->node;
+			lumex::wallet_id wallet_id;
+			if (!wallet_id.decode_hex (vm["wallet"].as<std::string> ()))
+			{
+				auto wallet (node->wallets.items.find (wallet_id));
+				if (wallet != node->wallets.items.end ())
+				{
+					lumex::account account_id;
+					if (!account_id.decode_account (vm["account"].as<std::string> ()))
+					{
+						if (wallet->second->exists (account_id))
+						{
+							wallet->second->remove_account (account_id);
+						}
+						else
+						{
+							std::cerr << "Account not found in wallet\n";
+							ec = lumex::error_cli::invalid_arguments;
+						}
+					}
+					else
+					{
+						std::cerr << "Invalid account id\n";
+						ec = lumex::error_cli::invalid_arguments;
+					}
+				}
+				else
+				{
+					std::cerr << "Wallet not found\n";
+					ec = lumex::error_cli::invalid_arguments;
+				}
+			}
+			else
+			{
+				std::cerr << "Invalid wallet id\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else
+		{
+			std::cerr << "wallet_remove command requires one <wallet> and one <account> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("wallet_representative_get"))
+	{
+		if (vm.count ("wallet") == 1)
+		{
+			lumex::wallet_id wallet_id;
+			if (!wallet_id.decode_hex (vm["wallet"].as<std::string> ()))
+			{
+				auto inactive_node = lumex::default_inactive_node (data_path, vm);
+				auto node = inactive_node->node;
+				auto wallet (node->wallets.items.find (wallet_id));
+				if (wallet != node->wallets.items.end ())
+				{
+					auto representative (wallet->second->get_representative ());
+					std::cout << boost::str (boost::format ("Representative: %1%\n") % representative.to_account ());
+				}
+				else
+				{
+					std::cerr << "Wallet not found\n";
+					ec = lumex::error_cli::invalid_arguments;
+				}
+			}
+			else
+			{
+				std::cerr << "Invalid wallet id\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else
+		{
+			std::cerr << "wallet_representative_get requires one <wallet> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else if (vm.count ("wallet_representative_set"))
+	{
+		if (vm.count ("wallet") == 1)
+		{
+			if (vm.count ("account") == 1)
+			{
+				lumex::wallet_id wallet_id;
+				if (!wallet_id.decode_hex (vm["wallet"].as<std::string> ()))
+				{
+					lumex::account account;
+					if (!account.decode_account (vm["account"].as<std::string> ()))
+					{
+						auto inactive_node = lumex::default_inactive_node (data_path, vm);
+						auto node = inactive_node->node;
+						auto wallet (node->wallets.items.find (wallet_id));
+						if (wallet != node->wallets.items.end ())
+						{
+							wallet->second->set_representative (account);
+						}
+						else
+						{
+							std::cerr << "Wallet not found\n";
+							ec = lumex::error_cli::invalid_arguments;
+						}
+					}
+					else
+					{
+						std::cerr << "Invalid account\n";
+						ec = lumex::error_cli::invalid_arguments;
+					}
+				}
+				else
+				{
+					std::cerr << "Invalid wallet id\n";
+					ec = lumex::error_cli::invalid_arguments;
+				}
+			}
+			else
+			{
+				std::cerr << "wallet_representative_set requires one <account> option\n";
+				ec = lumex::error_cli::invalid_arguments;
+			}
+		}
+		else
+		{
+			std::cerr << "wallet_representative_set requires one <wallet> option\n";
+			ec = lumex::error_cli::invalid_arguments;
+		}
+	}
+	else
+	{
+		ec = lumex::error_cli::unknown_command;
+	}
+
+	return ec;
+}
+
+std::unique_ptr<lumex::inactive_node> lumex::default_inactive_node (std::filesystem::path const & path_a, boost::program_options::variables_map const & vm_a)
+{
+	auto node_flags = lumex::inactive_node_flag_defaults ();
+	lumex::update_flags (node_flags, vm_a);
+	return std::make_unique<lumex::inactive_node> (path_a, node_flags);
+}
+
+namespace
+{
+void reset_confirmation_heights (lumex::ledger_constants & constants, lumex::store::ledger_store & store)
+{
+	// First do a clean sweep
+	store.confirmation_height.clear ();
+
+	// Then make sure the confirmation height of the genesis account open block is 1
+	auto transaction = store.tx_begin_write ();
+	store.confirmation_height.put (transaction, constants.genesis->account (), { 1, constants.genesis->hash () });
+}
+
+bool is_using_rocksdb (std::filesystem::path const & data_path, boost::program_options::variables_map const & vm, std::error_code & ec)
+{
+	lumex::network_params network_params{ lumex::get_active_network () };
+	lumex::daemon_config config{ data_path, network_params };
+
+	// Config overriding
+	auto config_arg (vm.find ("config"));
+	std::vector<std::string> config_overrides;
+	if (config_arg != vm.end ())
+	{
+		config_overrides = lumex::config_overrides (config_arg->second.as<std::vector<lumex::config_key_value_pair>> ());
+	}
+
+	// config override...
+	auto error = lumex::read_node_config_toml (data_path, config, config_overrides);
+	if (!error)
+	{
+		return config.node.rocksdb_config->enable;
+	}
+	else
+	{
+		ec = lumex::error_cli::reading_config;
+	}
+
+	return false;
+}
+}

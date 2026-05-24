@@ -4,7 +4,7 @@ on:
     inputs:
       repo:
         description: "Repository"
-        default: "nanocurrency/nano-node"
+        default: "lumexcurrency/lumex-node"
         required: true
       ref:
         description: "Version (VX.Y tag)"

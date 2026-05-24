@@ -1,0 +1,232 @@
+#pragma once
+
+#include <lumex/lib/assert.hpp>
+
+#include <boost/lexical_cast.hpp>
+
+#include <chrono>
+#include <deque>
+#include <span>
+#include <sstream>
+#include <string>
+#include <vector>
+
+namespace boost
+{
+namespace system
+{
+	class error_code;
+}
+
+namespace program_options
+{
+	class options_description;
+}
+}
+
+namespace lumex
+{
+// Helper for std::visit with multiple lambdas
+template <class... Ts>
+struct overloaded : Ts...
+{
+	using Ts::operator()...;
+};
+template <class... Ts>
+overloaded (Ts...) -> overloaded<Ts...>;
+
+// Lower priority of calling work generating thread
+void work_thread_reprioritize ();
+
+/**
+ * Reinterpret a byte view as a std::string
+ */
+inline std::string bytes_to_string (std::span<uint8_t const> const & bytes)
+{
+	return std::string{ reinterpret_cast<char const *> (bytes.data ()), bytes.size () };
+}
+
+template <class InputIt, class OutputIt, class Pred, class Func>
+void transform_if (InputIt first, InputIt last, OutputIt dest, Pred pred, Func transform)
+{
+	while (first != last)
+	{
+		if (pred (*first))
+		{
+			*dest++ = transform (*first);
+		}
+
+		++first;
+	}
+}
+
+/**
+ * Erase elements from container when predicate returns true
+ * TODO: Use `std::erase_if` in c++20
+ */
+template <class Container, class Pred>
+size_t erase_if (Container & container, Pred pred)
+{
+	size_t result = 0;
+	for (auto it = container.begin (), end = container.end (); it != end;)
+	{
+		if (pred (*it))
+		{
+			it = container.erase (it);
+			++result;
+		}
+		else
+		{
+			++it;
+		}
+	}
+	return result;
+}
+
+/**
+ * Erase elements from container when predicate returns true and return erased elements as a std::deque
+ */
+template <class Container, class Pred>
+std::deque<typename Container::value_type> erase_if_and_collect (Container & container, Pred pred)
+{
+	std::deque<typename Container::value_type> removed_elements;
+	for (auto it = container.begin (); it != container.end ();)
+	{
+		if (pred (*it))
+		{
+			removed_elements.push_back (*it);
+			it = container.erase (it);
+		}
+		else
+		{
+			++it;
+		}
+	}
+	return removed_elements;
+}
+
+/**
+ * Finds the value associated with a key in a map, or returns a default-constructed value if the key is not found.
+ */
+template <typename Map, typename Key>
+auto find_or_default (const Map & map, const Key & key)
+{
+	using Value = typename Map::mapped_type;
+	auto it = map.find (key);
+	return it != map.end () ? it->second : Value{};
+}
+
+/** Safe narrowing cast which silences warnings and asserts on data loss in debug builds. This is optimized away. */
+template <typename TARGET_TYPE, typename SOURCE_TYPE>
+constexpr TARGET_TYPE narrow_cast (SOURCE_TYPE const & val)
+{
+	auto res (static_cast<TARGET_TYPE> (val));
+	debug_assert (val == static_cast<SOURCE_TYPE> (res));
+	return res;
+}
+
+// Issue #3748
+void sort_options_description (const boost::program_options::options_description & source, boost::program_options::options_description & target);
+}
+
+/*
+ * Clock utilities
+ */
+namespace lumex
+{
+/**
+ * Steady clock should always be used for measuring time intervals
+ */
+using clock = std::chrono::steady_clock;
+
+/**
+ * Check whether time elapsed between `last` and `now` is greater than `duration`
+ * Force usage of steady clock
+ */
+template <typename Duration>
+bool elapsed (lumex::clock::time_point const & last, Duration const & duration, lumex::clock::time_point const & now)
+{
+	return last + duration < now;
+}
+
+/**
+ * Check whether time elapsed since `last` is greater than `duration`
+ * Force usage of steady clock
+ */
+template <typename Duration>
+bool elapsed (lumex::clock::time_point const & last, Duration const & duration)
+{
+	return elapsed (last, duration, lumex::clock::now ());
+}
+
+/**
+ * Check whether time elapsed since `last` is greater than `duration` and update `last` if true
+ * Force usage of steady clock
+ */
+template <typename Duration>
+bool elapse (lumex::clock::time_point & last, Duration const & duration)
+{
+	auto now = lumex::clock::now ();
+	if (last + duration < now)
+	{
+		last = now;
+		return true;
+	}
+	return false;
+}
+}
+
+namespace lumex::util
+{
+/**
+ * Joins elements with specified delimiter while transforming those elements via specified transform function
+ */
+template <class InputIt, class Func>
+std::string join (InputIt first, InputIt last, std::string_view delimiter, Func transform)
+{
+	bool start = true;
+	std::stringstream ss;
+	while (first != last)
+	{
+		if (start)
+		{
+			start = false;
+		}
+		else
+		{
+			ss << delimiter;
+		}
+		ss << transform (*first);
+		++first;
+	}
+	return ss.str ();
+}
+
+template <class Container, class Func>
+std::string join (Container const & container, std::string_view delimiter, Func transform)
+{
+	return join (container.begin (), container.end (), delimiter, transform);
+}
+
+inline std::vector<std::string> split (std::string const & input, std::string_view delimiter)
+{
+	std::vector<std::string> result;
+	std::size_t startPos = 0;
+	std::size_t delimiterPos = input.find (delimiter, startPos);
+	while (delimiterPos != std::string::npos)
+	{
+		std::string token = input.substr (startPos, delimiterPos - startPos);
+		result.push_back (token);
+		startPos = delimiterPos + delimiter.length ();
+		delimiterPos = input.find (delimiter, startPos);
+	}
+	result.push_back (input.substr (startPos));
+	return result;
+}
+
+template <class T>
+std::string to_str (T const & val)
+{
+	return boost::lexical_cast<std::string> (val);
+}
+}

@@ -1,0 +1,70 @@
+#include <lumex/lib/version.hpp>
+#include <lumex/messages/telemetry.hpp>
+#include <lumex/node/endpoint.hpp>
+#include <lumex/node/node.hpp>
+#include <lumex/test_common/telemetry.hpp>
+
+#include <gtest/gtest.h>
+
+namespace
+{
+void compare_telemetry_data_impl (const lumex::messages::telemetry_data & data_a, const lumex::messages::telemetry_data & data_b, bool & result)
+{
+	ASSERT_EQ (data_a.block_count, data_b.block_count);
+	ASSERT_EQ (data_a.cemented_count, data_b.cemented_count);
+	ASSERT_EQ (data_a.bandwidth_cap, data_b.bandwidth_cap);
+	ASSERT_EQ (data_a.peer_count, data_b.peer_count);
+	ASSERT_EQ (data_a.protocol_version, data_b.protocol_version);
+	ASSERT_EQ (data_a.unchecked_count, data_b.unchecked_count);
+	ASSERT_EQ (data_a.account_count, data_b.account_count);
+	ASSERT_LE (data_a.uptime, data_b.uptime);
+	ASSERT_EQ (data_a.genesis_block, data_b.genesis_block);
+	ASSERT_EQ (data_a.major_version, lumex::get_major_node_version ());
+	ASSERT_EQ (data_a.minor_version, lumex::get_minor_node_version ());
+	ASSERT_EQ (data_a.patch_version, lumex::get_patch_node_version ());
+	ASSERT_EQ (data_a.pre_release_version, lumex::get_pre_release_node_version ());
+	ASSERT_EQ (data_a.maker, lumex::messages::telemetry_maker::nf_node);
+	ASSERT_GT (data_a.timestamp, std::chrono::system_clock::now () - std::chrono::seconds (100));
+	ASSERT_EQ (data_a.active_difficulty, data_b.active_difficulty);
+	ASSERT_EQ (data_a.database_backend, data_b.database_backend);
+	ASSERT_EQ (data_a.confirmation_latency_ms_p50, data_b.confirmation_latency_ms_p50);
+	ASSERT_EQ (data_a.confirmation_latency_ms_p90, data_b.confirmation_latency_ms_p90);
+	ASSERT_EQ (data_a.confirmation_latency_ms_p99, data_b.confirmation_latency_ms_p99);
+	// bootstrap_status is not compared because it can change between telemetry snapshots
+	ASSERT_EQ (data_a.unknown_data, std::vector<uint8_t>{});
+	result = true;
+}
+}
+
+bool lumex::test::compare_telemetry_data (const lumex::messages::telemetry_data & data_a, const lumex::messages::telemetry_data & data_b)
+{
+	bool result = false;
+	compare_telemetry_data_impl (data_a, data_b, result);
+	return result;
+}
+
+namespace
+{
+void compare_telemetry_impl (const lumex::messages::telemetry_data & data, lumex::node const & node, bool & result)
+{
+	ASSERT_FALSE (data.validate_signature ());
+	ASSERT_EQ (data.node_id, node.get_node_id ());
+
+	// Signature should be different because uptime/timestamp will have changed.
+	lumex::messages::telemetry_data data_l = data;
+	data_l.signature.clear ();
+	data_l.sign (node.node_id);
+	ASSERT_NE (data.signature, data_l.signature);
+
+	ASSERT_TRUE (lumex::test::compare_telemetry_data (data, node.local_telemetry ()));
+
+	result = true;
+}
+}
+
+bool lumex::test::compare_telemetry (const lumex::messages::telemetry_data & data, const lumex::node & node)
+{
+	bool result = false;
+	compare_telemetry_impl (data, node, result);
+	return result;
+}

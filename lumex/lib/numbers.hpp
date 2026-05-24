@@ -1,0 +1,565 @@
+#pragma once
+
+// clang-format off
+// <memory> must precede fwd.hpp: boost bug — fwd.hpp uses std::allocator without including <memory>
+#include <memory>
+#include <boost/multiprecision/fwd.hpp>
+// clang-format on
+
+#include <boost/functional/hash_fwd.hpp>
+
+#include <array>
+#include <compare>
+#include <cstring>
+#include <iosfwd>
+#include <limits>
+#include <optional>
+#include <string>
+#include <string_view>
+
+namespace lumex
+{
+using uint128_t = boost::multiprecision::uint128_t;
+using uint256_t = boost::multiprecision::uint256_t;
+using uint512_t = boost::multiprecision::uint512_t;
+
+using bucket_index = uint64_t;
+using priority_timestamp = uint64_t; // Priority within the bucket
+
+using vote_timestamp = uint64_t;
+
+class uint128_union
+{
+public:
+	// Type that is implicitly convertible to this union
+	using underlying_type = lumex::uint128_t;
+
+public:
+	uint128_union () = default;
+	uint128_union (uint64_t value);
+	uint128_union (lumex::uint128_t const & value);
+
+	/**
+	 * Decode from hex string
+	 * @warning Aborts at runtime if the input is invalid
+	 */
+	explicit uint128_union (std::string const &);
+
+	void encode_hex (std::ostream &) const;
+	bool decode_hex (std::string const &);
+	void encode_dec (std::ostream &) const;
+	bool decode_dec (std::string const &, bool = false);
+	bool decode_dec (std::string const &, lumex::uint128_t const &);
+
+	void encode_balance (std::ostream &, lumex::uint128_t const & scale, int precision, bool group_digits) const;
+	std::string format_balance (lumex::uint128_t const & scale, int precision, bool group_digits) const;
+
+	void clear ()
+	{
+		qwords.fill (0);
+	}
+	bool is_zero () const
+	{
+		return qwords[0] == 0 && qwords[1] == 0;
+	}
+
+	lumex::uint128_t number () const;
+	operator lumex::uint128_t () const;
+
+	std::string to_string () const;
+	std::string to_string_dec () const;
+
+public:
+	union
+	{
+		std::array<uint8_t, 16> bytes;
+		std::array<char, 16> chars;
+		std::array<uint32_t, 4> dwords;
+		std::array<uint64_t, 2> qwords;
+	};
+
+public: // Keep operators inlined
+	std::strong_ordering operator<=> (lumex::uint128_union const & other) const
+	{
+		return std::memcmp (bytes.data (), other.bytes.data (), 16) <=> 0;
+	};
+	bool operator== (lumex::uint128_union const & other) const
+	{
+		return *this <=> other == 0;
+	}
+	uint128_union const & as_union () const
+	{
+		return *this;
+	}
+};
+static_assert (std::is_nothrow_move_constructible<uint128_union>::value, "uint128_union should be noexcept MoveConstructible");
+
+// Balances are 128 bit.
+class amount : public uint128_union
+{
+public:
+	using uint128_union::uint128_union;
+
+	auto operator<=> (lumex::amount const & other) const
+	{
+		return uint128_union::operator<=> (other);
+	}
+
+	operator lumex::uint128_t () const;
+};
+
+class raw_key;
+
+class uint256_union
+{
+public:
+	// Type that is implicitly convertible to this union
+	using underlying_type = lumex::uint256_t;
+
+public:
+	uint256_union () = default;
+	uint256_union (uint64_t value);
+	uint256_union (lumex::uint256_t const & value);
+
+	/**
+	 * Decode from hex string
+	 * @warning Aborts at runtime if the input is invalid
+	 */
+	explicit uint256_union (std::string const &);
+
+	void encrypt (lumex::raw_key const &, lumex::raw_key const &, uint128_union const &);
+
+	uint256_union & operator^= (uint256_union const &);
+	uint256_union operator^ (uint256_union const &) const;
+
+	void encode_hex (std::ostream &) const;
+	bool decode_hex (std::string const &);
+	void encode_dec (std::ostream &) const;
+	bool decode_dec (std::string const &);
+
+	void clear ()
+	{
+		qwords.fill (0);
+	}
+	bool is_zero () const
+	{
+		return owords[0].is_zero () && owords[1].is_zero ();
+	}
+
+	lumex::uint256_t number () const;
+	operator lumex::uint256_t () const;
+
+	std::string to_string () const;
+	std::string to_string_dec () const;
+
+public:
+	union
+	{
+		std::array<uint8_t, 32> bytes;
+		std::array<char, 32> chars;
+		std::array<uint32_t, 8> dwords;
+		std::array<uint64_t, 4> qwords;
+		std::array<uint128_union, 2> owords;
+	};
+
+public:
+	std::strong_ordering operator<=> (lumex::uint256_union const & other) const
+	{
+		return std::memcmp (bytes.data (), other.bytes.data (), 32) <=> 0;
+	};
+	bool operator== (lumex::uint256_union const & other) const
+	{
+		return *this <=> other == 0;
+	}
+	uint256_union const & as_union () const
+	{
+		return *this;
+	}
+};
+static_assert (std::is_nothrow_move_constructible<uint256_union>::value, "uint256_union should be noexcept MoveConstructible");
+
+// All keys and hashes are 256 bit.
+class block_hash final : public uint256_union
+{
+public:
+	using uint256_union::uint256_union;
+
+public:
+	operator lumex::uint256_t () const;
+
+	auto operator<=> (lumex::block_hash const & other) const
+	{
+		return uint256_union::operator<=> (other);
+	}
+	bool operator== (lumex::block_hash const & other) const
+	{
+		return *this <=> other == 0;
+	}
+};
+
+class public_key : public uint256_union
+{
+public:
+	using uint256_union::uint256_union;
+
+	public_key () :
+		uint256_union{ 0 } {};
+
+	static const public_key & null ();
+
+	bool decode_node_id (std::string const &);
+	void encode_account (std::ostream &) const;
+	void encode_node_id (std::ostream &) const;
+	bool decode_account (std::string const &);
+
+	std::string to_node_id () const;
+	std::string to_account () const;
+
+	/**
+	 * Decode from account string
+	 * @warning Aborts at runtime if the input is invalid
+	 */
+	static public_key from_account (std::string const &);
+
+	/**
+	 * Decode from node id string
+	 * @warning Aborts at runtime if the input is invalid
+	 */
+	static public_key from_node_id (std::string const &);
+
+public:
+	operator lumex::uint256_t () const;
+
+	auto operator<=> (lumex::public_key const & other) const
+	{
+		return uint256_union::operator<=> (other);
+	}
+	bool operator== (lumex::public_key const & other) const
+	{
+		return *this <=> other == 0;
+	}
+	bool operator== (std::nullptr_t) const
+	{
+		return *this == null ();
+	}
+};
+
+class wallet_id final : public uint256_union
+{
+	using uint256_union::uint256_union;
+};
+
+/// Parse a hex string into a wallet_id. @throws std::invalid_argument if the text is not a valid wallet id
+wallet_id parse_wallet_id (std::string const &);
+/// Parse a hex string into a wallet_id, or std::nullopt if the text is not a valid wallet id
+std::optional<wallet_id> try_parse_wallet_id (std::string const &);
+
+class account final : public public_key
+{
+public:
+	using public_key::public_key;
+
+	account () = default;
+	account (lumex::public_key const & key) :
+		public_key{ key } {};
+};
+
+class hash_or_account
+{
+public:
+	// Type that is implicitly convertible to this union
+	using underlying_type = lumex::uint256_t;
+
+public:
+	hash_or_account () :
+		account{} {};
+	hash_or_account (uint64_t value) :
+		raw{ value } {};
+	hash_or_account (uint256_union const & value) :
+		raw{ value } {};
+
+	void clear ()
+	{
+		raw.clear ();
+	}
+	bool is_zero () const
+	{
+		return raw.is_zero ();
+	}
+
+	bool decode_hex (std::string const &);
+	bool decode_account (std::string const &);
+
+	std::string to_string () const;
+	std::string to_account () const;
+
+public:
+	union
+	{
+		std::array<uint8_t, 32> bytes;
+		lumex::uint256_union raw; // This can be used when you don't want to explicitly mention either of the types
+		lumex::account account;
+		lumex::block_hash hash;
+	};
+
+public:
+	explicit operator lumex::uint256_t () const;
+
+	auto operator<=> (lumex::hash_or_account const & other) const
+	{
+		return raw <=> other.raw;
+	};
+	bool operator== (lumex::hash_or_account const & other) const
+	{
+		return *this <=> other == 0;
+	}
+	explicit operator lumex::uint256_union () const
+	{
+		return raw;
+	}
+	lumex::account const & as_account () const
+	{
+		return account;
+	}
+	lumex::block_hash const & as_block_hash () const
+	{
+		return hash;
+	}
+	lumex::uint256_union const & as_union () const
+	{
+		return raw;
+	}
+};
+
+// A link can either be a destination account or source hash
+class link final : public hash_or_account
+{
+public:
+	using hash_or_account::hash_or_account;
+
+	explicit link (std::string_view str);
+
+public: // Keep operators inlined
+	auto operator<=> (lumex::link const & other) const
+	{
+		return hash_or_account::operator<=> (other);
+	}
+	bool operator== (lumex::link const & other) const
+	{
+		return *this <=> other == 0;
+	}
+};
+
+// A root can either be an open block hash or a previous hash
+class root final : public hash_or_account
+{
+public:
+	using hash_or_account::hash_or_account;
+
+	lumex::block_hash const & previous () const
+	{
+		return hash;
+	}
+
+public: // Keep operators inlined
+	auto operator<=> (lumex::root const & other) const
+	{
+		return hash_or_account::operator<=> (other);
+	}
+	bool operator== (lumex::root const & other) const
+	{
+		return *this <=> other == 0;
+	}
+};
+
+// The seed or private key
+class raw_key final : public uint256_union
+{
+public:
+	using uint256_union::uint256_union;
+	~raw_key ();
+	void decrypt (lumex::uint256_union const &, lumex::raw_key const &, uint128_union const &);
+};
+
+class uint512_union
+{
+public:
+	// Type that is implicitly convertible to this union
+	using underlying_type = lumex::uint512_t;
+
+public:
+	uint512_union () = default;
+	uint512_union (uint64_t value);
+	uint512_union (lumex::uint512_t const & value);
+	uint512_union (lumex::uint256_union const & upper, lumex::uint256_union const & lower) :
+		uint256s{ upper, lower } {};
+
+	lumex::uint512_union & operator^= (lumex::uint512_union const & other)
+	{
+		uint256s[0] ^= other.uint256s[0];
+		uint256s[1] ^= other.uint256s[1];
+		return *this;
+	}
+
+	void encode_hex (std::ostream &) const;
+	bool decode_hex (std::string const &);
+
+	void clear ()
+	{
+		bytes.fill (0);
+	}
+	bool is_zero () const
+	{
+		return uint256s[0].is_zero () && uint256s[1].is_zero ();
+	}
+
+	lumex::uint512_t number () const;
+	operator lumex::uint512_t () const;
+
+	std::string to_string () const;
+
+public:
+	union
+	{
+		std::array<uint8_t, 64> bytes;
+		std::array<uint32_t, 16> dwords;
+		std::array<uint64_t, 8> qwords;
+		std::array<uint256_union, 2> uint256s;
+	};
+
+public: // Keep operators inlined
+	std::strong_ordering operator<=> (lumex::uint512_union const & other) const
+	{
+		return std::memcmp (bytes.data (), other.bytes.data (), 64) <=> 0;
+	};
+	bool operator== (lumex::uint512_union const & other) const
+	{
+		return *this <=> other == 0;
+	}
+	uint512_union const & as_union () const
+	{
+		return *this;
+	}
+};
+static_assert (std::is_nothrow_move_constructible<uint512_union>::value, "uint512_union should be noexcept MoveConstructible");
+
+class signature : public uint512_union
+{
+public:
+	using uint512_union::uint512_union;
+};
+
+class qualified_root : public uint512_union
+{
+public:
+	qualified_root () = default;
+	qualified_root (lumex::root const & root, lumex::block_hash const & previous) :
+		uint512_union{ root.as_union (), previous.as_union () } {};
+	qualified_root (lumex::uint512_t const & value) :
+		uint512_union{ value } {};
+
+	lumex::root root () const
+	{
+		return lumex::root{ uint256s[0] };
+	}
+	lumex::block_hash previous () const
+	{
+		lumex::block_hash result;
+		result.bytes = uint256s[1].bytes;
+		return result;
+	}
+};
+
+lumex::signature sign_message (lumex::raw_key const &, lumex::public_key const &, lumex::uint256_union const &);
+lumex::signature sign_message (lumex::raw_key const &, lumex::public_key const &, uint8_t const *, size_t);
+bool validate_message (lumex::public_key const &, lumex::uint256_union const &, lumex::signature const &);
+bool validate_message (lumex::public_key const &, uint8_t const *, size_t, lumex::signature const &);
+lumex::raw_key deterministic_key (lumex::raw_key const &, uint32_t);
+lumex::public_key pub_key (lumex::raw_key const &);
+
+/* Conversion methods */
+std::string to_string_hex (uint64_t const);
+std::string to_string_hex (uint16_t const);
+bool from_string_hex (std::string const &, uint64_t &);
+
+/* Printing adapters */
+std::ostream & operator<< (std::ostream &, const uint128_union &);
+std::ostream & operator<< (std::ostream &, const uint256_union &);
+std::ostream & operator<< (std::ostream &, const uint512_union &);
+std::ostream & operator<< (std::ostream &, const hash_or_account &);
+std::ostream & operator<< (std::ostream &, const account &);
+
+void encode_balance (std::ostream &, lumex::uint128_t const & value, lumex::uint128_t const & scale, int precision, bool group_digits);
+
+/**
+ * Convert a double to string in fixed format
+ * @param precision (optional) use a specific precision (default is the maximum)
+ */
+std::string to_string (double const, int const precision = std::numeric_limits<double>::digits10);
+
+namespace difficulty
+{
+	uint64_t from_multiplier (double const, uint64_t const);
+	double to_multiplier (uint64_t const, uint64_t const);
+}
+}
+
+/*
+ * Hashing
+ */
+
+namespace std
+{
+template <>
+struct hash<::lumex::uint128_union>;
+template <>
+struct hash<::lumex::uint256_union>;
+template <>
+struct hash<::lumex::public_key>;
+template <>
+struct hash<::lumex::block_hash>;
+template <>
+struct hash<::lumex::hash_or_account>;
+template <>
+struct hash<::lumex::root>;
+template <>
+struct hash<::lumex::link>;
+template <>
+struct hash<::lumex::raw_key>;
+template <>
+struct hash<::lumex::wallet_id>;
+template <>
+struct hash<::lumex::uint512_union>;
+template <>
+struct hash<::lumex::qualified_root>;
+template <>
+struct hash<::lumex::signature>;
+}
+
+namespace boost
+{
+template <>
+struct hash<::lumex::uint128_union>;
+template <>
+struct hash<::lumex::uint256_union>;
+template <>
+struct hash<::lumex::public_key>;
+template <>
+struct hash<::lumex::block_hash>;
+template <>
+struct hash<::lumex::hash_or_account>;
+template <>
+struct hash<::lumex::root>;
+template <>
+struct hash<::lumex::link>;
+template <>
+struct hash<::lumex::raw_key>;
+template <>
+struct hash<::lumex::wallet_id>;
+template <>
+struct hash<::lumex::uint512_union>;
+template <>
+struct hash<::lumex::qualified_root>;
+template <>
+struct hash<::lumex::signature>;
+}

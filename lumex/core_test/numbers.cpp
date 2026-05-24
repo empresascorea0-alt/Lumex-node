@@ -1,0 +1,911 @@
+#include <lumex/lib/balance_formatting.hpp>
+#include <lumex/lib/numbers.hpp>
+#include <lumex/lib/numbers_templ.hpp>
+#include <lumex/lib/ratios.hpp>
+#include <lumex/lib/saturate.hpp>
+#include <lumex/secure/common.hpp>
+#include <lumex/secure/network_params.hpp>
+
+#include <gtest/gtest.h>
+
+#include <boost/container_hash/hash.hpp>
+
+#include <thread>
+#include <unordered_set>
+
+TEST (numbers, identity)
+{
+	ASSERT_EQ (1, lumex::uint128_union (1).number ().convert_to<uint8_t> ());
+	ASSERT_EQ (1, lumex::uint256_union (1).number ().convert_to<uint8_t> ());
+	ASSERT_EQ (1, lumex::uint512_union (1).number ().convert_to<uint8_t> ());
+}
+
+namespace
+{
+template <typename Type>
+void check_operator_less_than (Type lhs, Type rhs)
+{
+	ASSERT_TRUE (lhs < rhs);
+	ASSERT_FALSE (rhs < lhs);
+	ASSERT_FALSE (lhs < lhs);
+	ASSERT_FALSE (rhs < rhs);
+}
+
+template <typename Type>
+void test_operator_less_than ()
+{
+	using underlying_t = typename Type::underlying_type;
+
+	// Small
+	check_operator_less_than (Type{ 123 }, Type{ 124 });
+	check_operator_less_than (Type{ 124 }, Type{ 125 });
+
+	// Medium
+	check_operator_less_than (Type{ std::numeric_limits<uint16_t>::max () - 1 }, Type{ std::numeric_limits<uint16_t>::max () + 1 });
+	check_operator_less_than (Type{ std::numeric_limits<uint32_t>::max () - 12345678 }, Type{ std::numeric_limits<uint32_t>::max () - 123456 });
+
+	// Large
+	check_operator_less_than (Type{ std::numeric_limits<uint64_t>::max () - 555555555555 }, Type{ std::numeric_limits<uint64_t>::max () - 1 });
+
+	// Boundary values
+	check_operator_less_than (Type{ std::numeric_limits<underlying_t>::min () }, Type{ std::numeric_limits<underlying_t>::max () });
+}
+
+template <typename Type>
+void check_operator_greater_than (Type lhs, Type rhs)
+{
+	ASSERT_TRUE (lhs > rhs);
+	ASSERT_FALSE (rhs > lhs);
+	ASSERT_FALSE (lhs > lhs);
+	ASSERT_FALSE (rhs > rhs);
+}
+
+template <typename Type>
+void test_operator_greater_than ()
+{
+	using underlying_t = typename Type::underlying_type;
+
+	// Small
+	check_operator_greater_than (Type{ 124 }, Type{ 123 });
+	check_operator_greater_than (Type{ 125 }, Type{ 124 });
+
+	// Medium
+	check_operator_greater_than (Type{ std::numeric_limits<uint16_t>::max () + 1 }, Type{ std::numeric_limits<uint16_t>::max () - 1 });
+	check_operator_greater_than (Type{ std::numeric_limits<uint32_t>::max () - 123456 }, Type{ std::numeric_limits<uint32_t>::max () - 12345678 });
+
+	// Large
+	check_operator_greater_than (Type{ std::numeric_limits<uint64_t>::max () - 1 }, Type{ std::numeric_limits<uint64_t>::max () - 555555555555 });
+
+	// Boundary values
+	check_operator_greater_than (Type{ std::numeric_limits<underlying_t>::max () }, Type{ std::numeric_limits<underlying_t>::min () });
+}
+
+template <typename Type>
+void test_comparison ()
+{
+	test_operator_less_than<Type> ();
+	test_operator_greater_than<Type> ();
+}
+}
+
+TEST (numbers, comparison)
+{
+	test_comparison<lumex::uint128_union> ();
+	test_comparison<lumex::uint256_union> ();
+	test_comparison<lumex::uint512_union> ();
+	test_comparison<lumex::block_hash> ();
+	test_comparison<lumex::public_key> ();
+	test_comparison<lumex::hash_or_account> ();
+	test_comparison<lumex::link> ();
+	test_comparison<lumex::root> ();
+	test_comparison<lumex::raw_key> ();
+	test_comparison<lumex::wallet_id> ();
+	test_comparison<lumex::qualified_root> ();
+}
+
+namespace
+{
+template <typename Type, template <typename> class Hash>
+void test_hashing ()
+{
+	Hash<Type> hash;
+	using underlying_t = typename Type::underlying_type;
+
+	// Basic equality tests
+	ASSERT_EQ (hash (Type{}), hash (Type{}));
+	ASSERT_EQ (hash (Type{ 123 }), hash (Type{ 123 }));
+
+	// Basic inequality tests
+	ASSERT_NE (hash (Type{ 123 }), hash (Type{ 124 }));
+	ASSERT_NE (hash (Type{ 0 }), hash (Type{ 1 }));
+
+	// Boundary value tests
+	constexpr auto min_val = std::numeric_limits<underlying_t>::min ();
+	constexpr auto max_val = std::numeric_limits<underlying_t>::max ();
+
+	// Min/Max tests
+	ASSERT_EQ (hash (Type{ min_val }), hash (Type{ min_val }));
+	ASSERT_EQ (hash (Type{ max_val }), hash (Type{ max_val }));
+	ASSERT_NE (hash (Type{ min_val }), hash (Type{ max_val }));
+
+	// Near boundary tests
+	ASSERT_NE (hash (Type{ min_val }), hash (Type{ min_val + 1 }));
+	ASSERT_NE (hash (Type{ max_val }), hash (Type{ max_val - 1 }));
+	ASSERT_NE (hash (Type{ min_val + 1 }), hash (Type{ max_val }));
+	ASSERT_NE (hash (Type{ max_val - 1 }), hash (Type{ min_val }));
+
+	// Common value tests
+	std::vector<underlying_t> common_values = {
+		0, // Zero
+		1, // One
+		42, // Common test value
+		0xFF, // Byte boundary
+		0xFFFF, // Word boundary
+		min_val, // Minimum
+		max_val, // Maximum
+		max_val / 2, // Middle value
+		min_val + (max_val / 2) // Offset middle
+	};
+
+	// Test all common values against each other
+	for (size_t i = 0; i < common_values.size (); ++i)
+	{
+		for (size_t j = i + 1; j < common_values.size (); ++j)
+		{
+			if (common_values[i] != common_values[j])
+			{
+				ASSERT_NE (hash (Type{ common_values[i] }), hash (Type{ common_values[j] }));
+			}
+			else
+			{
+				ASSERT_EQ (hash (Type{ common_values[i] }), hash (Type{ common_values[j] }));
+			}
+		}
+	}
+}
+}
+
+TEST (numbers, hashing)
+{
+	// Using std::hash
+	test_hashing<lumex::uint128_union, std::hash> ();
+	test_hashing<lumex::uint256_union, std::hash> ();
+	test_hashing<lumex::uint512_union, std::hash> ();
+	test_hashing<lumex::block_hash, std::hash> ();
+	test_hashing<lumex::public_key, std::hash> ();
+	test_hashing<lumex::hash_or_account, std::hash> ();
+	test_hashing<lumex::link, std::hash> ();
+	test_hashing<lumex::root, std::hash> ();
+	test_hashing<lumex::raw_key, std::hash> ();
+	test_hashing<lumex::wallet_id, std::hash> ();
+	test_hashing<lumex::qualified_root, std::hash> ();
+
+	// Using boost::hash
+	test_hashing<lumex::uint128_union, boost::hash> ();
+	test_hashing<lumex::uint256_union, boost::hash> ();
+	test_hashing<lumex::uint512_union, boost::hash> ();
+	test_hashing<lumex::block_hash, boost::hash> ();
+	test_hashing<lumex::public_key, boost::hash> ();
+	test_hashing<lumex::hash_or_account, boost::hash> ();
+	test_hashing<lumex::link, boost::hash> ();
+	test_hashing<lumex::root, boost::hash> ();
+	test_hashing<lumex::raw_key, boost::hash> ();
+	test_hashing<lumex::wallet_id, boost::hash> ();
+	test_hashing<lumex::qualified_root, boost::hash> ();
+}
+
+TEST (numbers, uint128_union_decode_dec)
+{
+	lumex::uint128_union value;
+	std::string text ("16");
+	ASSERT_FALSE (value.decode_dec (text));
+	ASSERT_EQ (16, value.bytes[15]);
+}
+
+TEST (numbers, uint128_union_decode_dec_negative)
+{
+	lumex::uint128_union value;
+	std::string text ("-1");
+	auto error (value.decode_dec (text));
+	ASSERT_TRUE (error);
+}
+
+TEST (numbers, uint128_union_decode_dec_zero)
+{
+	lumex::uint128_union value;
+	std::string text ("0");
+	ASSERT_FALSE (value.decode_dec (text));
+	ASSERT_TRUE (value.is_zero ());
+}
+
+TEST (numbers, uint128_union_decode_dec_leading_zero)
+{
+	lumex::uint128_union value;
+	std::string text ("010");
+	auto error (value.decode_dec (text));
+	ASSERT_TRUE (error);
+}
+
+TEST (numbers, uint128_union_decode_dec_overflow)
+{
+	lumex::uint128_union value;
+	std::string text ("340282366920938463463374607431768211456");
+	auto error (value.decode_dec (text));
+	ASSERT_TRUE (error);
+}
+
+struct test_punct : std::moneypunct<char>
+{
+	pattern do_pos_format () const
+	{
+		return { { value, none, none, none } };
+	}
+	int do_frac_digits () const
+	{
+		return 0;
+	}
+	char_type do_decimal_point () const
+	{
+		return '+';
+	}
+	char_type do_thousands_sep () const
+	{
+		return '-';
+	}
+	string_type do_grouping () const
+	{
+		return "\3\4";
+	}
+};
+
+TEST (numbers, uint128_union_format_balance)
+{
+	ASSERT_EQ ("0", lumex::amount (lumex::uint128_t ("0")).format_balance (lumex::lumex_ratio, 0, false));
+	ASSERT_EQ ("0", lumex::amount (lumex::uint128_t ("0")).format_balance (lumex::lumex_ratio, 2, true));
+	ASSERT_EQ ("340,282,366", lumex::amount (lumex::uint128_t ("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")).format_balance (lumex::lumex_ratio, 0, true));
+	ASSERT_EQ ("340,282,366.920938463463374607431768211455", lumex::amount (lumex::uint128_t ("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")).format_balance (lumex::lumex_ratio, 64, true));
+	ASSERT_EQ ("340,282,366,920,938,463,463,374,607,431,768,211,455", lumex::amount (lumex::uint128_t ("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")).format_balance (1, 4, true));
+	ASSERT_EQ ("340,282,366", lumex::amount (lumex::uint128_t ("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE")).format_balance (lumex::lumex_ratio, 0, true));
+	ASSERT_EQ ("340,282,366.920938463463374607431768211454", lumex::amount (lumex::uint128_t ("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE")).format_balance (lumex::lumex_ratio, 64, true));
+	ASSERT_EQ ("340282366920938463463374607431768211454", lumex::amount (lumex::uint128_t ("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE")).format_balance (1, 4, false));
+	ASSERT_EQ ("170,141,183", lumex::amount (lumex::uint128_t ("0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE")).format_balance (lumex::lumex_ratio, 0, true));
+	ASSERT_EQ ("170,141,183.460469231731687303715884105726", lumex::amount (lumex::uint128_t ("0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE")).format_balance (lumex::lumex_ratio, 64, true));
+	ASSERT_EQ ("170141183460469231731687303715884105726", lumex::amount (lumex::uint128_t ("0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE")).format_balance (1, 4, false));
+	ASSERT_EQ ("1", lumex::amount (lumex::uint128_t ("1000000000000000000000000000000")).format_balance (lumex::lumex_ratio, 2, true));
+	ASSERT_EQ ("1.2", lumex::amount (lumex::uint128_t ("1200000000000000000000000000000")).format_balance (lumex::lumex_ratio, 2, true));
+	ASSERT_EQ ("1.23", lumex::amount (lumex::uint128_t ("1230000000000000000000000000000")).format_balance (lumex::lumex_ratio, 2, true));
+	ASSERT_EQ ("1.2", lumex::amount (lumex::uint128_t ("1230000000000000000000000000000")).format_balance (lumex::lumex_ratio, 1, true));
+	ASSERT_EQ ("1", lumex::amount (lumex::uint128_t ("1230000000000000000000000000000")).format_balance (lumex::lumex_ratio, 0, true));
+	ASSERT_EQ ("123456789", lumex::amount (lumex::lumex_ratio * 123456789).format_balance (lumex::lumex_ratio, 2, false));
+	ASSERT_EQ ("123,456,789", lumex::amount (lumex::lumex_ratio * 123456789).format_balance (lumex::lumex_ratio, 2, true));
+	ASSERT_EQ ("0.5", lumex::amount (lumex::lumex_ratio / 2).format_balance (lumex::lumex_ratio, 1, true));
+	ASSERT_EQ ("< 0.01", lumex::amount (1).format_balance (lumex::lumex_ratio, 2, true));
+}
+
+TEST (numbers, uint128_union_encode_balance)
+{
+	auto encode = [] (lumex::uint128_t value, lumex::uint128_t scale, int precision, bool group_digits) {
+		std::ostringstream stream;
+		lumex::uint128_union{ value }.encode_balance (stream, scale, precision, group_digits);
+		return stream.str ();
+	};
+	ASSERT_EQ ("0", encode (0, lumex::lumex_ratio, 0, false));
+	ASSERT_EQ ("0", encode (0, lumex::lumex_ratio, 2, true));
+	ASSERT_EQ ("340,282,366", encode (lumex::uint128_t ("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"), lumex::lumex_ratio, 0, true));
+	ASSERT_EQ ("1", encode (lumex::uint128_t ("1000000000000000000000000000000"), lumex::lumex_ratio, 2, true));
+	ASSERT_EQ ("1.2", encode (lumex::uint128_t ("1200000000000000000000000000000"), lumex::lumex_ratio, 2, true));
+	ASSERT_EQ ("1.23", encode (lumex::uint128_t ("1230000000000000000000000000000"), lumex::lumex_ratio, 2, true));
+	ASSERT_EQ ("1.2", encode (lumex::uint128_t ("1230000000000000000000000000000"), lumex::lumex_ratio, 1, true));
+	ASSERT_EQ ("1", encode (lumex::uint128_t ("1230000000000000000000000000000"), lumex::lumex_ratio, 0, true));
+	ASSERT_EQ ("123,456,789", encode (lumex::lumex_ratio * 123456789, lumex::lumex_ratio, 2, true));
+	ASSERT_EQ ("123456789", encode (lumex::lumex_ratio * 123456789, lumex::lumex_ratio, 2, false));
+	ASSERT_EQ ("< 0.01", encode (lumex::lumex_ratio / 1000, lumex::lumex_ratio, 2, true));
+	ASSERT_EQ ("< 0.1", encode (lumex::lumex_ratio / 1000, lumex::lumex_ratio, 1, true));
+	ASSERT_EQ ("< 1", encode (lumex::lumex_ratio / 1000, lumex::lumex_ratio, 0, true));
+	ASSERT_EQ ("0.5", encode (lumex::lumex_ratio / 2, lumex::lumex_ratio, 1, true));
+	ASSERT_EQ ("< 0.01", encode (1, lumex::lumex_ratio, 2, true));
+}
+
+TEST (numbers, uint128_union_decode_decimal)
+{
+	lumex::amount amount;
+	ASSERT_FALSE (amount.decode_dec ("340282366920938463463374607431768211455", lumex::raw_ratio));
+	ASSERT_EQ (std::numeric_limits<lumex::uint128_t>::max (), amount.number ());
+	ASSERT_TRUE (amount.decode_dec ("340282366920938463463374607431768211456", lumex::raw_ratio));
+	ASSERT_TRUE (amount.decode_dec ("340282366920938463463374607431768211455.1", lumex::raw_ratio));
+	ASSERT_TRUE (amount.decode_dec ("0.1", lumex::raw_ratio));
+	ASSERT_FALSE (amount.decode_dec ("1", lumex::raw_ratio));
+	ASSERT_EQ (1, amount.number ());
+	ASSERT_FALSE (amount.decode_dec ("340282366.920938463463374607431768211454", lumex::lumex_ratio));
+	ASSERT_EQ (std::numeric_limits<lumex::uint128_t>::max () - 1, amount.number ());
+	ASSERT_TRUE (amount.decode_dec ("340282366.920938463463374607431768211456", lumex::lumex_ratio));
+	ASSERT_TRUE (amount.decode_dec ("340282367", lumex::lumex_ratio));
+	ASSERT_FALSE (amount.decode_dec ("0.000000000000000000000001", lumex::lumex_ratio));
+	ASSERT_EQ (1000000, amount.number ());
+	ASSERT_FALSE (amount.decode_dec ("0.000000000000000000000000000001", lumex::lumex_ratio));
+	ASSERT_EQ (1, amount.number ());
+	ASSERT_TRUE (amount.decode_dec ("0.0000000000000000000000000000001", lumex::lumex_ratio));
+	ASSERT_TRUE (amount.decode_dec (".1", lumex::lumex_ratio));
+	ASSERT_TRUE (amount.decode_dec ("0.", lumex::lumex_ratio));
+	ASSERT_FALSE (amount.decode_dec ("9.999999999999999999999999999999", lumex::lumex_ratio));
+	ASSERT_EQ (lumex::uint128_t ("9999999999999999999999999999999"), amount.number ());
+	ASSERT_FALSE (amount.decode_dec ("170141183.460469231731687303715884105727", lumex::lumex_ratio));
+	ASSERT_EQ (lumex::uint128_t ("170141183460469231731687303715884105727"), amount.number ());
+	ASSERT_FALSE (amount.decode_dec ("1230", lumex::Klumex_ratio));
+	ASSERT_EQ (1230 * lumex::Klumex_ratio, amount.number ());
+}
+
+TEST (numbers, uint256_union_key_encryption)
+{
+	lumex::keypair key1;
+	lumex::raw_key secret_key;
+	secret_key.clear ();
+	lumex::uint256_union encrypted;
+	encrypted.encrypt (key1.prv, secret_key, key1.pub.owords[0]);
+	lumex::raw_key key4;
+	key4.decrypt (encrypted, secret_key, key1.pub.owords[0]);
+	ASSERT_EQ (key1.prv, key4);
+	auto pub (lumex::pub_key (key4));
+	ASSERT_EQ (key1.pub, pub);
+}
+
+TEST (numbers, uint256_union_encryption)
+{
+	lumex::raw_key key;
+	key.clear ();
+	lumex::raw_key number1;
+	number1 = 1;
+	lumex::uint256_union encrypted1;
+	encrypted1.encrypt (number1, key, key.owords[0]);
+	lumex::uint256_union encrypted2;
+	encrypted2.encrypt (number1, key, key.owords[0]);
+	ASSERT_EQ (encrypted1, encrypted2);
+	lumex::raw_key number2;
+	number2.decrypt (encrypted1, key, key.owords[0]);
+	ASSERT_EQ (number1, number2);
+}
+
+TEST (numbers, uint256_union_decode_empty)
+{
+	std::string text;
+	lumex::uint256_union val;
+	ASSERT_TRUE (val.decode_hex (text));
+}
+
+TEST (numbers, uint256_union_parse_zero)
+{
+	lumex::uint256_union input (lumex::uint256_t (0));
+	std::string text = input.to_string ();
+	lumex::uint256_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_FALSE (error);
+	ASSERT_EQ (input, output);
+	ASSERT_TRUE (output.number ().is_zero ());
+}
+
+TEST (numbers, uint256_union_parse_zero_short)
+{
+	std::string text ("0");
+	lumex::uint256_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_FALSE (error);
+	ASSERT_TRUE (output.number ().is_zero ());
+}
+
+TEST (numbers, uint256_union_parse_one)
+{
+	lumex::uint256_union input (lumex::uint256_t (1));
+	std::string text = input.to_string ();
+	lumex::uint256_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_FALSE (error);
+	ASSERT_EQ (input, output);
+	ASSERT_EQ (1, output.number ());
+}
+
+TEST (numbers, uint256_union_parse_error_symbol)
+{
+	lumex::uint256_union input (lumex::uint256_t (1000));
+	std::string text = input.to_string ();
+	text[5] = '!';
+	lumex::uint256_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_TRUE (error);
+}
+
+TEST (numbers, uint256_union_max_hex)
+{
+	lumex::uint256_union input (std::numeric_limits<lumex::uint256_t>::max ());
+	std::string text = input.to_string ();
+	lumex::uint256_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_FALSE (error);
+	ASSERT_EQ (input, output);
+	ASSERT_EQ (lumex::uint256_t ("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), output.number ());
+}
+
+TEST (numbers, uint256_union_decode_dec)
+{
+	lumex::uint256_union value;
+	std::string text ("16");
+	ASSERT_FALSE (value.decode_dec (text));
+	ASSERT_EQ (16, value.bytes[31]);
+}
+
+TEST (numbers, uint256_union_max_dec)
+{
+	lumex::uint256_union input (std::numeric_limits<lumex::uint256_t>::max ());
+	std::string text = input.to_string_dec ();
+	lumex::uint256_union output;
+	auto error (output.decode_dec (text));
+	ASSERT_FALSE (error);
+	ASSERT_EQ (input, output);
+	ASSERT_EQ (lumex::uint256_t ("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), output.number ());
+}
+
+TEST (numbers, uint256_union_decode_dec_negative)
+{
+	lumex::uint256_union value;
+	std::string text ("-1");
+	auto error (value.decode_dec (text));
+	ASSERT_TRUE (error);
+}
+
+TEST (numbers, uint256_union_decode_dec_zero)
+{
+	lumex::uint256_union value;
+	std::string text ("0");
+	ASSERT_FALSE (value.decode_dec (text));
+	ASSERT_TRUE (value.is_zero ());
+}
+
+TEST (numbers, uint256_union_decode_dec_leading_zero)
+{
+	lumex::uint256_union value;
+	std::string text ("010");
+	auto error (value.decode_dec (text));
+	ASSERT_TRUE (error);
+}
+
+TEST (numbers, uint256_union_parse_error_overflow)
+{
+	lumex::uint256_union input (std::numeric_limits<lumex::uint256_t>::max ());
+	std::string text = input.to_string ();
+	text.push_back (0);
+	lumex::uint256_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_TRUE (error);
+}
+
+TEST (numbers, uint256_union_big_endian_union_constructor)
+{
+	lumex::uint256_t value1 (1);
+	lumex::uint256_union bytes1 (value1);
+	ASSERT_EQ (1, bytes1.bytes[31]);
+	lumex::uint512_t value2 (1);
+	lumex::uint512_union bytes2 (value2);
+	ASSERT_EQ (1, bytes2.bytes[63]);
+}
+
+TEST (numbers, uint256_union_big_endian_union_function)
+{
+	lumex::uint256_union bytes1 ("FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210");
+	ASSERT_EQ (0xfe, bytes1.bytes[0x00]);
+	ASSERT_EQ (0xdc, bytes1.bytes[0x01]);
+	ASSERT_EQ (0xba, bytes1.bytes[0x02]);
+	ASSERT_EQ (0x98, bytes1.bytes[0x03]);
+	ASSERT_EQ (0x76, bytes1.bytes[0x04]);
+	ASSERT_EQ (0x54, bytes1.bytes[0x05]);
+	ASSERT_EQ (0x32, bytes1.bytes[0x06]);
+	ASSERT_EQ (0x10, bytes1.bytes[0x07]);
+	ASSERT_EQ (0xfe, bytes1.bytes[0x08]);
+	ASSERT_EQ (0xdc, bytes1.bytes[0x09]);
+	ASSERT_EQ (0xba, bytes1.bytes[0x0a]);
+	ASSERT_EQ (0x98, bytes1.bytes[0x0b]);
+	ASSERT_EQ (0x76, bytes1.bytes[0x0c]);
+	ASSERT_EQ (0x54, bytes1.bytes[0x0d]);
+	ASSERT_EQ (0x32, bytes1.bytes[0x0e]);
+	ASSERT_EQ (0x10, bytes1.bytes[0x0f]);
+	ASSERT_EQ (0xfe, bytes1.bytes[0x10]);
+	ASSERT_EQ (0xdc, bytes1.bytes[0x11]);
+	ASSERT_EQ (0xba, bytes1.bytes[0x12]);
+	ASSERT_EQ (0x98, bytes1.bytes[0x13]);
+	ASSERT_EQ (0x76, bytes1.bytes[0x14]);
+	ASSERT_EQ (0x54, bytes1.bytes[0x15]);
+	ASSERT_EQ (0x32, bytes1.bytes[0x16]);
+	ASSERT_EQ (0x10, bytes1.bytes[0x17]);
+	ASSERT_EQ (0xfe, bytes1.bytes[0x18]);
+	ASSERT_EQ (0xdc, bytes1.bytes[0x19]);
+	ASSERT_EQ (0xba, bytes1.bytes[0x1a]);
+	ASSERT_EQ (0x98, bytes1.bytes[0x1b]);
+	ASSERT_EQ (0x76, bytes1.bytes[0x1c]);
+	ASSERT_EQ (0x54, bytes1.bytes[0x1d]);
+	ASSERT_EQ (0x32, bytes1.bytes[0x1e]);
+	ASSERT_EQ (0x10, bytes1.bytes[0x1f]);
+	ASSERT_EQ ("FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210", bytes1.to_string ());
+	ASSERT_EQ (lumex::uint256_t ("0xFEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210"), bytes1.number ());
+	lumex::uint512_union bytes2;
+	bytes2.clear ();
+	bytes2.bytes[63] = 1;
+	ASSERT_EQ (lumex::uint512_t (1), bytes2.number ());
+}
+
+TEST (numbers, uint256_union_decode_lumex_variant)
+{
+	lumex::account key;
+	ASSERT_FALSE (key.decode_account ("xrb_1111111111111111111111111111111111111111111111111111hifc8npp"));
+	ASSERT_FALSE (key.decode_account ("lumex_1111111111111111111111111111111111111111111111111111hifc8npp"));
+}
+
+/**
+ * It used to be the case that when the address was wrong only in the checksum part
+ * then the decode_account would return error and it would also write the address with
+ * fixed checksum into 'key', which is not desirable.
+ */
+TEST (numbers, uint256_union_key_is_not_updated_on_checksum_error)
+{
+	lumex::account key;
+	ASSERT_EQ (key, 0);
+	bool result = key.decode_account ("lumex_3e3j5tkog48pnny9dmfzj1r16pg8t1e76dz5tmac6iq689wyjfpiij4txtd1");
+	ASSERT_EQ (key, 0);
+	ASSERT_TRUE (result);
+}
+
+TEST (numbers, uint256_union_account_transcode)
+{
+	lumex::account value;
+	auto text (lumex::dev::genesis_key.pub.to_account ());
+	ASSERT_FALSE (value.decode_account (text));
+	ASSERT_EQ (lumex::dev::genesis_key.pub, value);
+
+	/*
+	 * Handle different offsets for the underscore separator
+	 * for "xrb_" prefixed and "lumex_" prefixed accounts
+	 */
+	unsigned offset = (text.front () == 'x') ? 3 : 4;
+	ASSERT_EQ ('_', text[offset]);
+	text[offset] = '-';
+	lumex::account value2;
+	ASSERT_FALSE (value2.decode_account (text));
+	ASSERT_EQ (value, value2);
+}
+
+TEST (numbers, uint256_union_account_encode_lex)
+{
+	lumex::account min ("0000000000000000000000000000000000000000000000000000000000000000");
+	lumex::account max ("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+	auto min_text (min.to_account ());
+	auto max_text (max.to_account ());
+
+	/*
+	 * Handle different lengths for "xrb_" prefixed and "lumex_" prefixed accounts
+	 */
+	unsigned length = (min_text.front () == 'x') ? 64 : 65;
+	ASSERT_EQ (length, min_text.size ());
+	ASSERT_EQ (length, max_text.size ());
+
+	auto previous (min_text);
+	for (auto i (1); i != 1000; ++i)
+	{
+		lumex::account number (min.number () + i);
+		auto text (number.to_account ());
+		lumex::account output;
+		output.decode_account (text);
+		ASSERT_EQ (number, output);
+		ASSERT_GT (text, previous);
+		previous = text;
+	}
+	for (auto i (1); i != 1000; ++i)
+	{
+		lumex::keypair key;
+		auto text (key.pub.to_account ());
+		lumex::account output;
+		output.decode_account (text);
+		ASSERT_EQ (key.pub, output);
+	}
+}
+
+TEST (numbers, uint256_union_bounds)
+{
+	lumex::account key;
+	std::string bad1 (64, '\x000');
+	bad1[0] = 'x';
+	bad1[1] = 'r';
+	bad1[2] = 'b';
+	bad1[3] = '-';
+	ASSERT_TRUE (key.decode_account (bad1));
+	std::string bad2 (64, '\x0ff');
+	bad2[0] = 'x';
+	bad2[1] = 'r';
+	bad2[2] = 'b';
+	bad2[3] = '-';
+	ASSERT_TRUE (key.decode_account (bad2));
+}
+
+TEST (numbers, uint64_t_parse)
+{
+	uint64_t value0 (1);
+	ASSERT_FALSE (lumex::from_string_hex ("0", value0));
+	ASSERT_EQ (0, value0);
+	uint64_t value1 (1);
+	ASSERT_FALSE (lumex::from_string_hex ("ffffffffffffffff", value1));
+	ASSERT_EQ (0xffffffffffffffffULL, value1);
+	uint64_t value2 (1);
+	ASSERT_TRUE (lumex::from_string_hex ("g", value2));
+	uint64_t value3 (1);
+	ASSERT_TRUE (lumex::from_string_hex ("ffffffffffffffff0", value3));
+	uint64_t value4 (1);
+	ASSERT_TRUE (lumex::from_string_hex ("", value4));
+}
+
+TEST (numbers, uint256_union_hash)
+{
+	ASSERT_EQ (4, lumex::uint256_union{}.qwords.size ());
+	std::hash<lumex::uint256_union> h{};
+	for (size_t i (0), n (lumex::uint256_union{}.bytes.size ()); i < n; ++i)
+	{
+		lumex::uint256_union x1{ 0 };
+		lumex::uint256_union x2{ 0 };
+		x2.bytes[i] = 1;
+		ASSERT_NE (h (x1), h (x2));
+	}
+}
+
+TEST (numbers, uint512_union_hash)
+{
+	ASSERT_EQ (2, lumex::uint512_union{}.uint256s.size ());
+	std::hash<lumex::uint512_union> h{};
+	for (size_t i (0), n (lumex::uint512_union{}.bytes.size ()); i < n; ++i)
+	{
+		lumex::uint512_union x1{ 0 };
+		lumex::uint512_union x2{ 0 };
+		x2.bytes[i] = 1;
+		ASSERT_NE (h (x1), h (x2));
+	}
+	for (auto part (0); part < lumex::uint512_union{}.uint256s.size (); ++part)
+	{
+		for (size_t i (0), n (lumex::uint512_union{}.uint256s[part].bytes.size ()); i < n; ++i)
+		{
+			lumex::uint512_union x1{ 0 };
+			lumex::uint512_union x2{ 0 };
+			x2.uint256s[part].bytes[i] = 1;
+			ASSERT_NE (h (x1), h (x2));
+		}
+	}
+}
+
+TEST (numbers, uint512_union_parse_zero)
+{
+	lumex::uint512_union input (lumex::uint512_t (0));
+	std::string text = input.to_string ();
+	lumex::uint512_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_FALSE (error);
+	ASSERT_EQ (input, output);
+	ASSERT_TRUE (output.number ().is_zero ());
+}
+
+TEST (numbers, uint512_union_parse_zero_short)
+{
+	std::string text ("0");
+	lumex::uint512_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_FALSE (error);
+	ASSERT_TRUE (output.number ().is_zero ());
+}
+
+TEST (numbers, uint512_union_parse_one)
+{
+	lumex::uint512_union input (lumex::uint512_t (1));
+	std::string text = input.to_string ();
+	lumex::uint512_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_FALSE (error);
+	ASSERT_EQ (input, output);
+	ASSERT_EQ (1, output.number ());
+}
+
+TEST (numbers, uint512_union_parse_error_symbol)
+{
+	lumex::uint512_union input (lumex::uint512_t (1000));
+	std::string text = input.to_string ();
+	text[5] = '!';
+	lumex::uint512_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_TRUE (error);
+}
+
+TEST (numbers, uint512_union_max)
+{
+	lumex::uint512_union input (std::numeric_limits<lumex::uint512_t>::max ());
+	std::string text = input.to_string ();
+	lumex::uint512_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_FALSE (error);
+	ASSERT_EQ (input, output);
+	ASSERT_EQ (lumex::uint512_t ("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), output.number ());
+}
+
+TEST (numbers, uint512_union_parse_error_overflow)
+{
+	lumex::uint512_union input (std::numeric_limits<lumex::uint512_t>::max ());
+	std::string text = input.to_string ();
+	text.push_back (0);
+	lumex::uint512_union output;
+	auto error (output.decode_hex (text));
+	ASSERT_TRUE (error);
+}
+
+TEST (numbers, sat_math_add_sat)
+{
+	// Test uint128_t
+	{
+		lumex::uint128_t max = std::numeric_limits<lumex::uint128_t>::max ();
+		lumex::uint128_t one = 1;
+		lumex::uint128_t large_val = max - 100;
+
+		// Normal addition
+		ASSERT_EQ (lumex::add_sat (one, one), lumex::uint128_t (2));
+
+		// Saturation at max
+		ASSERT_EQ (lumex::add_sat (max, one), max);
+		ASSERT_EQ (lumex::add_sat (large_val, lumex::uint128_t (200)), max);
+		ASSERT_EQ (lumex::add_sat (max, max), max);
+	}
+	// Test uint256_t
+	{
+		lumex::uint256_t max = std::numeric_limits<lumex::uint256_t>::max ();
+		lumex::uint256_t one = 1;
+		lumex::uint256_t large_val = max - 100;
+
+		// Normal addition
+		ASSERT_EQ (lumex::add_sat (one, one), lumex::uint256_t (2));
+
+		// Saturation at max
+		ASSERT_EQ (lumex::add_sat (max, one), max);
+		ASSERT_EQ (lumex::add_sat (large_val, lumex::uint256_t (200)), max);
+		ASSERT_EQ (lumex::add_sat (max, max), max);
+	}
+	// Test uint512_t
+	{
+		lumex::uint512_t max = std::numeric_limits<lumex::uint512_t>::max ();
+		lumex::uint512_t one = 1;
+		lumex::uint512_t large_val = max - 100;
+
+		// Normal addition
+		ASSERT_EQ (lumex::add_sat (one, one), lumex::uint512_t (2));
+
+		// Saturation at max
+		ASSERT_EQ (lumex::add_sat (max, one), max);
+		ASSERT_EQ (lumex::add_sat (large_val, lumex::uint512_t (200)), max);
+		ASSERT_EQ (lumex::add_sat (max, max), max);
+	}
+}
+
+TEST (numbers, sat_math_sub_sat)
+{
+	// Test uint128_t
+	{
+		lumex::uint128_t max = std::numeric_limits<lumex::uint128_t>::max ();
+		lumex::uint128_t min = std::numeric_limits<lumex::uint128_t>::min ();
+		lumex::uint128_t one = 1;
+		lumex::uint128_t hundred (100);
+
+		// Normal subtraction
+		ASSERT_EQ (lumex::sub_sat (hundred, one), lumex::uint128_t (99));
+
+		// Saturation at min
+		ASSERT_EQ (lumex::sub_sat (min, one), min);
+		ASSERT_EQ (lumex::sub_sat (hundred, lumex::uint128_t (200)), min);
+		ASSERT_EQ (lumex::sub_sat (min, max), min);
+	}
+	// Test uint256_t
+	{
+		lumex::uint256_t max = std::numeric_limits<lumex::uint256_t>::max ();
+		lumex::uint256_t min = std::numeric_limits<lumex::uint256_t>::min ();
+		lumex::uint256_t one = 1;
+		lumex::uint256_t hundred (100);
+
+		// Normal subtraction
+		ASSERT_EQ (lumex::sub_sat (hundred, one), lumex::uint256_t (99));
+
+		// Saturation at min
+		ASSERT_EQ (lumex::sub_sat (min, one), min);
+		ASSERT_EQ (lumex::sub_sat (hundred, lumex::uint256_t (200)), min);
+		ASSERT_EQ (lumex::sub_sat (min, max), min);
+	}
+	// Test uint512_t
+	{
+		lumex::uint512_t max = std::numeric_limits<lumex::uint512_t>::max ();
+		lumex::uint512_t min = std::numeric_limits<lumex::uint512_t>::min ();
+		lumex::uint512_t one = 1;
+		lumex::uint512_t hundred (100);
+
+		// Normal subtraction
+		ASSERT_EQ (lumex::sub_sat (hundred, one), lumex::uint512_t (99));
+
+		// Saturation at min
+		ASSERT_EQ (lumex::sub_sat (min, one), min);
+		ASSERT_EQ (lumex::sub_sat (hundred, lumex::uint512_t (200)), min);
+		ASSERT_EQ (lumex::sub_sat (min, max), min);
+	}
+}
+
+TEST (numbers, account_encode_zero)
+{
+	lumex::account number0{};
+	std::stringstream stream;
+	number0.encode_account (stream);
+	auto str0 = stream.str ();
+
+	/*
+	 * Handle different lengths for "xrb_" prefixed and "lumex_" prefixed accounts
+	 */
+	ASSERT_EQ ((str0.front () == 'x') ? 64 : 65, str0.size ());
+	ASSERT_EQ (65, str0.size ());
+	lumex::account number1;
+	ASSERT_FALSE (number1.decode_account (str0));
+	ASSERT_EQ (number0, number1);
+}
+
+TEST (numbers, account_encode_all)
+{
+	lumex::account number0;
+	number0.decode_hex ("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+	std::stringstream stream;
+	number0.encode_account (stream);
+	auto str0 = stream.str ();
+
+	/*
+	 * Handle different lengths for "xrb_" prefixed and "lumex_" prefixed accounts
+	 */
+	ASSERT_EQ ((str0.front () == 'x') ? 64 : 65, str0.size ());
+	lumex::account number1;
+	ASSERT_FALSE (number1.decode_account (str0));
+	ASSERT_EQ (number0, number1);
+}
+
+TEST (numbers, account_encode_fail)
+{
+	lumex::account number0{};
+	std::stringstream stream;
+	number0.encode_account (stream);
+	auto str0 = stream.str ();
+	str0[16] ^= 1;
+	lumex::account number1;
+	ASSERT_TRUE (number1.decode_account (str0));
+}
+
+TEST (numbers, account_known_addresses)
+{
+	lumex::account account1{ "0000000000000000000000000000000000000000000000000000000000000000" };
+	ASSERT_EQ (account1.to_account (), "lumex_1111111111111111111111111111111111111111111111111111hifc8npp");
+
+	lumex::account account2{ "B0311EA55708D6A53C75CDBF88300259C6D018522FE3D4D0A242E431F9E8B6D0" };
+	ASSERT_EQ (account2.to_account (), "lumex_3e3j5tkog48pnny9dmfzj1r16pg8t1e76dz5tmac6iq689wyjfpiij4txtdo");
+
+	lumex::account account3{ "45C6FF9D1706D61F0821327752671BDA9F9ED2DA40326B01935AB566FB9E08ED" };
+	ASSERT_EQ (account3.to_account (), "lumex_1jg8zygjg3pp5w644emqcbmjqpnzmubfni3kfe1s8pooeuxsw49fdq1mco9j");
+
+	lumex::account account4{ "E89208DD038FBB269987689621D52292AE9C35941A7484756ECCED92A65093BA" };
+	ASSERT_EQ (account4.to_account (), "lumex_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3");
+
+	lumex::account account5{ "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" };
+	ASSERT_EQ (account5.to_account (), "lumex_3zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzc3yoon41");
+}
+
+TEST (numbers, balance_formatting_encode_balance)
+{
+	auto encode = [] (lumex::uint128_t value, lumex::uint128_t scale, int precision) {
+		std::ostringstream stream;
+		std::string grouping = "\3";
+		lumex::encode_balance (stream, value, scale, precision, true, ',', '.', grouping);
+		return stream.str ();
+	};
+	ASSERT_EQ ("0", encode (0, lumex::lumex_ratio, 0));
+	ASSERT_EQ ("1", encode (lumex::lumex_ratio, lumex::lumex_ratio, 0));
+	ASSERT_EQ ("1.5", encode (lumex::lumex_ratio + lumex::lumex_ratio / 2, lumex::lumex_ratio, 1));
+	ASSERT_EQ ("1,000", encode (lumex::lumex_ratio * 1000, lumex::lumex_ratio, 0));
+	ASSERT_EQ ("< 0.01", encode (lumex::lumex_ratio / 1000, lumex::lumex_ratio, 2));
+	ASSERT_EQ ("< 0.000001", encode (1, lumex::lumex_ratio, 6));
+}

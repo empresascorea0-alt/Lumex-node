@@ -8,5 +8,5 @@ echo "Building Docker test image with COMPILER=${COMPILER}"
 docker build \
     --build-arg COMPILER=${COMPILER} \
     -f docker/tests/Dockerfile-tests \
-    -t nano-test:latest \
+    -t lumex-test:latest \
     .

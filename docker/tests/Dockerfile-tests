@@ -19,5 +19,5 @@ RUN ci/build-tests.sh
 
 CMD ["docker/tests/docker-test-entrypoint.sh"]
 
-ARG REPOSITORY=nanocurrency/nano-node
+ARG REPOSITORY=lumexcurrency/lumex-node
 LABEL org.opencontainers.image.source=https://github.com/$REPOSITORY

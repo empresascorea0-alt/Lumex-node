@@ -19,19 +19,19 @@ CMAKE_SANITIZER=""
 if [[ ${SANITIZER:-} ]]; then
     case "${SANITIZER}" in
         ASAN)
-            CMAKE_SANITIZER="-DNANO_ASAN=ON"
+            CMAKE_SANITIZER="-DLUMEX_ASAN=ON"
             ;;
         ASAN_INT)
-            CMAKE_SANITIZER="-DNANO_ASAN_INT=ON"
+            CMAKE_SANITIZER="-DLUMEX_ASAN_INT=ON"
             ;;
         TSAN)
-            CMAKE_SANITIZER="-DNANO_TSAN=ON"
+            CMAKE_SANITIZER="-DLUMEX_TSAN=ON"
             ;;
         UBSAN)
-            CMAKE_SANITIZER="-DNANO_UBSAN=ON"
+            CMAKE_SANITIZER="-DLUMEX_UBSAN=ON"
             ;;
         LEAK)
-            CMAKE_SANITIZER="-DNANO_ASAN=ON"
+            CMAKE_SANITIZER="-DLUMEX_ASAN=ON"
             ;;
         *)
             echo "Unknown sanitizer: '${SANITIZER}'"
@@ -48,10 +48,10 @@ pushd $BUILD_DIR
 cmake \
 -DCMAKE_BUILD_TYPE=${BUILD_TYPE:-"Debug"} \
 -DPORTABLE=ON \
--DACTIVE_NETWORK=nano_${NANO_NETWORK:-"live"}_network \
--DNANO_TEST=${NANO_TEST:-OFF} \
--DNANO_GUI=${NANO_GUI:-OFF} \
--DNANO_TRACING=${NANO_TRACING:-OFF} \
+-DACTIVE_NETWORK=lumex_${LUMEX_NETWORK:-"live"}_network \
+-DLUMEX_TEST=${LUMEX_TEST:-OFF} \
+-DLUMEX_GUI=${LUMEX_GUI:-OFF} \
+-DLUMEX_TRACING=${LUMEX_TRACING:-OFF} \
 -DCOVERAGE=${COVERAGE:-OFF} \
 -DCI_TAG=${CI_TAG:-OFF} \
 -DCI_VERSION_PRE_RELEASE=${CI_VERSION_PRE_RELEASE:-OFF} \

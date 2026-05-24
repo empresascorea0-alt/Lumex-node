@@ -10,7 +10,7 @@ code_inspect()
         return 1
     fi
 
-    if [[ $(grep -rlP "^\s*assert \(" $SOURCE_ROOT_PATH/nano) ]]; then
+    if [[ $(grep -rlP "^\s*assert \(" $SOURCE_ROOT_PATH/lumex) ]]; then
         echo "Using assert is not permitted. Use debug_assert instead." >&2
         return 1
     fi

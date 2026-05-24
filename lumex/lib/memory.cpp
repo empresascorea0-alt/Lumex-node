@@ -1,0 +1,37 @@
+#include <lumex/lib/memory.hpp>
+
+namespace
+{
+#ifdef MEMORY_POOL_DISABLED
+/** TSAN on mac is generating some warnings. They need further investigating before memory pools can be used, so disable them for now */
+bool use_memory_pools{ false };
+#else
+bool use_memory_pools{ true };
+#endif
+}
+
+bool lumex::get_use_memory_pools ()
+{
+	return use_memory_pools;
+}
+
+/** This has no effect on Mac */
+void lumex::set_use_memory_pools (bool use_memory_pools_a)
+{
+#ifndef MEMORY_POOL_DISABLED
+	use_memory_pools = use_memory_pools_a;
+#endif
+}
+
+lumex::cleanup_guard::cleanup_guard (std::vector<std::function<void ()>> const & cleanup_funcs_a) :
+	cleanup_funcs (cleanup_funcs_a)
+{
+}
+
+lumex::cleanup_guard::~cleanup_guard ()
+{
+	for (auto & func : cleanup_funcs)
+	{
+		func ();
+	}
+}

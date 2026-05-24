@@ -3,19 +3,19 @@ set -uo pipefail
 
 source "$(dirname "$BASH_SOURCE")/common.sh"
 
-# Path to the nano-node repository can be provided as an argument
+# Path to the lumex-node repository can be provided as an argument
 # Otherwise parent directory of working directory is assumed
-NANO_REPO_DIR=${1:-../}
-NANO_SYSTEST_DIR=${NANO_REPO_DIR}/systest
+LUMEX_REPO_DIR=${1:-../}
+LUMEX_SYSTEST_DIR=${LUMEX_REPO_DIR}/systest
 
 # Allow TEST_TIMEOUT to be set from an environment variable
 TEST_TIMEOUT=${TEST_TIMEOUT:-300s}
 
-echo "Running systests from: ${NANO_SYSTEST_DIR}"
+echo "Running systests from: ${LUMEX_SYSTEST_DIR}"
 
 # This assumes that the executables are in the current working directory
-export NANO_NODE_EXE=./nano_node$(get_exec_extension)
-export NANO_RPC_EXE=./nano_rpc$(get_exec_extension)
+export LUMEX_NODE_EXE=./lumex_node$(get_exec_extension)
+export LUMEX_RPC_EXE=./lumex_rpc$(get_exec_extension)
 
 # Enable core dumps for this process
 if [ -n "${COREDUMP_DIR-}" ]; then
@@ -24,7 +24,7 @@ fi
 
 overall_status=0
 
-for script in ${NANO_SYSTEST_DIR}/*.sh; do
+for script in ${LUMEX_SYSTEST_DIR}/*.sh; do
     name=$(basename ${script})
 
     echo "::group::Running: $name"
@@ -37,7 +37,7 @@ for script in ${NANO_SYSTEST_DIR}/*.sh; do
     
     # Show core dumps after each test
     if [ -n "${COREDUMP_DIR-}" ]; then
-        "$(dirname "$BASH_SOURCE")/show-core-dumps.sh" "${NANO_NODE_EXE}"
+        "$(dirname "$BASH_SOURCE")/show-core-dumps.sh" "${LUMEX_NODE_EXE}"
     fi
 
     echo "::endgroup::"

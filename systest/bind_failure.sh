@@ -18,7 +18,7 @@ cleanup() {
 trap cleanup EXIT
 
 # Start first node with ephemeral port
-$NANO_NODE_EXE --daemon --network dev --data_path "$DATADIR1" \
+$LUMEX_NODE_EXE --daemon --network dev --data_path "$DATADIR1" \
     --runtime_info_file "$RUNTIME_INFO" \
     --config node.peering_port=0 &
 NODE1_PID=$!
@@ -39,7 +39,7 @@ PORT=$(jq -r '.peering_port' "$RUNTIME_INFO")
 
 # Start second node on same port - should fail gracefully
 set +e
-OUTPUT=$($NANO_NODE_EXE --daemon --network dev --data_path "$DATADIR2" --config node.peering_port=$PORT 2>&1)
+OUTPUT=$($LUMEX_NODE_EXE --daemon --network dev --data_path "$DATADIR2" --config node.peering_port=$PORT 2>&1)
 EXIT_CODE=$?
 set -e
 

@@ -17,11 +17,11 @@ if [[ "${RELEASE:-false}" == "true" ]]; then
 fi
 
 if [[ ${ASAN_INT:-0} -eq 1 ]]; then
-    SANITIZERS="-DNANO_ASAN_INT=ON"
+    SANITIZERS="-DLUMEX_ASAN_INT=ON"
 elif [[ ${ASAN:-0} -eq 1 ]]; then
-    SANITIZERS="-DNANO_ASAN=ON"
+    SANITIZERS="-DLUMEX_ASAN=ON"
 elif [[ ${TSAN:-0} -eq 1 ]]; then
-    SANITIZERS="-DNANO_TSAN=ON"
+    SANITIZERS="-DLUMEX_TSAN=ON"
 elif [[ ${LCOV:-0} -eq 1 ]]; then
     SANITIZERS="-DCOVERAGE=ON"
 fi
@@ -30,11 +30,11 @@ ulimit -S -n 8192
 
 cmake \
 -G'Unix Makefiles' \
--DACTIVE_NETWORK=nano_dev_network \
--DNANO_TEST=ON \
--DNANO_GUI=ON \
+-DACTIVE_NETWORK=lumex_dev_network \
+-DLUMEX_TEST=ON \
+-DLUMEX_GUI=ON \
 -DPORTABLE=1 \
--DNANO_WARN_TO_ERR=ON \
+-DLUMEX_WARN_TO_ERR=ON \
 -DCMAKE_BUILD_TYPE=${BUILD_TYPE:-Debug} \
 -DQt5_DIR=${qt_dir} \
 ${SANITIZERS:-} \

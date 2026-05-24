@@ -1,0 +1,221 @@
+#pragma once
+
+#include <lumex/lib/config.hpp>
+#include <lumex/lib/fwd.hpp>
+#include <lumex/lib/networks.hpp>
+
+#include <chrono>
+#include <string_view>
+
+using namespace std::chrono_literals;
+
+namespace lumex
+{
+class work_thresholds
+{
+public:
+	uint64_t epoch_1;
+	uint64_t epoch_2;
+	uint64_t epoch_2_receive;
+
+	// Automatically calculated. The base threshold is the maximum of all thresholds and is used for all work multiplier calculations
+	uint64_t base;
+
+	// Automatically calculated. The entry threshold is the minimum of all thresholds and defines the required work to enter the node, but does not guarantee a block is processed
+	uint64_t entry;
+
+public:
+	static work_thresholds const publish_full;
+	static work_thresholds const publish_beta;
+	static work_thresholds const publish_dev;
+	static work_thresholds const publish_test;
+
+public:
+	constexpr work_thresholds (uint64_t epoch_1_a, uint64_t epoch_2_a, uint64_t epoch_2_receive_a) :
+		epoch_1 (epoch_1_a), epoch_2 (epoch_2_a), epoch_2_receive (epoch_2_receive_a),
+		base (std::max ({ epoch_1, epoch_2, epoch_2_receive })),
+		entry (std::min ({ epoch_1, epoch_2, epoch_2_receive }))
+	{
+	}
+	work_thresholds () = delete;
+
+	uint64_t threshold_entry (lumex::work_version, lumex::block_type) const;
+	uint64_t threshold (lumex::block_details const &) const;
+	uint64_t threshold (lumex::work_version, lumex::block_details) const;
+	uint64_t threshold_base (lumex::work_version) const;
+	uint64_t value (lumex::root const & root, uint64_t work) const;
+	double normalized_multiplier (double multiplier, uint64_t threshold) const;
+	double denormalized_multiplier (double multiplier, uint64_t threshold) const;
+	uint64_t difficulty (lumex::work_version, lumex::root const & root, uint64_t work) const;
+	uint64_t difficulty (lumex::block const & block) const;
+	bool validate_entry (lumex::work_version, lumex::root const & root, uint64_t work) const;
+	bool validate_entry (lumex::block const & block) const;
+};
+
+class network_constants
+{
+public:
+	network_constants (lumex::work_thresholds const & work_a, lumex::network_type network_a) :
+		current_network (network_a),
+		work (work_a),
+		principal_weight_factor (1000), // 0.1% A representative is classified as principal based on its weight and this factor
+		default_node_port (44000),
+		default_rpc_port (45000),
+		default_ipc_port (46000),
+		default_websocket_port (47000),
+		aec_loop_interval (300ms), // Update AEC ~3 times per second
+		cleanup_period (60s),
+		merge_period (std::chrono::milliseconds (250)),
+		keepalive_period (std::chrono::seconds (15)),
+		idle_timeout (120s),
+		silent_connection_tolerance_time (std::chrono::seconds (120)),
+		syn_cookie_cutoff (std::chrono::seconds (5)),
+		bootstrap_interval (std::chrono::seconds (15 * 60)),
+		ipv6_subnetwork_prefix_for_limiting (64), // Equivalent to network prefix /64.
+		peer_dump_interval (std::chrono::seconds (5 * 60))
+	{
+		if (is_live_network ())
+		{
+			default_node_port = 7075;
+			default_rpc_port = 7076;
+			default_ipc_port = 7077;
+			default_websocket_port = 7078;
+		}
+		else if (is_beta_network ())
+		{
+			default_node_port = 54000;
+			default_rpc_port = 55000;
+			default_ipc_port = 56000;
+			default_websocket_port = 57000;
+		}
+		else if (is_test_network ())
+		{
+			default_node_port = test_node_port ();
+			default_rpc_port = test_rpc_port ();
+			default_ipc_port = test_ipc_port ();
+			default_websocket_port = test_websocket_port ();
+		}
+		else if (is_dev_network ())
+		{
+			aec_loop_interval = 20ms;
+			cleanup_period = std::chrono::seconds (1);
+			merge_period = std::chrono::milliseconds (10);
+			keepalive_period = std::chrono::seconds (1);
+			idle_timeout = cleanup_period * 15;
+			peer_dump_interval = std::chrono::seconds (1);
+			vote_broadcast_interval = 500ms;
+			block_broadcast_interval = 500ms;
+			telemetry_request_cooldown = 500ms;
+			telemetry_cache_cutoff = 2000ms;
+			telemetry_request_interval = 500ms;
+			telemetry_broadcast_interval = 500ms;
+			rep_crawler_normal_interval = 500ms;
+			rep_crawler_warmup_interval = 500ms;
+			reachout_preconfigured_period = std::chrono::seconds (1);
+			reachout_preconfigured_warmup_period = std::chrono::seconds (1);
+		}
+	}
+
+	/** The network this param object represents. This may differ from the global active network; this is needed for certain --debug... commands */
+	lumex::network_type current_network{ lumex::get_active_network () };
+	lumex::work_thresholds const & work;
+
+	unsigned principal_weight_factor;
+	uint16_t default_node_port;
+	uint16_t default_rpc_port;
+	uint16_t default_ipc_port;
+	uint16_t default_websocket_port;
+	std::chrono::milliseconds aec_loop_interval;
+
+	std::chrono::seconds cleanup_period;
+	std::chrono::milliseconds cleanup_period_half () const
+	{
+		return std::chrono::duration_cast<std::chrono::milliseconds> (cleanup_period) / 2;
+	}
+	std::chrono::seconds cleanup_cutoff () const
+	{
+		return cleanup_period * 5;
+	}
+
+	/** How often to connect to other peers */
+	std::chrono::milliseconds merge_period;
+	/** How often to send keepalive messages */
+	std::chrono::seconds keepalive_period;
+	/** Default maximum idle time for a socket before it's automatically closed */
+	std::chrono::seconds idle_timeout;
+	std::chrono::seconds silent_connection_tolerance_time;
+	std::chrono::seconds syn_cookie_cutoff;
+	std::chrono::seconds bootstrap_interval;
+	size_t ipv6_subnetwork_prefix_for_limiting;
+	std::chrono::seconds peer_dump_interval;
+
+	/** Time to wait before rebroadcasts for active elections */
+	std::chrono::milliseconds vote_broadcast_interval{ 15s };
+	std::chrono::milliseconds block_broadcast_interval{ 150s };
+
+	/** We do not reply to telemetry requests made within cooldown period */
+	std::chrono::milliseconds telemetry_request_cooldown{ 1000 * 15 };
+	/** How often to request telemetry from peers */
+	std::chrono::milliseconds telemetry_request_interval{ 1000 * 60 };
+	/** How often to broadcast telemetry to peers */
+	std::chrono::milliseconds telemetry_broadcast_interval{ 1000 * 60 };
+	/** Telemetry data older than this value is considered stale */
+	std::chrono::milliseconds telemetry_cache_cutoff{ 1000 * 130 }; // 2 * `telemetry_broadcast_interval` + some margin
+
+	std::chrono::milliseconds rep_crawler_normal_interval{ 1000 * 7 };
+	std::chrono::milliseconds rep_crawler_warmup_interval{ 1000 * 3 };
+
+	/** How often to reach out to preconfigured peers */
+	std::chrono::seconds reachout_preconfigured_period{ 10min };
+	std::chrono::seconds reachout_preconfigured_warmup_period{ 1min };
+
+	/** Returns the network this object contains values for */
+	lumex::network_type network () const
+	{
+		return current_network;
+	}
+
+	std::string_view get_current_network_as_string () const
+	{
+		switch (current_network)
+		{
+			case lumex::network_type::lumex_live_network:
+				return "live";
+			case lumex::network_type::lumex_beta_network:
+				return "beta";
+			case lumex::network_type::lumex_dev_network:
+				return "dev";
+			case lumex::network_type::lumex_test_network:
+				return "test";
+			case network_type::invalid:
+				break;
+		}
+		release_assert (false, "invalid network");
+	}
+
+	bool is_live_network () const
+	{
+		return current_network == lumex::network_type::lumex_live_network;
+	}
+	bool is_beta_network () const
+	{
+		return current_network == lumex::network_type::lumex_beta_network;
+	}
+	bool is_dev_network () const
+	{
+		return current_network == lumex::network_type::lumex_dev_network;
+	}
+	bool is_test_network () const
+	{
+		return current_network == lumex::network_type::lumex_test_network;
+	}
+
+	/** Current protocol version */
+	uint8_t const protocol_version = 0x15;
+	/** Minimum accepted protocol version */
+	uint8_t const protocol_version_min = 0x14;
+
+	/** Minimum accepted protocol version used when bootstrapping */
+	uint8_t const bootstrap_protocol_version_min = 0x14;
+};
+}

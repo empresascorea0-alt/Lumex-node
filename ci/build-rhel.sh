@@ -10,7 +10,7 @@ run_source() {
 
 run_build() {
     mkdir -p ~/rpmbuild/SOURCES/
-    mv -f ~/nano-${VERSION}.tar.gz ~/rpmbuild/SOURCES/.
+    mv -f ~/lumex-${VERSION}.tar.gz ~/rpmbuild/SOURCES/.
     case "${NETWORK}" in
 	  "LIVE")
 	  	scl enable gcc-toolset-12 'rpmbuild --nodebuginfo -ba lumexcurrency.spec'

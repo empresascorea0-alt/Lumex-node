@@ -1,0 +1,25 @@
+#pragma once
+
+namespace lumex::transport
+{
+class channel;
+class loopback_channel;
+class message_deserializer;
+
+class tcp_config;
+class tcp_channel;
+class tcp_channels;
+class tcp_listener;
+class tcp_server;
+class tcp_socket;
+}
+
+namespace lumex::transport::fake
+{
+class channel;
+}
+
+namespace lumex::transport::inproc
+{
+class channel;
+}
