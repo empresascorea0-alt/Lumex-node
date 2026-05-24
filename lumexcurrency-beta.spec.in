@@ -1,18 +1,18 @@
-Name:                   nanocurrency-beta
+Name:                   lumexcurrency-beta
 Version:                @VERSION@ 
 Release:                @RELEASE@%{?dist}
-Summary:                Nanocurrency Beta Daemon
+Summary:                Lumexcurrency Beta Daemon
 License:                BSD-2-Clause
-URL:                    https://nano.org/
+URL:                    https://lumex.org/
 Requires(pre):          /usr/sbin/useradd, /usr/bin/getent
 Requires(postun):       /usr/sbin/userdel
 BuildRequires:          make, glibc-devel, glibc-headers
-Source:                 nano-%{version}.tar.gz
+Source:                 lumex-%{version}.tar.gz
 
 %description
-This is nanocurrency daemon.  Nano is a digital currency that is
+This is lumexcurrency daemon.  Lumex is a digital currency that is
 peer-to-peer, decentralized, and trustless. This package includes
-the nano daemon, and a service.
+the lumex daemon, and a service.
 
 %prep
 if [ ! -x "$(which cmake)" ]; then
@@ -25,7 +25,7 @@ if cc --std=c++20 --version 2>&1 >/dev/null | grep '^' >/dev/null; then
 	echo "      scl enable gcc-toolset-12 'rpmbuild ...'" >&2
 	exit 1
 fi
-%autosetup -n nano-%{version}
+%autosetup -n lumex-%{version}
 
 %build
 cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DACTIVE_NETWORK=nano_beta_network -DCMAKE_BUILD_TYPE=RelWithDebInfo .
@@ -36,28 +36,28 @@ make nano_rpc %{?_smp_mflags}
 if [ ! %{buildroot} = "/" ]; then %{__rm} -rf %{buildroot}; fi
 mkdir -p %{buildroot}/usr/bin
 mkdir -p %{buildroot}/etc/systemd/system/
-cp nano_node %{buildroot}/usr/bin/nano_node-beta
-cp nano_rpc %{buildroot}/usr/bin/nano_rpc-beta
-cp etc/systemd/nanocurrency-beta.service %{buildroot}/etc/systemd/system/nanocurrency-beta.service
-sed -i "s/nano_node/nano_node-beta/g" %{buildroot}/etc/systemd/system/nanocurrency-beta.service
+cp lumex_node %{buildroot}/usr/bin/lumex_node-beta
+cp lumex_rpc %{buildroot}/usr/bin/lumex_rpc-beta
+cp etc/systemd/lumexcurrency-beta.service %{buildroot}/etc/systemd/system/lumexcurrency-beta.service
+sed -i "s/lumex_node/lumex_node-beta/g" %{buildroot}/etc/systemd/system/lumexcurrency-beta.service
 
 %clean
 if [ ! %{buildroot} = "/" ]; then %{__rm} -rf %{buildroot}; fi
 
 %files
 %defattr(755,root,root)
-%{_bindir}/nano_node-beta
-%{_bindir}/nano_rpc-beta
-%attr(644,root,root) /etc/systemd/system/nanocurrency-beta.service
+%{_bindir}/lumex_node-beta
+%{_bindir}/lumex_rpc-beta
+%attr(644,root,root) /etc/systemd/system/lumexcurrency-beta.service
 
 %pre
 PATH="/usr/bin:/usr/sbin:/bin:/sbin:${PATH}"; export PATH
-mkdir -p /var/nanocurrency/Nano
-getent group nanocurrency >/dev/null || groupadd --system nanocurrency || exit 1
-getent passwd nanocurrency >/dev/null || useradd --system --create-home --home-dir /var/nanocurrency --shell /bin/bash --comment "Nanocurrency Daemon user" --gid nanocurrency nanocurrency || exit 1
-chown -R nanocurrency:nanocurrency /var/nanocurrency
-chmod 700 /var/nanocurrency
+mkdir -p /var/lumexcurrency/Lumex
+getent group lumexcurrency >/dev/null || groupadd --system lumexcurrency || exit 1
+getent passwd lumexcurrency >/dev/null || useradd --system --create-home --home-dir /var/lumexcurrency --shell /bin/bash --comment "Lumexcurrency Daemon user" --gid lumexcurrency lumexcurrency || exit 1
+chown -R lumexcurrency:lumexcurrency /var/lumexcurrency
+chmod 700 /var/lumexcurrency
 
 %postun
 PATH="/usr/bin:/usr/sbin:/bin:/sbin:${PATH}"; export PATH
-userdel nanocurrency >/dev/null 2>/dev/null || :
+userdel lumexcurrency >/dev/null 2>/dev/null || :

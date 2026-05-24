@@ -1,5 +1,7 @@
 add_executable(nano_rpc entry.cpp)
 
+set_target_properties(nano_rpc PROPERTIES OUTPUT_NAME lumex_rpc)
+
 target_link_libraries(nano_rpc node)
 
 target_compile_definitions(

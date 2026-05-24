@@ -1,0 +1,13 @@
+[Unit]
+Description=Lumex Test Network Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=lumexcurrency
+WorkingDirectory=/var/lumexcurrency/LumexTest
+ExecStart=/usr/bin/lumex_node --daemon --network=test --data_path=/var/lumexcurrency/LumexTest
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

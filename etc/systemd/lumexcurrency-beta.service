@@ -1,0 +1,13 @@
+[Unit]
+Description=Lumex Beta Network Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=lumexcurrency
+WorkingDirectory=/var/lumexcurrency/LumexBeta
+ExecStart=/usr/bin/lumex_node --daemon --network=beta --data_path=/var/lumexcurrency/LumexBeta
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

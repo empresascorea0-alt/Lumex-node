@@ -19,7 +19,8 @@ target_compile_definitions(
                     -DGIT_COMMIT_HASH=${GIT_COMMIT_HASH})
 
 set_target_properties(
-  nano_node PROPERTIES COMPILE_FLAGS
+  nano_node PROPERTIES OUTPUT_NAME lumex_node
+                       COMPILE_FLAGS
                        "-DQT_NO_KEYWORDS -DBOOST_ASIO_HAS_STD_ARRAY=1")
 
 add_custom_command(

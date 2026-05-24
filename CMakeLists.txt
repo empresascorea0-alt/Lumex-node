@@ -18,7 +18,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET
     13.3
     CACHE STRING "")
 
-project(nano-node)
+project(lumex-node)
 
 # Get the latest abbreviated commit hash of the working branch
 execute_process(
@@ -43,7 +43,7 @@ if(MSVC)
     -D_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING) # Suppress iterator warning
 endif()
 
-set(CPACK_PACKAGE_VENDOR "Nano Currency")
+set(CPACK_PACKAGE_VENDOR "Lumex Currency")
 set(CPACK_PACKAGE_VERSION_MAJOR "29")
 set(CPACK_PACKAGE_VERSION_MINOR "0")
 set(CPACK_PACKAGE_VERSION_PATCH "0")
@@ -164,41 +164,41 @@ set_property(
   CACHE ACTIVE_NETWORK PROPERTY STRINGS nano_dev_network nano_beta_network
                                 nano_live_network nano_test_network)
 set(CPACK_PACKAGE_NAME
-    "nano-node"
+    "lumex-node"
     CACHE STRING "" FORCE)
 set(CPACK_NSIS_PACKAGE_NAME
-    "Nano"
+    "Lumex"
     CACHE STRING "" FORCE)
 set(CPACK_PACKAGE_INSTALL_DIRECTORY
-    "nanocurrency"
+    "lumexcurrency"
     CACHE STRING "" FORCE)
-set(NANO_SERVICE "nanocurrency.service")
+set(NANO_SERVICE "lumexcurrency.service")
 set(NANO_PREFIX "")
 if("${ACTIVE_NETWORK}" MATCHES "nano_beta_network")
-  project("nano-node-beta")
+  project("lumex-node-beta")
   set(CPACK_PACKAGE_NAME
-      "nano-node-beta"
+      "lumex-node-beta"
       CACHE STRING "" FORCE)
   set(CPACK_NSIS_PACKAGE_NAME
-      "Nano-Beta"
+      "Lumex-Beta"
       CACHE STRING "" FORCE)
   set(CPACK_PACKAGE_INSTALL_DIRECTORY
-      "nanocurrency-beta"
+      "lumexcurrency-beta"
       CACHE STRING "" FORCE)
-  set(NANO_SERVICE "nanocurrency-beta.service")
+  set(NANO_SERVICE "lumexcurrency-beta.service")
   set(NANO_PREFIX "Beta")
 elseif("${ACTIVE_NETWORK}" MATCHES "nano_test_network")
-  project("nano-node-test")
+  project("lumex-node-test")
   set(CPACK_PACKAGE_NAME
-      "nano-node-test"
+      "lumex-node-test"
       CACHE STRING "" FORCE)
   set(CPACK_NSIS_PACKAGE_NAME
-      "Nano-Test"
+      "Lumex-Test"
       CACHE STRING "" FORCE)
   set(CPACK_PACKAGE_INSTALL_DIRECTORY
-      "nanocurrency-test"
+      "lumexcurrency-test"
       CACHE STRING "" FORCE)
-  set(NANO_SERVICE "nanocurrency-test.service")
+  set(NANO_SERVICE "lumexcurrency-test.service")
   set(NANO_PREFIX "Test")
 endif()
 set(NANO_OSX_PACKAGE_NAME
@@ -823,7 +823,7 @@ if(NANO_GUI OR RAIBLOCKS_GUI)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(PLATFORM_WALLET_SOURCE nano/nano_wallet/plat/default/icon.cpp)
   elseif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    set(PLATFORM_WALLET_SOURCE nano/nano_wallet/plat/windows/icon.cpp Nano.rc)
+    set(PLATFORM_WALLET_SOURCE nano/nano_wallet/plat/windows/icon.cpp Lumex.rc)
   elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     set(PLATFORM_WALLET_SOURCE nano/nano_wallet/plat/default/icon.cpp)
   elseif(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
@@ -845,8 +845,9 @@ if(NANO_GUI OR RAIBLOCKS_GUI)
   endif()
 
   set_target_properties(
-    qt nano_wallet PROPERTIES COMPILE_FLAGS
-                              "-DQT_NO_KEYWORDS -DBOOST_ASIO_HAS_STD_ARRAY=1")
+    nano_wallet PROPERTIES OUTPUT_NAME lumex_wallet
+                           COMPILE_FLAGS
+                           "-DQT_NO_KEYWORDS -DBOOST_ASIO_HAS_STD_ARRAY=1")
 
   if(NANO_TEST OR RAIBLOCKS_TEST)
     add_executable(qt_test nano/qt_test/entry.cpp nano/qt_test/qt.cpp)
@@ -894,7 +895,7 @@ if(NANO_GUI OR RAIBLOCKS_GUI)
             DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/Frameworks)
     install(FILES "${Qt5_DIR}/../../../plugins/platforms/libqcocoa.dylib"
             DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/PlugIns/platforms)
-    install(FILES Nano.icns
+    install(FILES Lumex.icns
             DESTINATION ${NANO_OSX_PACKAGE_NAME}.app/Contents/Resources)
   elseif(WIN32)
     if("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
@@ -910,12 +911,12 @@ if(NANO_GUI OR RAIBLOCKS_GUI)
     set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
         "DeleteRegKey HKLM 'SYSTEM\\\\CurrentControlSet\\\\Services\\\\EventLog\\\\Nano${NANO_PREFIX}'"
     )
-    set(CPACK_NSIS_MUI_ICON ${CMAKE_SOURCE_DIR}/Nano.ico)
-    set(CPACK_NSIS_DISPLAY_NAME "Nano${NANO_PREFIX}")
-    set(CPACK_NSIS_URL_INFO_ABOUT "https://nano.org")
-    set(CPACK_NSIS_CONTACT "info@nano.org")
-    set(CPACK_NSIS_MENU_LINKS "nano_wallet.exe" "Nano Wallet"
-                              "https://nano.org" "Nano website")
+    set(CPACK_NSIS_MUI_ICON ${CMAKE_SOURCE_DIR}/Lumex.ico)
+    set(CPACK_NSIS_DISPLAY_NAME "Lumex${NANO_PREFIX}")
+    set(CPACK_NSIS_URL_INFO_ABOUT "https://lumex.org")
+    set(CPACK_NSIS_CONTACT "info@lumex.org")
+    set(CPACK_NSIS_MENU_LINKS "nano_wallet.exe" "Lumex Wallet"
+                              "https://lumex.org" "Lumex website")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     get_target_property(Qt5WindowsPlugin Qt5::QWindowsIntegrationPlugin
                         LOCATION)

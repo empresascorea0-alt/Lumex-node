@@ -13,10 +13,10 @@ run_build() {
     mv -f ~/nano-${VERSION}.tar.gz ~/rpmbuild/SOURCES/.
     case "${NETWORK}" in
 	  "LIVE")
-	  	scl enable gcc-toolset-12 'rpmbuild --nodebuginfo -ba nanocurrency.spec'
+	  	scl enable gcc-toolset-12 'rpmbuild --nodebuginfo -ba lumexcurrency.spec'
 	  	;;
 	  "BETA")
-	  	scl enable gcc-toolset-12 'rpmbuild -ba nanocurrency-beta.spec'
+	  	scl enable gcc-toolset-12 'rpmbuild -ba lumexcurrency-beta.spec'
 	  	;;
 	  *)
 	  	echo "Error: the node network was not defined."
@@ -26,7 +26,7 @@ run_build() {
 }
 
 run_update() {
-	for file in ./nanocurrency*.in; do
+	for file in ./lumexcurrency*.in; do
 		outfile="${file//.in/}"
 
 		echo "Updating \"${outfile}\"..."
