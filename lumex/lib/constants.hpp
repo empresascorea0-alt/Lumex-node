@@ -76,10 +76,10 @@ public:
 	{
 		if (is_live_network ())
 		{
-			default_node_port = 7075;
-			default_rpc_port = 7076;
-			default_ipc_port = 7077;
-			default_websocket_port = 7078;
+			default_node_port = 8075;
+			default_rpc_port = 8076;
+			default_ipc_port = 8077;
+			default_websocket_port = 8078;
 		}
 		else if (is_beta_network ())
 		{

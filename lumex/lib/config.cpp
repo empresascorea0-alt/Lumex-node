@@ -147,7 +147,7 @@ std::array<uint8_t, 2> lumex::test_magic_number ()
 		return std::nullopt;
 	}();
 
-	auto value = test_env.value_or ("RX");
+	auto value = test_env.value_or ("LX");
 	release_assert (value.size () == 2);
 	std::array<uint8_t, 2> ret{};
 	std::copy (value.begin (), value.end (), ret.data ());

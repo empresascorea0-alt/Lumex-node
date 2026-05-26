@@ -16,8 +16,7 @@ namespace
 char const * dev_private_key_data = "34F0A37AAD20F4A260F0A5B3CB3D7FB50673212263E58A380BC10474BB039CE4";
 char const * dev_public_key_data = "B0311EA55708D6A53C75CDBF88300259C6D018522FE3D4D0A242E431F9E8B6D0"; // xrb_3e3j5tkog48pnny9dmfzj1r16pg8t1e76dz5tmac6iq689wyjfpiij4txtdo
 char const * beta_public_key_data = "259A438A8F9F9226130C84D902C237AF3E57C0981C7D709C288046B110D8C8AC"; // lumex_1betagoxpxwykx4kw86dnhosc8t3s7ix8eeentwkcg1hbpez1outjrcyg4n1
-char const * live_public_key_data = "E89208DD038FBB269987689621D52292AE9C35941A7484756ECCED92A65093BA"; // xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3
-std::string const test_public_key_data = lumex::env::get ("LUMEX_TEST_GENESIS_PUB").value_or ("45C6FF9D1706D61F0821327752671BDA9F9ED2DA40326B01935AB566FB9E08ED"); // lumex_1jg8zygjg3pp5w644emqcbmjqpnzmubfni3kfe1s8pooeuxsw49fdq1mco9j
+char const * live_public_key_data = "2B77EDDB1CF57B1496C25E25BEE2D13A7A74B5A161B5DF440C8F390ABE575611"; // lumex_genesis_account
 
 char const * dev_genesis_data = R"%%%({
 	"type": "open",
@@ -39,11 +38,11 @@ char const * beta_genesis_data = R"%%%({
 
 char const * live_genesis_data = R"%%%({
 	"type": "open",
-	"source": "E89208DD038FBB269987689621D52292AE9C35941A7484756ECCED92A65093BA",
-	"representative": "xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3",
-	"account": "xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3",
-	"work": "62f05417dd3fb691",
-	"signature": "9F0C933C8ADE004D808EA1985FA746A7E95BA2A38F867640F53EC8F180BDFE9E2C1268DEAD7C2664F356E37ABA362BC58E46DBA03E523A7B5A19E4B6EB12BB02"
+	"source": "2B77EDDB1CF57B1496C25E25BEE2D13A7A74B5A161B5DF440C8F390ABE575611",
+	"representative": "2B77EDDB1CF57B1496C25E25BEE2D13A7A74B5A161B5DF440C8F390ABE575611",
+	"account": "2B77EDDB1CF57B1496C25E25BEE2D13A7A74B5A161B5DF440C8F390ABE575611",
+	"work": "0000000000000000",
+	"signature": "BF33DE7C9C4E10BD563EE7C46661616877CCA6CBC82AA9B0CBD669C27EF5E734DB08514024EE3C171A1A9DBAFAF85829F5601B5E48DE795F9F40CB8333E16200"
     })%%%";
 
 std::string const test_genesis_data = lumex::env::get ("LUMEX_TEST_GENESIS_BLOCK").value_or (R"%%%({
