@@ -17,6 +17,7 @@ char const * dev_private_key_data = "34F0A37AAD20F4A260F0A5B3CB3D7FB50673212263E
 char const * dev_public_key_data = "B0311EA55708D6A53C75CDBF88300259C6D018522FE3D4D0A242E431F9E8B6D0"; // xrb_3e3j5tkog48pnny9dmfzj1r16pg8t1e76dz5tmac6iq689wyjfpiij4txtdo
 char const * beta_public_key_data = "259A438A8F9F9226130C84D902C237AF3E57C0981C7D709C288046B110D8C8AC"; // lumex_1betagoxpxwykx4kw86dnhosc8t3s7ix8eeentwkcg1hbpez1outjrcyg4n1
 char const * live_public_key_data = "2B77EDDB1CF57B1496C25E25BEE2D13A7A74B5A161B5DF440C8F390ABE575611"; // lumex_genesis_account
+char const * test_public_key_data = "45C6FF9D1706D61F0821327752671BDA9F9ED2DA40326B01935AB566FB9E08ED"; // lumex_1jg8zygjg3pp5w644emqcbmjqpnzmubfni3kfe1s8pooeuxsw49fdq1mco9j
 
 char const * dev_genesis_data = R"%%%({
 	"type": "open",
@@ -120,12 +121,12 @@ lumex::ledger_constants::ledger_constants (lumex::network_type network_type) :
 	lumex_beta_genesis{ parse_block_from_genesis_data (beta_genesis_data) },
 	lumex_live_genesis{ parse_block_from_genesis_data (live_genesis_data) },
 	lumex_test_genesis{ parse_block_from_genesis_data (test_genesis_data) },
-	genesis_amount{ std::numeric_limits<lumex::uint128_t>::max () },
+	genesis_amount{ lumex::uint128_t ("20000000000000000000000000000000000000") },
 	burn_account{ lumex::account{ 0 } }
 {
 	lumex_beta_genesis->sideband_set (lumex::block_sideband{
 	/* account */ lumex_beta_genesis->account_field ().value (),
-	/* balance (amount) */ lumex::amount{ std::numeric_limits<lumex::uint128_t>::max () },
+	/* balance (amount) */ lumex::amount{ lumex::uint128_t ("20000000000000000000000000000000000000") },
 	/* height */ uint64_t{ 1 },
 	/* local_timestamp */ 0,
 	/* epoch */ lumex::epoch::epoch_0,
@@ -137,7 +138,7 @@ lumex::ledger_constants::ledger_constants (lumex::network_type network_type) :
 
 	lumex_dev_genesis->sideband_set (lumex::block_sideband{
 	/* account */ lumex_dev_genesis->account_field ().value (),
-	/* balance (amount) */ lumex::amount{ std::numeric_limits<lumex::uint128_t>::max () },
+	/* balance (amount) */ lumex::amount{ lumex::uint128_t ("20000000000000000000000000000000000000") },
 	/* height */ uint64_t{ 1 },
 	/* local_timestamp */ 0,
 	/* epoch */ lumex::epoch::epoch_0,
@@ -149,7 +150,7 @@ lumex::ledger_constants::ledger_constants (lumex::network_type network_type) :
 
 	lumex_live_genesis->sideband_set (lumex::block_sideband{
 	/* account */ lumex_live_genesis->account_field ().value (),
-	/* balance (amount) */ lumex::amount{ std::numeric_limits<lumex::uint128_t>::max () },
+	/* balance (amount) */ lumex::amount{ lumex::uint128_t ("20000000000000000000000000000000000000") },
 	/* height */ uint64_t{ 1 },
 	/* local_timestamp */ 0,
 	/* epoch */ lumex::epoch::epoch_0,
@@ -161,7 +162,7 @@ lumex::ledger_constants::ledger_constants (lumex::network_type network_type) :
 
 	lumex_test_genesis->sideband_set (lumex::block_sideband{
 	/* account */ lumex_test_genesis->account_field ().value (),
-	/* balance (amount) */ lumex::amount{ std::numeric_limits<lumex::uint128_t>::max () },
+	/* balance (amount) */ lumex::amount{ lumex::uint128_t ("20000000000000000000000000000000000000") },
 	/* height */ uint64_t{ 1 },
 	/* local_timestamp */ 0,
 	/* epoch */ lumex::epoch::epoch_0,

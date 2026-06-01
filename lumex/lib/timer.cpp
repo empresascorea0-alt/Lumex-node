@@ -6,7 +6,7 @@
 
 namespace
 {
-template <typename U, std::enable_if_t<std::is_same<U, std::chrono::lumexseconds>::value> * = nullptr>
+template <typename U, std::enable_if_t<std::is_same<U, std::chrono::seconds>::value> * = nullptr>
 std::string typed_unit ()
 {
 	return "lumexseconds";
@@ -22,12 +22,6 @@ template <typename U, std::enable_if_t<std::is_same<U, std::chrono::milliseconds
 std::string typed_unit ()
 {
 	return "milliseconds";
-}
-
-template <typename U, std::enable_if_t<std::is_same<U, std::chrono::seconds>::value> * = nullptr>
-std::string typed_unit ()
-{
-	return "seconds";
 }
 
 template <typename U, std::enable_if_t<std::is_same<U, std::chrono::minutes>::value> * = nullptr>
@@ -222,9 +216,7 @@ lumex::timer_state lumex::timer<UNIT, CLOCK>::current_state () const
 // Explicitly instantiate all realistically used timers
 template class lumex::timer<std::chrono::milliseconds, std::chrono::steady_clock>;
 template class lumex::timer<std::chrono::microseconds, std::chrono::steady_clock>;
-template class lumex::timer<std::chrono::lumexseconds, std::chrono::steady_clock>;
 template class lumex::timer<std::chrono::seconds, std::chrono::steady_clock>;
 template class lumex::timer<std::chrono::milliseconds, std::chrono::system_clock>;
 template class lumex::timer<std::chrono::microseconds, std::chrono::system_clock>;
-template class lumex::timer<std::chrono::lumexseconds, std::chrono::system_clock>;
 template class lumex::timer<std::chrono::seconds, std::chrono::system_clock>;
