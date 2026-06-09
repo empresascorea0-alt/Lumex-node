@@ -81,16 +81,16 @@ lumex::node_config::node_config (lumex::network_params const & network_params) :
 			break;
 		}
 		case lumex::network_type::lumex_live_network:
-			preconfigured_peers.emplace_back (default_live_peer_network);
-			preconfigured_representatives.emplace_back ("A30E0A32ED41C8607AA9212843392E853FCBCB4E7CB194E35C94F07F91DE59EF");
-			preconfigured_representatives.emplace_back ("67556D31DDFC2A440BF6147501449B4CB9572278D034EE686A6BEE29851681DF");
-			preconfigured_representatives.emplace_back ("5C2FBB148E006A8E8BA7A75DD86C9FE00C83F5FFDBFD76EAA09531071436B6AF");
-			preconfigured_representatives.emplace_back ("AE7AC63990DAAAF2A69BF11C913B928844BF5012355456F2F164166464024B29");
-			preconfigured_representatives.emplace_back ("BD6267D6ECD8038327D2BCC0850BDF8F56EC0414912207E81BCF90DFAC8A4AAA");
-			preconfigured_representatives.emplace_back ("2399A083C600AA0572F5E36247D978FCFC840405F8D4B6D33161C0066A55F431");
-			preconfigured_representatives.emplace_back ("2298FAB7C61058E77EA554CB93EDEEDA0692CBFCC540AB213B2836B29029E23A");
-			preconfigured_representatives.emplace_back ("3FE80B4BC842E82C1C18ABFEEC47EA989E63953BC82AC411F304D13833D52A56");
-			break;
+		        preconfigured_peers.emplace_back (default_live_peer_network);
+		        preconfigured_representatives.emplace_back ("F6AD4D6622ABFBF59D0918E28EA8D018D2DF689B65BF9B0CC27E3025FC466937");
+		        preconfigured_representatives.emplace_back ("D0185DEF9149C95C69E0B28DDA5F8A45544799F2F4A8AD26B365A698D0270D2A");
+		        preconfigured_representatives.emplace_back ("DEE2995AEA03FFA302C70A8B13565B37DF93EFFF9EB0929DA5C817D88E440FF8");
+		        preconfigured_representatives.emplace_back ("26FC32AE78FAD8B634B65BDFE7DAD93635D5AD82D60812387B2A99997477F581");
+		        preconfigured_representatives.emplace_back ("D5ECE47366390E3CE8688A375E56CA93C1F8B8A7AB6ABF678CF674792BDA1F74");
+		        preconfigured_representatives.emplace_back ("E61959C686CE7E41233B34E30E4D8CC0BFF69F9CBF2F1B8EBFA3E5E5565FD614");
+		        preconfigured_representatives.emplace_back ("CE6FE0BA2B0AAFB7F94EA88A3C8F6BEE901FC34D7DD31B20DAEF16FB21705CDB");
+		        preconfigured_representatives.emplace_back ("D7C65766BEC69AF18AA404F2AC914AE50ED4FDC249015162E4DEC8E3BC1A96AF");
+		        break;
 		case lumex::network_type::lumex_test_network:
 			preconfigured_peers.push_back (default_test_peer_network);
 			preconfigured_representatives.push_back (network_params.ledger.genesis->account ());
@@ -646,7 +646,7 @@ lumex::error lumex::node_config::deserialize_toml (lumex::tomlconfig & toml)
 
 		auto pow_sleep_interval_l (pow_sleep_interval.count ());
 		toml.get (pow_sleep_interval_key, pow_sleep_interval_l);
-		pow_sleep_interval = std::chrono::lumexseconds (pow_sleep_interval_l);
+		pow_sleep_interval = std::chrono::seconds (pow_sleep_interval_l);
 		toml.get<bool> ("use_memory_pools", use_memory_pools);
 
 		toml.get<std::size_t> ("bandwidth_limit", bandwidth_limit);
