@@ -40,7 +40,7 @@ public:
 class work_pool final
 {
 public:
-	work_pool (lumex::network_constants & network_constants, unsigned, std::chrono::lumexseconds = std::chrono::lumexseconds (0), lumex::opencl_work_func_t = nullptr);
+	work_pool (lumex::network_constants & network_constants, unsigned, std::chrono::seconds = std::chrono::seconds (0), lumex::opencl_work_func_t = nullptr);
 	~work_pool ();
 	void loop (uint64_t);
 	void stop ();
@@ -58,7 +58,7 @@ public:
 	std::list<lumex::work_item> pending;
 	mutable lumex::mutex mutex{ mutex_identifier (mutexes::work_pool) };
 	lumex::condition_variable producer_condition;
-	std::chrono::lumexseconds pow_rate_limiter;
+	std::chrono::seconds pow_rate_limiter;
 	lumex::opencl_work_func_t opencl;
 	lumex::observer_set<bool> work_observers;
 

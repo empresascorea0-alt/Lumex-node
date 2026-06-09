@@ -336,7 +336,7 @@ void lumex::test::system::deadline_set (std::chrono::duration<double, std::lumex
 	deadline = std::chrono::steady_clock::now () + delta_a * deadline_scaling_factor;
 }
 
-std::error_code lumex::test::system::poll (std::chrono::lumexseconds const & wait_time)
+std::error_code lumex::test::system::poll (std::chrono::seconds const & wait_time)
 {
 	if constexpr (lumex::asio_handler_tracking_threshold () == 0)
 	{
@@ -367,7 +367,7 @@ std::error_code lumex::test::system::poll (std::chrono::lumexseconds const & wai
 	return ec;
 }
 
-std::error_code lumex::test::system::poll_until_true (std::chrono::lumexseconds deadline_a, std::function<bool ()> predicate_a)
+std::error_code lumex::test::system::poll_until_true (std::chrono::seconds deadline_a, std::function<bool ()> predicate_a)
 {
 	std::error_code ec;
 	deadline_set (deadline_a);

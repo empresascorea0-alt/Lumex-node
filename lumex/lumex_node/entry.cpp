@@ -432,7 +432,7 @@ int main (int argc, char * const * argv)
 			for (auto i (node->store.online_weight.begin (transaction)), n (node->store.online_weight.end (transaction)); i != n; ++i)
 			{
 				using time_point = std::chrono::system_clock::time_point;
-				time_point ts (std::chrono::duration_cast<time_point::duration> (std::chrono::lumexseconds (i->first)));
+				time_point ts (std::chrono::duration_cast<time_point::duration> (std::chrono::seconds (i->first)));
 				std::time_t timestamp = std::chrono::system_clock::to_time_t (ts);
 				std::string weight = i->second.to_string_dec ();
 				std::cout << boost::str (boost::format ("Timestamp %1% Weight %2%\n") % ctime (&timestamp) % weight);
@@ -531,11 +531,11 @@ int main (int argc, char * const * argv)
 				}
 			}
 
-			auto pow_rate_limiter = std::chrono::lumexseconds (0);
+			auto pow_rate_limiter = std::chrono::seconds (0);
 			auto pow_sleep_interval_it = vm.find ("pow_sleep_interval");
 			if (pow_sleep_interval_it != vm.cend ())
 			{
-				pow_rate_limiter = std::chrono::lumexseconds (boost::lexical_cast<uint64_t> (pow_sleep_interval_it->second.as<std::string> ()));
+				pow_rate_limiter = std::chrono::seconds (boost::lexical_cast<uint64_t> (pow_sleep_interval_it->second.as<std::string> ()));
 			}
 
 			lumex::work_pool work{ network_params.network, std::numeric_limits<unsigned>::max (), pow_rate_limiter };
@@ -566,7 +566,7 @@ int main (int argc, char * const * argv)
 				valid = network_params.work.value (hash, i) > difficulty;
 			}
 			std::ostringstream oss (valid ? "true" : "false"); // IO forces compiler to not dismiss the variable
-			auto total_time (std::chrono::duration_cast<std::chrono::lumexseconds> (std::chrono::steady_clock::now () - start).count ());
+			auto total_time (std::chrono::duration_cast<std::chrono::seconds> (std::chrono::steady_clock::now () - start).count ());
 			uint64_t average (total_time / count);
 			std::cout << "Average validation time: " << std::to_string (average) << " ns (" << std::to_string (static_cast<unsigned> (count * 1e9 / total_time)) << " validations/s)" << std::endl;
 		}
@@ -663,7 +663,7 @@ int main (int argc, char * const * argv)
 									return opencl->generate_work (version_a, root_a, difficulty_a);
 								};
 							}
-							lumex::work_pool work_pool{ network_params.network, 0, std::chrono::lumexseconds (0), opencl_work_func };
+							lumex::work_pool work_pool{ network_params.network, 0, std::chrono::seconds (0), opencl_work_func };
 							lumex::change_block block (0, 0, lumex::keypair ().prv, 0, 0);
 							std::cerr << boost::str (boost::format ("Starting OpenCL generation profiling. Platform: %1%. Device: %2%. Threads: %3%. Difficulty: %4$#x (%5%x from base difficulty %6$#x)\n") % platform % device % threads % difficulty % lumex::to_string (lumex::difficulty::to_multiplier (difficulty, lumex::work_thresholds::publish_full.base), 4) % lumex::work_thresholds::publish_full.base);
 							for (uint64_t i (0); true; ++i)

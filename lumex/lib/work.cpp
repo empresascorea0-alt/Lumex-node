@@ -26,7 +26,7 @@ std::string lumex::to_string (lumex::work_version const version_a)
 	return result;
 }
 
-lumex::work_pool::work_pool (lumex::network_constants & network_constants, unsigned max_threads_a, std::chrono::lumexseconds pow_rate_limiter_a, lumex::opencl_work_func_t opencl_a) :
+lumex::work_pool::work_pool (lumex::network_constants & network_constants, unsigned max_threads_a, std::chrono::seconds pow_rate_limiter_a, lumex::opencl_work_func_t opencl_a) :
 	network_constants{ network_constants },
 	ticket (0),
 	done (false),
@@ -115,7 +115,7 @@ void lumex::work_pool::loop (uint64_t thread)
 					}
 
 					// Add a rate limiter (if specified) to the pow calculation to save some CPUs which don't want to operate at full throttle
-					if (pow_sleep != std::chrono::lumexseconds (0))
+					if (pow_sleep != std::chrono::seconds (0))
 					{
 						std::this_thread::sleep_for (pow_sleep);
 					}

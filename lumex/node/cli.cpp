@@ -978,7 +978,7 @@ std::error_code lumex::handle_node_options (boost::program_options::variables_ma
 		lumex::kdf kdf{ inactive_node->node->config.network_params.kdf_work };
 		kdf.phs (junk1, "", junk2);
 		std::cout << "Testing time retrieval latency... " << std::flush;
-		lumex::timer<std::chrono::lumexseconds> timer (lumex::timer_state::started);
+		lumex::timer<std::chrono::seconds> timer (lumex::timer_state::started);
 		auto const iters = 2'000'000;
 		for (auto i (0); i < iters; ++i)
 		{

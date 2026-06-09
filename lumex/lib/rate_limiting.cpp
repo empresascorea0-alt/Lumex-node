@@ -36,7 +36,7 @@ bool lumex::rate::token_bucket::try_consume (unsigned tokens_required_a)
 void lumex::rate::token_bucket::refill ()
 {
 	auto now (std::chrono::steady_clock::now ());
-	std::size_t tokens_to_add = static_cast<std::size_t> (std::chrono::duration_cast<std::chrono::lumexseconds> (now - last_refill).count () / 1e9 * refill_rate);
+	std::size_t tokens_to_add = static_cast<std::size_t> (std::chrono::duration_cast<std::chrono::seconds> (now - last_refill).count () / 1e9 * refill_rate);
 	// Only update if there are any tokens to add
 	if (tokens_to_add > 0)
 	{

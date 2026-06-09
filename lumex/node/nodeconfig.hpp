@@ -72,7 +72,7 @@ public:
 	uint16_t external_port{ 0 };
 	std::chrono::milliseconds block_processor_batch_max_time{ std::chrono::milliseconds (500) };
 	std::chrono::seconds unchecked_cutoff_time{ std::chrono::seconds (4 * 60 * 60) };
-	std::chrono::lumexseconds pow_sleep_interval{ 0 };
+	std::chrono::seconds pow_sleep_interval{ 0 };
 	bool use_memory_pools{ true };
 	static std::chrono::minutes constexpr wallet_backup_interval = std::chrono::minutes (5);
 	/** Default outbound traffic shaping is 10MB/s */

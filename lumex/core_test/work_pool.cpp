@@ -112,7 +112,7 @@ TEST (work, opencl)
 
 	// 0 threads, should add 1 for managing OpenCL
 	bool opencl_function_called = false;
-	lumex::work_pool pool{ lumex::dev::network_params.network, 0, std::chrono::lumexseconds (0),
+	lumex::work_pool pool{ lumex::dev::network_params.network, 0, std::chrono::seconds (0),
 		[&opencl, &opencl_function_called] (lumex::work_version const version_a, lumex::root const & root_a, uint64_t difficulty_a, std::atomic<int> & ticket_a) {
 			opencl_function_called = true;
 			return opencl->generate_work (version_a, root_a, difficulty_a);
@@ -165,11 +165,11 @@ TEST (work, difficulty)
 // check that the pow_rate_limiter of work_pool works, this test can fail occasionally
 TEST (work, eco_pow)
 {
-	auto work_func = [] (std::promise<std::chrono::lumexseconds> & promise, std::chrono::lumexseconds interval) {
+	auto work_func = [] (std::promise<std::chrono::seconds> & promise, std::chrono::seconds interval) {
 		lumex::work_pool pool{ lumex::dev::network_params.network, 1, interval };
 		constexpr auto num_iterations = 5;
 
-		lumex::timer<std::chrono::lumexseconds> timer;
+		lumex::timer<std::chrono::seconds> timer;
 		timer.start ();
 		for (int i = 0; i < num_iterations; ++i)
 		{
@@ -188,12 +188,12 @@ TEST (work, eco_pow)
 		promise.set_value_at_thread_exit (timer.stop ());
 	};
 
-	std::promise<std::chrono::lumexseconds> promise1;
-	std::future<std::chrono::lumexseconds> future1 = promise1.get_future ();
-	std::promise<std::chrono::lumexseconds> promise2;
-	std::future<std::chrono::lumexseconds> future2 = promise2.get_future ();
+	std::promise<std::chrono::seconds> promise1;
+	std::future<std::chrono::seconds> future1 = promise1.get_future ();
+	std::promise<std::chrono::seconds> promise2;
+	std::future<std::chrono::seconds> future2 = promise2.get_future ();
 
-	std::thread thread1 (work_func, std::ref (promise1), std::chrono::lumexseconds (0));
+	std::thread thread1 (work_func, std::ref (promise1), std::chrono::seconds (0));
 	std::thread thread2 (work_func, std::ref (promise2), std::chrono::milliseconds (10));
 
 	thread1.join ();

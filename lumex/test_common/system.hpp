@@ -59,8 +59,8 @@ namespace test
 		 * Polls, sleep if there's no work to be done (default 10ms), then check the deadline
 		 * @returns 0 or lumex::deadline_expired
 		 */
-		std::error_code poll (std::chrono::lumexseconds const & sleep_time = std::chrono::milliseconds (10));
-		std::error_code poll_until_true (std::chrono::lumexseconds deadline, std::function<bool ()>);
+		std::error_code poll (std::chrono::seconds const & sleep_time = std::chrono::milliseconds (10));
+		std::error_code poll_until_true (std::chrono::seconds deadline, std::function<bool ()>);
 		void delay_ms (std::chrono::milliseconds const & delay);
 		void deadline_set (std::chrono::duration<double, std::lumex> const & delta);
 		/*
