@@ -1,34 +1,54 @@
 name: Compilacion Automatizada Lumex
 
-# Se activa en cada guardado de cambios (push) en la rama principal
 on:
   push:
     branches: [ "main" ]
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest # La máquina potente de 16 GB de RAM que nos prestan
-    
+    runs-on: ubuntu-latest
+
     steps:
-    - name: 1. Descargar codigo fuente de Lumex
-      uses: actions/checkout@v3
+    - name: 1. Descargar codigo fuente
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive  # Trae submódulos si el proyecto los necesita
 
-    - name: 2. Configurar entorno Docker Buildx
-      uses: docker/setup-buildx-action@v2
+    - name: 2. Configurar herramientas de compilacion
+      uses: ammaraskar/gcc-action@master
+      with:
+        gcc-version: '12'
 
-    - name: 3. Iniciar sesion en Docker Hub
-      uses: docker/login-action@v2
+    - name: 3. Instalar dependencias esenciales
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake boost-all-dev libssl-dev libgmp-dev
+
+    - name: 4. Compilar Nodo de Lumex
+      run: |
+        mkdir build
+        cd build
+        cmake -DPLATFORM=linux -DCMAKE_BUILD_TYPE=Release ..
+        make lumex_node -j$(nproc)
+
+    - name: 5. Autenticar en Docker Hub
+      uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: 4. Compilar en C++ y Subir a Docker Hub
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        file: ./Dockerfile
-        push: true
-        # Forzamos la compilación para arquitectura AMD/Intel (Tus servidores gratis de Oracle)
-        platforms: linux/amd64
-        tags: |
-          ${{ secrets.DOCKERHUB_USERNAME }}/lumex-node:latest
+    - name: 6. Construir y Subir Imagen Ligera
+      run: |
+        # Creamos una imagen Docker express usando el binario que acabamos de compilar exitosamente afuera
+        cat <<EOF > Dockerfile.express
+        FROM ubuntu:22.04
+        RUN apt-get update && apt-get install -y libboost-program-options-dev libboost-filesystem-dev libboost-thread-dev libssl-dev && rm -rf /var/lib/apt/lists/*
+        COPY build/lumex_node /usr/local/bin/lumex_node
+        WORKDIR /root/LumexData
+        VOLUME /root/LumexData
+        EXPOSE 7075/udp 7075/tcp 7076/tcp
+        CMD ["lumex_node", "--daemon"]
+        EOF
+        
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/lumex-node:latest -f Dockerfile.express .
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/lumex-node:latest
