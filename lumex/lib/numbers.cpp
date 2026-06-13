@@ -272,14 +272,24 @@ bool lumex::public_key::decode_account (std::string const & source_a)
 	if (!error)
 	{
 		auto xrb_prefix (source_a[0] == 'x' && source_a[1] == 'r' && source_a[2] == 'b' && (source_a[3] == '_' || source_a[3] == '-'));
-		auto lumex_prefix (source_a[0] == 'n' && source_a[1] == 'a' && source_a[2] == 'n' && source_a[3] == 'o' && (source_a[4] == '_' || source_a[4] == '-'));
+		auto nano_prefix (source_a[0] == 'n' && source_a[1] == 'a' && source_a[2] == 'n' && source_a[3] == 'o' && (source_a[4] == '_' || source_a[4] == '-'));
+		auto lumex_prefix (source_a.size () >= 6 && source_a[0] == 'l' && source_a[1] == 'u' && source_a[2] == 'm' && source_a[3] == 'e' && source_a[4] == 'x' && (source_a[5] == '_' || source_a[5] == '-'));
 		auto node_id_prefix = (source_a[0] == 'n' && source_a[1] == 'o' && source_a[2] == 'd' && source_a[3] == 'e' && source_a[4] == '_');
-		error = (xrb_prefix && source_a.size () != 64) || (lumex_prefix && source_a.size () != 65);
+		error = (xrb_prefix && source_a.size () != 64) || (nano_prefix && source_a.size () != 65) || (lumex_prefix && source_a.size () != 66) || (node_id_prefix && source_a.size () != 65);
 		if (!error)
 		{
-			if (xrb_prefix || lumex_prefix || node_id_prefix)
+			if (xrb_prefix || nano_prefix || lumex_prefix || node_id_prefix)
 			{
-				auto i (source_a.begin () + (xrb_prefix ? 4 : 5));
+				size_t offset = 5;
+				if (xrb_prefix)
+				{
+					offset = 4;
+				}
+				else if (lumex_prefix)
+				{
+					offset = 6;
+				}
+				auto i (source_a.begin () + offset);
 				if (*i == '1' || *i == '3')
 				{
 					lumex::uint512_t number_l;
@@ -321,7 +331,7 @@ bool lumex::public_key::decode_account (std::string const & source_a)
 			}
 			else
 			{
-				error = true;
+				error = decode_hex (source_a);
 			}
 		}
 	}

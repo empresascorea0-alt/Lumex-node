@@ -124,6 +124,11 @@ lumex::ledger_constants::ledger_constants (lumex::network_type network_type) :
 	genesis_amount{ lumex::uint128_t ("20000000000000000000000000000000000000") },
 	burn_account{ lumex::account{ 0 } }
 {
+	release_assert (lumex_dev_genesis != nullptr);
+	release_assert (lumex_beta_genesis != nullptr);
+	release_assert (lumex_live_genesis != nullptr);
+	release_assert (lumex_test_genesis != nullptr);
+
 	lumex_beta_genesis->sideband_set (lumex::block_sideband{
 	/* account */ lumex_beta_genesis->account_field ().value (),
 	/* balance (amount) */ lumex::amount{ lumex::uint128_t ("20000000000000000000000000000000000000") },
